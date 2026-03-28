@@ -288,7 +288,7 @@ export default function Generator() {
                   />
                 </div>
                 <p className="text-sm text-gray-500">
-                  Enter only the main number. We automatically add the country code.
+                  Enter only the number.
                 </p>
               </div>
             </div>
