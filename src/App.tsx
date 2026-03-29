@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import Hero from './components/Hero';
 import Generator from './components/Generator';
 import HowItWorks from './components/HowItWorks';
@@ -21,6 +22,7 @@ function App() {
       <Features />
       <FAQ />
       <Footer />
+      <Analytics />
     </div>
   );
 }
