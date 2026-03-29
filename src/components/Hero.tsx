@@ -6,28 +6,28 @@ interface HeroProps {
 
 export default function Hero({ onGetStarted }: HeroProps) {
   return (
-    <section className="relative bg-gradient-to-b from-white via-green-50 to-white overflow-hidden py-24 sm:py-32">
+    <section className="relative overflow-hidden bg-gradient-to-b from-white via-green-50 to-white py-14 sm:py-16">
       <div className="absolute inset-0 opacity-40">
         <div className="absolute top-20 right-10 w-72 h-72 bg-green-100 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-20 w-80 h-80 bg-emerald-50 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="text-center">
-          <div className="flex justify-center mb-8">
+          <div className="mb-6 flex justify-center">
             <div className="relative">
               <div className="absolute inset-0 bg-green-600 rounded-3xl blur-2xl opacity-20"></div>
-              <div className="relative bg-gradient-to-br from-green-600 to-emerald-600 p-5 rounded-3xl shadow-2xl">
-                <MessageCircle className="w-14 h-14 text-white" strokeWidth={1.5} />
+              <div className="relative rounded-3xl bg-gradient-to-br from-green-600 to-emerald-600 p-4 shadow-2xl">
+                <MessageCircle className="h-11 w-11 text-white" strokeWidth={1.5} />
               </div>
             </div>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-950 mb-6 leading-tight tracking-tight">
+          <h1 className="mb-5 text-4xl font-bold leading-tight tracking-tight text-gray-950 sm:text-5xl lg:text-6xl">
             WhatsApp Links, Instantly
           </h1>
 
-          <p className="text-lg sm:text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
+          <p className="mx-auto mb-8 max-w-3xl text-base font-light leading-relaxed text-gray-600 sm:text-lg">
             Generate custom WhatsApp links with pre-filled messages in seconds. Share, scan, and connect. Perfect for businesses, support teams, and campaigns.
           </p>
 

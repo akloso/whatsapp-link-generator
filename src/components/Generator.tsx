@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
   Copy,
-  QrCode,
+  Download,
   Search,
   Sparkles,
 } from 'lucide-react';
@@ -78,15 +78,27 @@ const countryOptions: CountryOption[] = [
 ];
 
 export default function Generator() {
-  const [countryCode, setCountryCode] = useState('+91');
-  const [countrySearch, setCountrySearch] = useState('India');
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption>(() => {
+    return countryOptions.find((option) => option.code === '+91' && option.country === 'India') ?? countryOptions[0];
+  });
+  const [countrySearch, setCountrySearch] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
-  const [showQR, setShowQR] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
   const [isCountryOpen, setIsCountryOpen] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [showCelebration, setShowCelebration] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+
+  const qrImageUrl = useMemo(() => {
+    if (!generatedLink) return '';
+    return `https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(generatedLink)}`;
+  }, [generatedLink]);
 
   const filteredCountries = useMemo(() => {
     const query = countrySearch.trim().toLowerCase();
@@ -100,14 +112,6 @@ export default function Generator() {
       );
     });
   }, [countrySearch]);
-
-  const selectedCountry = useMemo(() => {
-    return (
-      countryOptions.find(
-        (option) => option.code === countryCode && option.country === countrySearch
-      ) ?? countryOptions.find((option) => option.code === countryCode) ?? countryOptions[0]
-    );
-  }, [countryCode, countrySearch]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -127,14 +131,25 @@ export default function Generator() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isCountryOpen) return;
+
+    setCountrySearch('');
+
+    window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+  }, [isCountryOpen]);
+
   const generateLink = () => {
     if (!phoneNumber.trim()) {
-      alert('Please enter a phone number');
+      setPhoneError('Please enter your phone number before generating the link.');
+      phoneInputRef.current?.focus();
       return;
     }
 
     const cleanNumber = phoneNumber.replace(/\D/g, '');
-    const fullNumber = `${countryCode.replace('+', '')}${cleanNumber}`;
+    const fullNumber = `${selectedCountry.code.replace('+', '')}${cleanNumber}`;
     const encodedMessage = encodeURIComponent(message.trim());
 
     const link = message.trim()
@@ -142,7 +157,10 @@ export default function Generator() {
       : `https://wa.me/${fullNumber}`;
 
     setGeneratedLink(link);
-    setShowQR(false);
+    setCopied(false);
+    setDownloaded(false);
+    setShowCelebration(true);
+    window.setTimeout(() => setShowCelebration(false), 1100);
   };
 
   const copyToClipboard = async () => {
@@ -153,29 +171,51 @@ export default function Generator() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      alert('Failed to copy link');
+      setCopied(false);
     }
   };
 
-  const toggleQR = () => {
-    if (!generatedLink) {
-      alert('Please generate a link first');
-      return;
-    }
+  const downloadQrCode = async () => {
+    if (!generatedLink || !qrImageUrl) return;
 
-    setShowQR((current) => !current);
+    const sanitizedNumber = phoneNumber.replace(/\D/g, '') || 'number';
+    const fileName = `whatsapp-qr-${sanitizedNumber}.png`;
+
+    try {
+      const response = await fetch(qrImageUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+      setDownloaded(true);
+      window.setTimeout(() => setDownloaded(false), 2200);
+    } catch {
+      window.open(qrImageUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const selectCountry = (option: CountryOption) => {
-    setCountryCode(option.code);
-    setCountrySearch(option.country);
+    setSelectedCountry(option);
+    setCountrySearch('');
     setIsCountryOpen(false);
+  };
+
+  const handlePhoneNumberChange = (value: string) => {
+    setPhoneNumber(value);
+    if (phoneError) {
+      setPhoneError('');
+    }
   };
 
   return (
     <section
       id="generator"
-      className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-20 sm:py-24"
+      className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-14 sm:py-16"
     >
       <div className="absolute inset-0 opacity-60">
         <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-green-100 blur-3xl"></div>
@@ -183,13 +223,13 @@ export default function Generator() {
       </div>
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-12 text-center sm:mb-14">
+        <div className="mb-8 text-center sm:mb-10">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-100 bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm">
             <Sparkles className="h-4 w-4" />
             Fast, clean, and ready to share
           </div>
-          <h2 className="mb-4 text-4xl font-bold tracking-tight text-gray-950 sm:text-5xl">
-            Create Your WhatsApp Link
+          <h2 className="mb-3 text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl">
+            Create Your Free Link
           </h2>
           <p className="mx-auto max-w-2xl text-base leading-relaxed text-gray-600 sm:text-lg">
             Pick a country, add your WhatsApp number, write an optional pre-filled
@@ -229,6 +269,7 @@ export default function Generator() {
                       <div className="relative mb-3">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                         <input
+                          ref={searchInputRef}
                           type="text"
                           value={countrySearch}
                           onChange={(e) => setCountrySearch(e.target.value)}
@@ -273,23 +314,32 @@ export default function Generator() {
 
               <div className="space-y-3">
                 <label className="block text-sm font-semibold tracking-wide text-gray-900">
-                  Phone Number
+                  Phone Number <span className="font-medium text-gray-400">(Required)</span>
                 </label>
-                <div className="flex items-center rounded-2xl border border-gray-300 bg-white px-4 shadow-sm transition-all hover:border-gray-400 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20">
+                <div
+                  className={`flex items-center rounded-2xl border bg-white px-4 shadow-sm transition-all focus-within:ring-2 ${
+                    phoneError
+                      ? 'border-rose-300 focus-within:border-rose-400 focus-within:ring-rose-100'
+                      : 'border-gray-300 hover:border-gray-400 focus-within:border-green-500 focus-within:ring-green-500/20'
+                  }`}
+                >
                   <span className="pr-3 text-sm font-semibold text-gray-500">
                     {selectedCountry.code}
                   </span>
                   <input
+                    ref={phoneInputRef}
                     type="tel"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={(e) => handlePhoneNumberChange(e.target.value)}
                     placeholder="9876543210"
                     className="w-full border-none bg-transparent py-3.5 text-gray-900 outline-none"
                   />
                 </div>
-                <p className="text-sm text-gray-500">
-                  Enter only the number.
-                </p>
+                {phoneError ? (
+                  <p className="text-sm text-rose-600">{phoneError}</p>
+                ) : (
+                  <p className="text-sm text-gray-500">Enter only the number.</p>
+                )}
               </div>
             </div>
 
@@ -314,63 +364,65 @@ export default function Generator() {
             </button>
 
             {generatedLink && (
-              <div className="space-y-5 border-t border-gray-200 pt-8">
+              <div className="relative space-y-5 border-t border-gray-200 pt-8">
+                {showCelebration && (
+                  <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center">
+                    <div className="success-confetti" aria-hidden="true">
+                      {[...Array(10)].map((_, index) => (
+                        <span key={index} style={{ '--delay': `${index * 45}ms` } as CSSProperties} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-5 sm:p-6">
                   <label className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
-                  <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="flex flex-col gap-3">
                     <input
                       type="text"
                       value={generatedLink}
                       readOnly
                       className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none"
                     />
-                    <button
-                      onClick={copyToClipboard}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold transition-all ${
-                        copied
-                          ? 'bg-emerald-600 text-white shadow-lg'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      }`}
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="h-5 w-5" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-5 w-5" />
-                          Copy Link
-                        </>
-                      )}
-                    </button>
                   </div>
                 </div>
 
-                <button
-                  onClick={toggleQR}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50"
-                >
-                  <QrCode className="h-5 w-5" />
-                  {showQR ? 'Hide QR Code' : 'Show QR Code'}
-                </button>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    onClick={copyToClipboard}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50"
+                  >
+                    <Copy className="h-5 w-5" />
+                    {copied ? 'Link Copied' : 'Copy Link'}
+                  </button>
 
-                {showQR && (
-                  <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-8 text-center shadow-lg">
-                    <p className="mb-6 text-sm font-medium text-gray-600">
-                      Scan this QR code with your phone camera or WhatsApp.
-                    </p>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(generatedLink)}`}
-                        alt="QR Code for generated WhatsApp link"
-                        className="h-60 w-60"
-                      />
-                    </div>
+                  <button
+                    onClick={downloadQrCode}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50"
+                  >
+                    {downloaded ? <Check className="h-5 w-5 text-green-600" /> : <Download className="h-5 w-5" />}
+                    {downloaded ? 'QR Downloaded' : 'Download QR'}
+                  </button>
+                </div>
+
+                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-8 text-center shadow-lg">
+                  <p className="mb-6 text-sm font-medium text-gray-600">
+                    Scan this QR code with your phone camera or WhatsApp.
+                  </p>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <img
+                      src={qrImageUrl}
+                      alt="QR Code for generated WhatsApp link"
+                      className="h-56 w-56 sm:h-60 sm:w-60"
+                    />
                   </div>
-                )}
+                </div>
+
+                <p className="text-center text-sm text-gray-600 sm:text-[15px]">
+                  Your link is ready to share anywhere, and your QR is one tap away whenever you need quick offline or on-screen access.
+                </p>
               </div>
             )}
           </div>
