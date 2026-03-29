@@ -5,67 +5,59 @@ export default function Features() {
     {
       icon: Zap,
       title: 'Lightning Fast',
-      description: 'Generate WhatsApp links instantly without any delays or complicated processes.',
+      description: 'Create your WhatsApp link instantly with a smooth, simple flow.',
     },
     {
       icon: Shield,
       title: 'Secure & Private',
-      description: 'All processing happens in your browser. No data is stored or shared.',
+      description: 'Generation happens in your browser. Your input is not stored by us.',
     },
     {
       icon: Smartphone,
       title: 'Mobile Friendly',
-      description: 'Works perfectly on all devices - desktop, tablet, and mobile.',
+      description: 'Built for phone-first usage with responsive controls and layout.',
     },
     {
       icon: Link,
       title: 'Clean Links',
-      description: 'Generate clean, professional wa.me links that work everywhere.',
+      description: 'Generate professional wa.me links you can use across channels.',
     },
     {
       icon: QrCode,
       title: 'QR Code Ready',
-      description: 'Instantly generate QR codes for your links to share offline.',
+      description: 'Get a QR instantly so anyone can scan and open your chat quickly.',
     },
     {
       icon: Globe,
       title: 'Global Support',
-      description: 'Supports all country codes and international phone numbers.',
+      description: 'Supports international numbers and country calling codes.',
     },
   ];
 
   return (
-    <section className="py-24 bg-gradient-to-b from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl sm:text-5xl font-bold text-gray-950 mb-4 tracking-tight">
-            Why Choose Us
-          </h2>
-          <p className="text-lg text-gray-600 font-light max-w-2xl mx-auto">
-            The fastest, most reliable WhatsApp link generator available
-          </p>
+    <section className="bg-gradient-to-b from-gray-50 to-white py-16 sm:py-20 lg:py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-12 text-center sm:mb-16">
+          <h2 className="mb-4 text-3xl font-bold tracking-tight text-gray-950 sm:text-5xl">Why Choose This Tool</h2>
+          <p className="mx-auto max-w-2xl text-base text-gray-600 sm:text-lg">Reliable link generation designed for speed, clarity, and sharing.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group relative bg-white rounded-3xl p-10 border border-gray-200 hover:border-green-300 hover:shadow-2xl transition-all duration-300 overflow-hidden"
+              className="group relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-8 transition-all duration-300 hover:border-green-300 hover:shadow-2xl sm:p-9"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
               <div className="relative">
-                <div className="relative mb-6 inline-block">
-                  <div className="absolute inset-0 bg-green-500 rounded-xl blur-lg opacity-20 group-hover:opacity-30 transition-all"></div>
-                  <div className="relative bg-gradient-to-br from-green-100 to-emerald-100 w-16 h-16 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <feature.icon className="w-8 h-8 text-green-600" strokeWidth={1.5} />
+                <div className="relative mb-5 inline-block">
+                  <div className="absolute inset-0 rounded-xl bg-green-500 opacity-20 blur-lg transition-all group-hover:opacity-30"></div>
+                  <div className="relative flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 transition-transform duration-300 group-hover:scale-110">
+                    <feature.icon className="h-8 w-8 text-green-600" strokeWidth={1.5} />
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-gray-950 mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed font-light">
-                  {feature.description}
-                </p>
+                <h3 className="mb-3 text-xl font-bold text-gray-950">{feature.title}</h3>
+                <p className="leading-relaxed text-gray-600">{feature.description}</p>
               </div>
             </div>
           ))}

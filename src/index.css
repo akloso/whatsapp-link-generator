@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html,
+  body,
+  #root {
+    width: 100%;
+    overflow-x: clip;
+  }
+
+  :where(a, button, input, textarea, select):focus-visible {
+    outline: 2px solid rgb(34 197 94 / 0.55);
+    outline-offset: 2px;
+  }
+}
+
 .success-confetti {
   position: relative;
   width: 220px;
@@ -29,16 +43,36 @@
   background: #34d399;
 }
 
-.success-confetti span:nth-child(1) { --x: -82px; }
-.success-confetti span:nth-child(2) { --x: -60px; }
-.success-confetti span:nth-child(3) { --x: -42px; }
-.success-confetti span:nth-child(4) { --x: -24px; }
-.success-confetti span:nth-child(5) { --x: -8px; }
-.success-confetti span:nth-child(6) { --x: 10px; }
-.success-confetti span:nth-child(7) { --x: 28px; }
-.success-confetti span:nth-child(8) { --x: 45px; }
-.success-confetti span:nth-child(9) { --x: 63px; }
-.success-confetti span:nth-child(10) { --x: 82px; }
+.success-confetti span:nth-child(1) {
+  --x: -82px;
+}
+.success-confetti span:nth-child(2) {
+  --x: -60px;
+}
+.success-confetti span:nth-child(3) {
+  --x: -42px;
+}
+.success-confetti span:nth-child(4) {
+  --x: -24px;
+}
+.success-confetti span:nth-child(5) {
+  --x: -8px;
+}
+.success-confetti span:nth-child(6) {
+  --x: 10px;
+}
+.success-confetti span:nth-child(7) {
+  --x: 28px;
+}
+.success-confetti span:nth-child(8) {
+  --x: 45px;
+}
+.success-confetti span:nth-child(9) {
+  --x: 63px;
+}
+.success-confetti span:nth-child(10) {
+  --x: 82px;
+}
 
 @keyframes confetti-pop {
   0% {
