@@ -7,27 +7,27 @@ export default function FAQ() {
   const faqs = [
     {
       question: 'What is a WhatsApp link generator?',
-      answer: 'A WhatsApp link generator creates clickable links that open WhatsApp with a specific phone number and optional pre-filled message. It\'s perfect for businesses and individuals who want to make it easy for people to contact them.',
+      answer: 'A WhatsApp link generator creates a clickable link that opens WhatsApp with a phone number and optional pre-filled message.',
     },
     {
       question: 'How do wa.me links work?',
-      answer: 'wa.me is WhatsApp\'s official URL format. When someone clicks a wa.me link, it opens WhatsApp on their device with the specified number ready to chat. If you include a message parameter, that text will be pre-filled in the chat box.',
+      answer: 'wa.me is WhatsApp’s official URL format. Clicking the link opens WhatsApp with the selected number ready for chat.',
     },
     {
       question: 'Is this tool free to use?',
-      answer: 'Yes, our WhatsApp link generator is completely free to use with no limitations. Generate as many links as you need for personal or business use.',
+      answer: 'Yes. You can generate as many links as you need for personal or business use.',
     },
     {
       question: 'Do I need a WhatsApp Business account?',
-      answer: 'No, these links work with both regular WhatsApp and WhatsApp Business accounts. You can use any valid WhatsApp number.',
+      answer: 'No. The links work with both personal and WhatsApp Business numbers.',
     },
     {
-      question: 'Can I use the QR code for print materials?',
-      answer: 'Absolutely! The generated QR code can be downloaded and used in business cards, flyers, posters, or any print material. Anyone who scans it will be directed to WhatsApp.',
+      question: 'Can I use the QR code for print?',
+      answer: 'Yes. Download and place it on cards, flyers, packaging, or posters for faster scanning.',
     },
     {
-      question: 'Are the generated links permanent?',
-      answer: 'Yes, the links are permanent and will work as long as the phone number remains active on WhatsApp. You can use them indefinitely in your marketing materials.',
+      question: 'Are generated links permanent?',
+      answer: 'Yes. They remain usable as long as the destination number stays active on WhatsApp.',
     },
   ];
 
@@ -36,49 +36,42 @@ export default function FAQ() {
   };
 
   return (
-    <section className="py-24 bg-white relative overflow-hidden">
+    <section className="relative overflow-hidden bg-white py-16 sm:py-20 lg:py-24">
       <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-green-100 rounded-full blur-3xl"></div>
+        <div className="absolute right-1/4 top-0 h-96 w-96 rounded-full bg-green-100 blur-3xl"></div>
       </div>
 
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl sm:text-5xl font-bold text-gray-950 mb-4 tracking-tight">
-            Frequently Asked Questions
-          </h2>
-          <p className="text-lg text-gray-600 font-light">
-            Everything you need to know about creating WhatsApp links
-          </p>
+      <div className="relative mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-12 text-center sm:mb-16">
+          <h2 className="mb-4 text-3xl font-bold tracking-tight text-gray-950 sm:text-5xl">Frequently Asked Questions</h2>
+          <p className="text-base text-gray-600 sm:text-lg">Everything important before you generate and share your link.</p>
         </div>
 
         <div className="space-y-4">
-          {faqs.map((faq, index) => (
-            <div
-              key={index}
-              className="group bg-white rounded-2xl border border-gray-200 overflow-hidden hover:border-green-300 hover:shadow-lg transition-all duration-300"
-            >
-              <button
-                onClick={() => toggleFAQ(index)}
-                className="w-full px-8 py-6 flex items-center justify-between text-left hover:bg-green-50 transition-colors duration-300"
-              >
-                <span className="font-semibold text-gray-950 pr-4 text-lg">
-                  {faq.question}
-                </span>
-                <ChevronDown
-                  className={`w-6 h-6 text-green-600 transition-transform flex-shrink-0 duration-300 ${
-                    openIndex === index ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-              {openIndex === index && (
-                <div className="px-8 pb-6 bg-gradient-to-br from-green-50 to-transparent border-t border-gray-200">
-                  <p className="text-gray-600 leading-relaxed font-light text-base">
-                    {faq.answer}
-                  </p>
-                </div>
-              )}
-            </div>
-          ))}
+          {faqs.map((faq, index) => {
+            const panelId = `faq-panel-${index}`;
+            const buttonId = `faq-button-${index}`;
+
+            return (
+              <div key={faq.question} className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:border-green-300 hover:shadow-lg">
+                <button
+                  id={buttonId}
+                  onClick={() => toggleFAQ(index)}
+                  className="flex w-full items-center justify-between px-5 py-5 text-left transition-colors duration-300 hover:bg-green-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20 sm:px-8 sm:py-6"
+                  aria-expanded={openIndex === index}
+                  aria-controls={panelId}
+                >
+                  <span className="pr-4 text-base font-semibold text-gray-950 sm:text-lg">{faq.question}</span>
+                  <ChevronDown className={`h-6 w-6 flex-shrink-0 text-green-600 transition-transform duration-300 ${openIndex === index ? 'rotate-180' : ''}`} />
+                </button>
+                {openIndex === index && (
+                  <div id={panelId} role="region" aria-labelledby={buttonId} className="border-t border-gray-200 bg-gradient-to-br from-green-50 to-transparent px-5 pb-5 sm:px-8 sm:pb-6">
+                    <p className="text-base leading-relaxed text-gray-600">{faq.answer}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
