@@ -1,5 +1,3 @@
-import { MessageCircle } from 'lucide-react';
-
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact';
 
 interface FooterProps {
@@ -23,16 +21,13 @@ export default function Footer({ currentPage, onNavigate, onGetStarted }: Footer
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center text-center">
           <div className="mb-6 flex items-center gap-3">
-            <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 p-2">
-              <MessageCircle className="h-6 w-6 text-white" strokeWidth={1.5} />
-            </div>
             <button
               type="button"
               onClick={onGetStarted}
               className="rounded-lg text-2xl font-bold tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/80"
-              aria-label="Go to WhatsApp Link Generator"
+              aria-label="Go to Zapora"
             >
-              WhatsApp Link
+              Zapora
             </button>
           </div>
           <p className="mb-8 max-w-md text-gray-400">
@@ -55,7 +50,7 @@ export default function Footer({ currentPage, onNavigate, onGetStarted }: Footer
                 </button>
               </div>
             </nav>
-            <p className="text-sm text-gray-500">© {currentYear} WhatsApp Link Generator. Built with care.</p>
+            <p className="text-sm text-gray-500">© {currentYear} Zapora. Built with care.</p>
             <p className="mt-3 text-xs font-light text-gray-600">Not affiliated with WhatsApp or Meta Platforms, Inc.</p>
           </div>
         </div>

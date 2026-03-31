@@ -1,0 +1,303 @@
+diff --git a/index.html b/index.html
+index 564ec519bcfb40d8fd1a33e99aed3e8e7f0f3afc..4f30cdfd4a60d0e04d5d1127c52a7868894e1037 100644
+--- a/index.html
++++ b/index.html
+@@ -2,28 +2,38 @@
+ <html lang="en">
+   <head>
+     <meta charset="UTF-8" />
+-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+-    <title>WhatsApp Link Generator | Fast wa.me Links + QR</title>
++
++    <link rel="icon" href="/favicon.ico" />
++    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
++    <link rel="manifest" href="/site.webmanifest" />
++
++    <title>Zapora - Free WhatsApp Link Generator</title>
+     <meta
+       name="description"
+-      content="Create a WhatsApp wa.me link with an optional pre-filled message. Generate, copy, and download a QR code in seconds."
++      content="Create WhatsApp chat links instantly with phone number, country code, and optional message."
+     />
++    <link rel="canonical" href="https://www.zapora.in/" />
++    <meta name="theme-color" content="#25D366" />
++
+     <meta property="og:type" content="website" />
+-    <meta property="og:title" content="WhatsApp Link Generator | Fast wa.me Links + QR" />
++    <meta property="og:title" content="Zapora - Free WhatsApp Link Generator" />
+     <meta
+       property="og:description"
+-      content="Create a WhatsApp wa.me link with an optional pre-filled message. Generate, copy, and download a QR code in seconds."
++      content="Create WhatsApp chat links instantly with phone number, country code, and optional message."
+     />
+-    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
+-    <meta property="og:url" content="https://walinkgenerator.com" />
++    <meta property="og:url" content="https://www.zapora.in/" />
++    <meta property="og:image" content="https://www.zapora.in/og-image.jpg" />
++
+     <meta name="twitter:card" content="summary_large_image" />
+-    <meta name="twitter:title" content="WhatsApp Link Generator | Fast wa.me Links + QR" />
++    <meta name="twitter:title" content="Zapora - Free WhatsApp Link Generator" />
+     <meta
+       name="twitter:description"
+-      content="Create a WhatsApp wa.me link with an optional pre-filled message. Generate, copy, and download a QR code in seconds."
++      content="Create WhatsApp chat links instantly with phone number, country code, and optional message."
+     />
+-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
++    <meta name="twitter:image" content="https://www.zapora.in/og-image.jpg" />
++
++    <!-- Google Analytics (GA4) placeholder: Insert gtag.js snippet here when measurement ID is available. -->
+   </head>
+   <body>
+     <div id="root"></div>
+diff --git a/package-lock.json b/package-lock.json
+index 0ca0d99de61b2d6aaa874a16814dff9f2eb4311e..0104c481ad498eba599a9cdcfc8719e5dd563126 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,11 +1,11 @@
+ {
+-  "name": "vite-react-typescript-starter",
++  "name": "zapora",
+   "version": "0.0.0",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+-      "name": "vite-react-typescript-starter",
++      "name": "zapora",
+       "version": "0.0.0",
+       "dependencies": {
+         "@supabase/supabase-js": "^2.57.4",
+diff --git a/package.json b/package.json
+index da3a0e99f08207e6f1c578260e535484473c7829..584759be0fbd4e7f4506885761b89c008e213c3a 100644
+--- a/package.json
++++ b/package.json
+@@ -1,5 +1,5 @@
+ {
+-  "name": "vite-react-typescript-starter",
++  "name": "zapora",
+   "private": true,
+   "version": "0.0.0",
+   "type": "module",
+diff --git a/public/robots.txt b/public/robots.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..539769a24b8ef778df712d0f717c60840b1523f9
+--- /dev/null
++++ b/public/robots.txt
+@@ -0,0 +1,4 @@
++User-agent: *
++Allow: /
++
++Sitemap: https://www.zapora.in/sitemap.xml
+diff --git a/public/site.webmanifest b/public/site.webmanifest
+new file mode 100644
+index 0000000000000000000000000000000000000000..fe26c20b8b01887fb7ca61050ad16b5d147d6517
+--- /dev/null
++++ b/public/site.webmanifest
+@@ -0,0 +1,20 @@
++{
++  "name": "Zapora",
++  "short_name": "Zapora",
++  "start_url": "/",
++  "display": "standalone",
++  "background_color": "#ffffff",
++  "theme_color": "#25D366",
++  "icons": [
++    {
++      "src": "/apple-touch-icon.png",
++      "sizes": "180x180",
++      "type": "image/png"
++    },
++    {
++      "src": "/favicon.ico",
++      "sizes": "48x48",
++      "type": "image/x-icon"
++    }
++  ]
++}
+diff --git a/public/sitemap.xml b/public/sitemap.xml
+new file mode 100644
+index 0000000000000000000000000000000000000000..962fb34763e11fece04644f872a2cc35d5ebcfe8
+--- /dev/null
++++ b/public/sitemap.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
++  <url>
++    <loc>https://www.zapora.in/</loc>
++    <changefreq>weekly</changefreq>
++    <priority>1.0</priority>
++  </url>
++</urlset>
+diff --git a/src/App.tsx b/src/App.tsx
+index 0b1c1e0b8eed8d6b7f8b98d9dde007fd21abc7cc..1d3f9f52461b723ffdf14025f8862ef2e2730340 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -6,6 +6,7 @@ import HowItWorks from './components/HowItWorks';
+ import Features from './components/Features';
+ import FAQ from './components/FAQ';
+ import Footer from './components/Footer';
++import Header from './components/Header';
+ 
+ type PageKey = 'home' | 'privacy' | 'terms' | 'contact';
+ 
+@@ -18,23 +19,23 @@ const routeToPage = (pathname: string): PageKey => {
+ 
+ const pageMetadata: Record<PageKey, { title: string; description: string }> = {
+   home: {
+-    title: 'WhatsApp Link Generator | Fast wa.me Links + QR',
++    title: 'Zapora - Free WhatsApp Link Generator',
+     description:
+-      'Create a WhatsApp wa.me link with an optional pre-filled message. Generate, copy, and download a QR code in seconds.',
++      'Create WhatsApp chat links instantly with phone number, country code, and optional message.',
+   },
+   privacy: {
+-    title: 'Privacy Policy | WhatsApp Link Generator',
++    title: 'Privacy Policy | Zapora',
+     description:
+-      'Read how WhatsApp Link Generator handles your data. We keep processing in your browser and do not store generated numbers or messages.',
++      'Read how Zapora handles your data. We keep processing in your browser and do not store generated numbers or messages.',
+   },
+   terms: {
+-    title: 'Terms of Use | WhatsApp Link Generator',
++    title: 'Terms of Use | Zapora',
+     description:
+-      'Review the Terms of Use for WhatsApp Link Generator, including acceptable use, service availability, and limitations.',
++      'Review the Terms of Use for Zapora, including acceptable use, service availability, and limitations.',
+   },
+   contact: {
+-    title: 'Contact | WhatsApp Link Generator',
+-    description: 'Contact WhatsApp Link Generator for support, feedback, or business questions.',
++    title: 'Contact | Zapora',
++    description: 'Contact Zapora for support, feedback, or business questions.',
+   },
+ };
+ 
+@@ -67,6 +68,19 @@ function App() {
+     setMeta('og:type', currentPage === 'home' ? 'website' : 'article', 'property');
+     setMeta('twitter:title', metadata.title, 'name');
+     setMeta('twitter:description', metadata.description, 'name');
++
++    const canonicalPath = currentPage === 'home' ? '/' : `/${currentPage}`;
++    const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
++
++    let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel=\"canonical\"]');
++    if (!canonicalTag) {
++      canonicalTag = document.createElement('link');
++      canonicalTag.setAttribute('rel', 'canonical');
++      document.head.appendChild(canonicalTag);
++    }
++    canonicalTag.setAttribute('href', absoluteUrl);
++
++    setMeta('og:url', absoluteUrl, 'property');
+   }, [currentPage]);
+ 
+   const navigateTo = (page: PageKey) => {
+@@ -120,7 +134,7 @@ function App() {
+           {
+             heading: 'Contact',
+             content:
+-              'For privacy questions or requests, email hello@walinkgenerator.com. We aim to respond within two business days.',
++              'For privacy questions or requests, email hello@zapora.in. We aim to respond within two business days.',
+           },
+         ]}
+       />
+@@ -175,11 +189,11 @@ function App() {
+           {
+             heading: 'General support',
+             content:
+-              'For troubleshooting, feature requests, or feedback, email hello@walinkgenerator.com and include as much context as possible.',
++              'For troubleshooting, feature requests, or feedback, email hello@zapora.in and include as much context as possible.',
+           },
+           {
+             heading: 'Founder contact',
+-            content: 'For partnerships or founder-level inquiries, contact founder@walinkgenerator.com.',
++            content: 'For partnerships or founder-level inquiries, contact founder@zapora.in.',
+           },
+           {
+             heading: 'Response time',
+@@ -189,7 +203,7 @@ function App() {
+         ]}
+         extra={
+           <a
+-            href="mailto:hello@walinkgenerator.com"
++            href="mailto:hello@zapora.in"
+             className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
+           >
+             Email Support
+@@ -211,6 +225,7 @@ function App() {
+ 
+   return (
+     <div className="min-h-screen bg-white">
++      <Header onHomeClick={() => navigateTo('home')} />
+       {pageContent}
+       <Footer currentPage={currentPage} onNavigate={navigateTo} onGetStarted={scrollToGenerator} />
+     </div>
+diff --git a/src/components/Footer.tsx b/src/components/Footer.tsx
+index 83ca48faa65bdb7f0c5e11205758a03db64f5ef0..b8eeafe5a0ed962046d207ef1e5073b7ee69c2ca 100644
+--- a/src/components/Footer.tsx
++++ b/src/components/Footer.tsx
+@@ -1,5 +1,3 @@
+-import { MessageCircle } from 'lucide-react';
+-
+ type PageKey = 'home' | 'privacy' | 'terms' | 'contact';
+ 
+ interface FooterProps {
+@@ -23,16 +21,13 @@ export default function Footer({ currentPage, onNavigate, onGetStarted }: Footer
+       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+         <div className="flex flex-col items-center text-center">
+           <div className="mb-6 flex items-center gap-3">
+-            <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 p-2">
+-              <MessageCircle className="h-6 w-6 text-white" strokeWidth={1.5} />
+-            </div>
+             <button
+               type="button"
+               onClick={onGetStarted}
+               className="rounded-lg text-2xl font-bold tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/80"
+-              aria-label="Go to WhatsApp Link Generator"
++              aria-label="Go to Zapora"
+             >
+-              WhatsApp Link
++              Zapora
+             </button>
+           </div>
+           <p className="mb-8 max-w-md text-gray-400">
+@@ -55,7 +50,7 @@ export default function Footer({ currentPage, onNavigate, onGetStarted }: Footer
+                 </button>
+               </div>
+             </nav>
+-            <p className="text-sm text-gray-500">© {currentYear} WhatsApp Link Generator. Built with care.</p>
++            <p className="text-sm text-gray-500">© {currentYear} Zapora. Built with care.</p>
+             <p className="mt-3 text-xs font-light text-gray-600">Not affiliated with WhatsApp or Meta Platforms, Inc.</p>
+           </div>
+         </div>
+diff --git a/src/components/Header.tsx b/src/components/Header.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..0241c0e39cee83e91cb62eb7333569d4a2b47023
+--- /dev/null
++++ b/src/components/Header.tsx
+@@ -0,0 +1,23 @@
++interface HeaderProps {
++  onHomeClick: () => void;
++}
++
++export default function Header({ onHomeClick }: HeaderProps) {
++  return (
++    <header className="border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
++      <div className="mx-auto flex max-w-7xl items-center px-4 py-3 sm:px-6 lg:px-8">
++        <a
++          href="/"
++          onClick={(event) => {
++            event.preventDefault();
++            onHomeClick();
++          }}
++          className="inline-flex items-center"
++          aria-label="Zapora home"
++        >
++          <img src="/logo.svg" alt="Zapora" className="h-9 w-auto" loading="eager" decoding="async" />
++        </a>
++      </div>
++    </header>
++  );
++}
