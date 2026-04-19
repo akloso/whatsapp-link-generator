@@ -15,7 +15,7 @@ export default function Header({ onHomeClick }: HeaderProps) {
           className="inline-flex items-center"
           aria-label="Zapora home"
         >
-          <img src="/logo.svg" alt="Zapora" className="h-9 w-auto" loading="eager" decoding="async" />
+          <img src="/logo.svg" alt="Zapora" className="h-9 w-auto sm:h-10" loading="eager" decoding="async" />
         </a>
       </div>
     </header>

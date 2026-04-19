@@ -24,10 +24,10 @@ export default function Footer({ currentPage, onNavigate, onGetStarted }: Footer
             <button
               type="button"
               onClick={onGetStarted}
-              className="rounded-lg text-2xl font-bold tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/80"
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/80"
               aria-label="Go to Zapora"
             >
-              Zapora
+              <img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-9" loading="lazy" decoding="async" />
             </button>
           </div>
           <p className="mb-8 max-w-md text-gray-400">
