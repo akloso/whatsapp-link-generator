@@ -6,6 +6,7 @@ import HowItWorks from './components/HowItWorks';
 import Features from './components/Features';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
+import Header from './components/Header';
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact';
 
@@ -18,23 +19,23 @@ const routeToPage = (pathname: string): PageKey => {
 
 const pageMetadata: Record<PageKey, { title: string; description: string }> = {
   home: {
-    title: 'WhatsApp Link Generator | Fast wa.me Links + QR',
+    title: 'Zapora - Free WhatsApp Link Generator',
     description:
-      'Create a WhatsApp wa.me link with an optional pre-filled message. Generate, copy, and download a QR code in seconds.',
+      'Create WhatsApp chat links instantly with phone number, country code, and optional message.',
   },
   privacy: {
-    title: 'Privacy Policy | WhatsApp Link Generator',
+    title: 'Privacy Policy | Zapora',
     description:
-      'Read how WhatsApp Link Generator handles your data. We keep processing in your browser and do not store generated numbers or messages.',
+      'Read how Zapora handles your data. We keep processing in your browser and do not store generated numbers or messages.',
   },
   terms: {
-    title: 'Terms of Use | WhatsApp Link Generator',
+    title: 'Terms of Use | Zapora',
     description:
-      'Review the Terms of Use for WhatsApp Link Generator, including acceptable use, service availability, and limitations.',
+      'Review the Terms of Use for Zapora, including acceptable use, service availability, and limitations.',
   },
   contact: {
-    title: 'Contact | WhatsApp Link Generator',
-    description: 'Contact WhatsApp Link Generator for support, feedback, or business questions.',
+    title: 'Contact | Zapora',
+    description: 'Contact Zapora for support, feedback, or business questions.',
   },
 };
 
@@ -67,6 +68,19 @@ function App() {
     setMeta('og:type', currentPage === 'home' ? 'website' : 'article', 'property');
     setMeta('twitter:title', metadata.title, 'name');
     setMeta('twitter:description', metadata.description, 'name');
+
+    const canonicalPath = currentPage === 'home' ? '/' : `/${currentPage}`;
+    const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
+
+    let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel=\"canonical\"]');
+    if (!canonicalTag) {
+      canonicalTag = document.createElement('link');
+      canonicalTag.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonicalTag);
+    }
+    canonicalTag.setAttribute('href', absoluteUrl);
+
+    setMeta('og:url', absoluteUrl, 'property');
   }, [currentPage]);
 
   const navigateTo = (page: PageKey) => {
@@ -120,7 +134,7 @@ function App() {
           {
             heading: 'Contact',
             content:
-              'For privacy questions or requests, email hello@walinkgenerator.com. We aim to respond within two business days.',
+              'For privacy questions or requests, email hello@zapora.in. We aim to respond within two business days.',
           },
         ]}
       />
@@ -175,11 +189,11 @@ function App() {
           {
             heading: 'General support',
             content:
-              'For troubleshooting, feature requests, or feedback, email hello@walinkgenerator.com and include as much context as possible.',
+              'For troubleshooting, feature requests, or feedback, email hello@zapora.in and include as much context as possible.',
           },
           {
             heading: 'Founder contact',
-            content: 'For partnerships or founder-level inquiries, contact founder@walinkgenerator.com.',
+            content: 'For partnerships or founder-level inquiries, contact founder@zapora.in.',
           },
           {
             heading: 'Response time',
@@ -189,7 +203,7 @@ function App() {
         ]}
         extra={
           <a
-            href="mailto:hello@walinkgenerator.com"
+            href="mailto:hello@zapora.in"
             className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
           >
             Email Support
@@ -211,6 +225,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white">
+      <Header onHomeClick={() => navigateTo('home')} />
       {pageContent}
       <Footer currentPage={currentPage} onNavigate={navigateTo} onGetStarted={scrollToGenerator} />
     </div>
