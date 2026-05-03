@@ -114,7 +114,7 @@ function App() {
           {
             heading: 'What this tool does',
             content:
-              'WhatsApp Link Generator helps you create a wa.me link and QR code in your browser. The information you type is used only to build your link and is not sent to our server for storage.',
+              'WhatsApp Link Generator helps you create a wa.me link and QR code in your browser. The information you type is used to build your link. After you generate a link, entered details may also be stored for analytics, product improvement, and service functionality.',
           },
           {
             heading: 'Data we process',
@@ -134,7 +134,7 @@ function App() {
           {
             heading: 'Contact',
             content:
-              'For privacy questions or requests, email hello@zapora.in. We aim to respond within two business days.',
+              'For privacy questions or requests, email hizapora@gmail.com. We aim to respond within two business days.',
           },
         ]}
       />
@@ -189,11 +189,11 @@ function App() {
           {
             heading: 'General support',
             content:
-              'For troubleshooting, feature requests, or feedback, email hello@zapora.in and include as much context as possible.',
+              'For troubleshooting, feature requests, or feedback, email hizapora@gmail.com and include as much context as possible.',
           },
           {
             heading: 'Founder contact',
-            content: 'For partnerships or founder-level inquiries, contact founder@zapora.in.',
+            content: 'For partnerships or founder-level inquiries, contact hizapora@gmail.com.',
           },
           {
             heading: 'Response time',
@@ -203,7 +203,7 @@ function App() {
         ]}
         extra={
           <a
-            href="mailto:hello@zapora.in"
+            href="mailto:hizapora@gmail.com"
             className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
           >
             Email Support

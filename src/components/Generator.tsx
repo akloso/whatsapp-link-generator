@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle } from 'lucide-react';
+import { saveSubmissionToSheet } from '../lib/saveSubmissionToSheet';
 
 type CountryOption = {
   code: string;
@@ -185,6 +186,15 @@ export default function Generator() {
     setDownloadStatus('idle');
     setShowCelebration(true);
     window.setTimeout(() => setShowCelebration(false), 1100);
+
+    void saveSubmissionToSheet({
+      phone_number: digitsOnlyPhone,
+      country_code: selectedCountry.code,
+      message: trimmedMessage,
+      generated_link: link,
+      consent: true,
+      created_at: new Date().toISOString(),
+    });
   };
 
   const copyToClipboard = async () => {
