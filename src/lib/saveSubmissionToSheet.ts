@@ -12,17 +12,11 @@ export type SheetSubmissionPayload = {
 
 export async function saveSubmissionToSheet(payload: SheetSubmissionPayload): Promise<void> {
   try {
-    const response = await fetch(SHEET_WEBHOOK_URL, {
+    await fetch(SHEET_WEBHOOK_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      mode: 'no-cors',
       body: JSON.stringify(payload),
     });
-
-    if (!response.ok) {
-      console.warn('Failed to save submission to Google Sheets:', response.status, response.statusText);
-    }
   } catch (error) {
     console.warn('Failed to save submission to Google Sheets:', error);
   }
