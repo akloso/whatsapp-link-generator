@@ -7,7 +7,8 @@ import Features from './components/Features';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import Header from './components/Header';
-import QrCodeEditorPage, { QR_EDITOR_STORAGE_KEY } from './components/QrCodeEditorPage';
+import QrCodeEditorPage from './components/QrCodeEditorPage';
+import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
 
@@ -78,7 +79,7 @@ function App() {
     const canonicalPath = currentPage === 'home' ? '/' : currentPage === 'qrCodeEditor' ? '/qr-code-editor' : `/${currentPage}`;
     const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
 
-    let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel=\"canonical\"]');
+    let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonicalTag) {
       canonicalTag = document.createElement('link');
       canonicalTag.setAttribute('rel', 'canonical');
