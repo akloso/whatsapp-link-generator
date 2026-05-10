@@ -304,7 +304,7 @@ export default function Generator() {
 
         <div className="rounded-[32px] border border-gray-200 bg-white/95 p-4 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.98fr_1.02fr] xl:gap-7">
-            <div className="flex flex-col justify-between space-y-4">
+            <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2.5" ref={dropdownRef}>
                 <label htmlFor="country-dropdown" className="block text-sm font-semibold tracking-wide text-gray-900">
@@ -447,7 +447,7 @@ export default function Generator() {
                   <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
                 </div>
               ) : (
-                <div className="relative space-y-3.5">
+                <div className="relative space-y-4">
                 {showCelebration && (
                   <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center" aria-hidden="true">
                     <div className="success-confetti">
@@ -462,9 +462,14 @@ export default function Generator() {
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
-                  <div className="flex flex-col gap-2.5">
-                    <input id="generated-link" type="text" value={generatedLink} readOnly className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-gray-700 outline-none" />
-                    <p className="break-all text-xs text-gray-500">{generatedLink}</p>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      id="generated-link"
+                      type="text"
+                      value={generatedLink}
+                      readOnly
+                      className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-gray-700 outline-none"
+                    />
                   </div>
                 </div>
 
@@ -496,13 +501,13 @@ export default function Generator() {
                   </button>
                 </div>
 
-                <p role="status" aria-live="polite" className="min-h-6 text-center text-sm text-gray-600">
+                <p role="status" aria-live="polite" className="min-h-5 text-center text-sm text-gray-600">
                   {downloadStatus === 'success' && 'QR code downloaded successfully.'}
                   {downloadStatus === 'error' && 'We could not download the QR code. Please try again.'}
                 </p>
 
-                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-6 text-center shadow-lg sm:p-8">
-                  <p className="mb-6 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
+                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 text-center shadow-md sm:p-6">
+                  <p className="mb-4 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                     <img src={qrImageUrl} alt="QR code for generated WhatsApp link" className="h-56 w-56 sm:h-60 sm:w-60" />
                   </div>
@@ -511,8 +516,8 @@ export default function Generator() {
                 <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">QR Foreground Color</p>
-                      <p className="text-xs text-gray-500">Choose a brand-safe dark tone for best scan quality.</p>
+                      <p className="text-sm font-semibold text-gray-900">QR Color Style</p>
+                      <p className="text-xs text-gray-500">Solid and gradient-inspired tones optimized for scan clarity.</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8">
@@ -522,7 +527,7 @@ export default function Generator() {
                         type="button"
                         onClick={() => setQrForegroundColor(preset.value)}
                         aria-label={`Use ${preset.id} for QR code`}
-                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'} ${preset.type === 'blend' ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_0_0_1px_rgba(0,0,0,0.03)]' : ''}`}
+                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'} ${preset.type === 'blend' ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_0_0_1px_rgba(0,0,0,0.12)] after:absolute after:-right-1 after:-top-1 after:h-2.5 after:w-2.5 after:rounded-full after:border after:border-white after:bg-gray-900 after:content-[\"\"]' : ''}`}
                         style={preset.type === 'blend' ? { backgroundImage: preset.swatch } : { backgroundColor: preset.value }}
                       >
                         {qrForegroundColor === preset.value ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}
