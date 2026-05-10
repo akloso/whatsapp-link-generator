@@ -108,6 +108,9 @@ export default function Generator() {
   const [phoneError, setPhoneError] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const [qrForegroundColor, setQrForegroundColor] = useState('#0f766e');
+
+  const qrColorPresets = ['#0f766e', '#166534', '#0f172a', '#1d4ed8', '#7c3aed', '#be123c', '#ea580c'];
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -115,8 +118,9 @@ export default function Generator() {
 
   const qrImageUrl = useMemo(() => {
     if (!generatedLink) return '';
-    return `https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(generatedLink)}`;
-  }, [generatedLink]);
+    const qrColor = qrForegroundColor.replace('#', '');
+    return `https://api.qrserver.com/v1/create-qr-code/?size=480x480&color=${qrColor}&bgcolor=ffffff&data=${encodeURIComponent(generatedLink)}`;
+  }, [generatedLink, qrForegroundColor]);
 
   const filteredCountries = useMemo(() => {
     const query = countrySearch.trim().toLowerCase();
@@ -261,7 +265,8 @@ export default function Generator() {
         </div>
 
         <div className="rounded-[32px] border border-gray-200 bg-white/95 p-5 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)] backdrop-blur sm:p-8 lg:p-10">
-          <div className="space-y-7">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
+            <div className="space-y-7">
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-3" ref={dropdownRef}>
                 <label htmlFor="country-dropdown" className="block text-sm font-semibold tracking-wide text-gray-900">
@@ -392,8 +397,19 @@ export default function Generator() {
               Generate WhatsApp Link
             </button>
 
-            {generatedLink && (
-              <div className="relative space-y-5 border-t border-gray-200 pt-8">
+            </div>
+
+            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 shadow-inner sm:p-6 ${generatedLink ? "block" : "hidden lg:block"} lg:min-h-[640px]`}>
+              {!generatedLink ? (
+                <div className="hidden h-full flex-col items-center justify-center text-center lg:flex">
+                  <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
+                    <Sparkles className="h-6 w-6 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Your result appears here</h3>
+                  <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
+                </div>
+              ) : (
+                <div className="relative space-y-5">
                 {showCelebration && (
                   <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center" aria-hidden="true">
                     <div className="success-confetti">
@@ -404,7 +420,7 @@ export default function Generator() {
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-5 sm:p-6">
+                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-5">
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
@@ -445,9 +461,36 @@ export default function Generator() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                  <p className="mb-3 text-sm font-semibold text-gray-900">QR Foreground Color</p>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {qrColorPresets.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setQrForegroundColor(color)}
+                        aria-label={`Use ${color} for QR code`}
+                        className={`h-8 w-8 rounded-full border-2 transition ${qrForegroundColor === color ? 'border-gray-900 scale-105' : 'border-white hover:scale-105'}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                  <label className="flex items-center justify-between gap-3 text-sm text-gray-600">
+                    Custom color
+                    <input
+                      type="color"
+                      value={qrForegroundColor}
+                      onChange={(event) => setQrForegroundColor(event.target.value)}
+                      className="h-9 w-14 cursor-pointer rounded-md border border-gray-200 bg-white p-1"
+                      aria-label="Pick custom QR foreground color"
+                    />
+                  </label>
+                </div>
+
                 <p className="text-center text-sm text-gray-600 sm:text-[15px]">Your link and QR are ready to share wherever your audience connects with you.</p>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
