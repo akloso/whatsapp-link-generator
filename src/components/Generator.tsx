@@ -110,9 +110,20 @@ export default function Generator() {
   const [phoneError, setPhoneError] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
-  const [qrForegroundColor, setQrForegroundColor] = useState('#0f766e');
+  const [qrForegroundColor, setQrForegroundColor] = useState('#000000');
 
-  const qrColorPresets = ['#0f766e', '#166534', '#0f172a', '#1d4ed8', '#7c3aed', '#be123c', '#ea580c'];
+  const qrColorPresets = [
+    { id: 'black', type: 'solid', value: '#000000' },
+    { id: 'slate', type: 'solid', value: '#334155' },
+    { id: 'forest', type: 'solid', value: '#2f5d50' },
+    { id: 'ocean', type: 'solid', value: '#3f5f8a' },
+    { id: 'plum', type: 'solid', value: '#5f4d79' },
+    { id: 'rosewood', type: 'solid', value: '#7a4b58' },
+    { id: 'cocoa', type: 'solid', value: '#7a5d47' },
+    { id: 'midnight-emerald', type: 'blend', value: '#2c4953', swatch: 'linear-gradient(135deg, #111827 10%, #2f5d50 90%)' },
+    { id: 'indigo-mauve', type: 'blend', value: '#57507a', swatch: 'linear-gradient(135deg, #334155 12%, #6b5b95 88%)' },
+    { id: 'graphite-bronze', type: 'blend', value: '#5c5248', swatch: 'linear-gradient(135deg, #374151 12%, #8b6a4f 88%)' },
+  ] as const;
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -414,7 +425,7 @@ export default function Generator() {
                   <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
                 </div>
               ) : (
-                <div className="relative space-y-5">
+                <div className="relative space-y-4">
                 {showCelebration && (
                   <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center" aria-hidden="true">
                     <div className="success-confetti">
@@ -472,19 +483,18 @@ export default function Generator() {
                       <p className="text-sm font-semibold text-gray-900">QR Foreground Color</p>
                       <p className="text-xs text-gray-500">Choose a brand-safe dark tone for best scan quality.</p>
                     </div>
-                    <div className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">White background fixed</div>
                   </div>
                   <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-7">
-                    {qrColorPresets.map((color) => (
+                    {qrColorPresets.map((preset) => (
                       <button
-                        key={color}
+                        key={preset.id}
                         type="button"
-                        onClick={() => setQrForegroundColor(color)}
-                        aria-label={`Use ${color} for QR code`}
-                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === color ? 'border-gray-900 ring-2 ring-gray-900/15' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'}`}
-                        style={{ backgroundColor: color }}
+                        onClick={() => setQrForegroundColor(preset.value)}
+                        aria-label={`Use ${preset.id} for QR code`}
+                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'}`}
+                        style={preset.type === 'blend' ? { backgroundImage: preset.swatch } : { backgroundColor: preset.value }}
                       >
-                        {qrForegroundColor === color ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}
+                        {qrForegroundColor === preset.value ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}
                       </button>
                     ))}
                   </div>
