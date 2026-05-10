@@ -1,407 +1,668 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-
-type ExportSizeId = 'square' | 'story' | 'poster';
-type ExportFormat = 'png' | 'jpg';
-type CenterContent = 'none' | 'emoji' | 'image';
+import { ArrowUpRight, Download, Image as ImageIcon, Palette, Smile, Trash2 } from 'lucide-react';
 
 const QR_EDITOR_STORAGE_KEY = 'zapora_qr_editor_link';
 
-const exportSizes: Record<ExportSizeId, { label: string; ratio: string; width: number; height: number }> = {
-  square: { label: 'Square Post', ratio: '1:1', width: 1200, height: 1200 },
-  story: { label: 'Story', ratio: '9:16', width: 1080, height: 1920 },
-  poster: { label: 'Poster', ratio: '4:5', width: 1080, height: 1350 },
+type Preset = {
+  name: string;
+  fg: string;
+  bg: string;
+  banner: string;
 };
 
-const colorPresets = [
-  { name: 'Classic', qr: '#111827', banner: '#0f172a' },
-  { name: 'WhatsApp', qr: '#075e54', banner: '#128c7e' },
-  { name: 'Midnight', qr: '#0b1220', banner: '#1e293b' },
-  { name: 'Royal', qr: '#312e81', banner: '#4338ca' },
-  { name: 'Sunset', qr: '#9a3412', banner: '#ea580c' },
-  { name: 'Berry', qr: '#831843', banner: '#be185d' },
-] as const;
+type SizeOption = {
+  name: string;
+  ratio: string;
+  w: number;
+  h: number;
+};
+
+type FormatOption = 'PNG' | 'JPG';
+type CenterType = 'none' | 'emoji' | 'image';
+
+const PRESETS: Preset[] = [
+  { name: 'Classic', fg: '#0f1f17', bg: '#ffffff', banner: '#16a34a' },
+  { name: 'WhatsApp', fg: '#0b3d2e', bg: '#ffffff', banner: '#25d366' },
+  { name: 'Midnight', fg: '#0b1220', bg: '#ffffff', banner: '#1e293b' },
+  { name: 'Royal', fg: '#1e1b4b', bg: '#ffffff', banner: '#4f46e5' },
+  { name: 'Sunset', fg: '#3b0a0a', bg: '#ffffff', banner: '#f97316' },
+  { name: 'Berry', fg: '#3b0764', bg: '#ffffff', banner: '#a21caf' },
+];
+
+const SIZES: SizeOption[] = [
+  { name: 'Square Post', ratio: '1:1', w: 1080, h: 1080 },
+  { name: 'Story', ratio: '9:16', w: 1080, h: 1920 },
+  { name: 'Poster', ratio: '4:5', w: 1080, h: 1350 },
+];
+
+const FORMATS: FormatOption[] = ['PNG', 'JPG'];
+
+const EMOJIS = ['💬', '📱', '🛍️', '❤️', '✨', '🎉', '📷', '🍔', '☕', '🎵', '🚀', '🌟'];
+
+function QrCodeEditorPage() {
+  const [rawContent, setRawContent] = useState('');
+  const [message, setMessage] = useState('');
+  const [title, setTitle] = useState('Scan to chat');
+  const [subtitle, setSubtitle] = useState('Connect with us on WhatsApp');
+  const [preset, setPreset] = useState<Preset>(PRESETS[1]);
+  const [fg, setFg] = useState(PRESETS[1].fg);
+  const [banner, setBanner] = useState(PRESETS[1].banner);
+  const [centerType, setCenterType] = useState<CenterType>('none');
+  const [centerEmoji, setCenterEmoji] = useState('💬');
+  const [centerImage, setCenterImage] = useState<string | null>(null);
+  const [size, setSize] = useState<SizeOption>(SIZES[0]);
+  const [format, setFormat] = useState<FormatOption>('PNG');
+  const [status, setStatus] = useState('');
+
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  const previewRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
+    if (saved) {
+      setRawContent(saved);
+      return;
+    }
+    setRawContent('https://wa.me/919999999999');
+  }, []);
+
+  const finalContent = useMemo(() => {
+    const value = rawContent.trim();
+    if (!value) return '';
+
+    try {
+      const url = new URL(value);
+      const isWhatsAppLink = url.hostname.includes('wa.me') || url.hostname.includes('whatsapp');
+
+      if (isWhatsAppLink && message.trim()) {
+        url.searchParams.set('text', message.trim());
+      }
+
+      return url.toString();
+    } catch {
+      return value;
+    }
+  }, [message, rawContent]);
+
+  const isReady = useMemo(() => finalContent.trim().length > 0, [finalContent]);
+
+  const applyPreset = (nextPreset: Preset) => {
+    setPreset(nextPreset);
+    setFg(nextPreset.fg);
+    setBanner(nextPreset.banner);
+  };
+
+  const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCenterImage(reader.result as string);
+      setCenterType('image');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  useEffect(() => {
+    const qrCanvas = qrCanvasRef.current;
+    if (!qrCanvas || !isReady) return;
+
+    QRCode.toCanvas(qrCanvas, finalContent, {
+      width: 1000,
+      margin: 1,
+      errorCorrectionLevel: 'H',
+      color: {
+        dark: fg,
+        light: '#ffffff',
+      },
+    }).catch(() => {
+      setStatus('Unable to generate QR preview right now.');
+    });
+  }, [finalContent, fg, isReady]);
+
+  const renderPreview = useMemo(
+    () => async () => {
+      const canvas = previewRef.current;
+      const qrCanvas = qrCanvasRef.current;
+
+      if (!canvas || !qrCanvas || !isReady) return;
+
+      const W = size.w;
+      const H = size.h;
+
+      canvas.width = W;
+      canvas.height = H;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+
+      const outerPadX = Math.round(W * 0.07);
+      const cardX = outerPadX;
+      const cardY = Math.round(H * 0.06);
+      const cardW = W - outerPadX * 2;
+      const cardH = H - cardY * 2;
+      const cardR = Math.round(W * 0.05);
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(15, 31, 23, 0.10)';
+      ctx.shadowBlur = 40;
+      ctx.shadowOffsetY = 12;
+      roundedRect(ctx, cardX, cardY, cardW, cardH, cardR);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.restore();
+
+      const bannerH = Math.round(cardH * 0.18);
+
+      ctx.save();
+      roundedRectTop(ctx, cardX, cardY, cardW, bannerH, cardR);
+      ctx.clip();
+
+      const gradient = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + bannerH);
+      gradient.addColorStop(0, banner);
+      gradient.addColorStop(1, shade(banner, -15));
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(cardX, cardY, cardW, bannerH);
+      ctx.restore();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const centerX = cardX + cardW / 2;
+
+      const titleSize = Math.round(W * 0.045);
+      ctx.font = `600 ${titleSize}px Inter, system-ui, sans-serif`;
+
+      const titleY = cardY + bannerH / 2 - (subtitle ? titleSize * 0.55 : 0);
+      ctx.fillText(truncate(title, 40), centerX, titleY);
+
+      if (subtitle) {
+        const subtitleSize = Math.round(W * 0.026);
+        ctx.font = `400 ${subtitleSize}px Inter, system-ui, sans-serif`;
+        ctx.globalAlpha = 0.9;
+        ctx.fillText(truncate(subtitle, 60), centerX, titleY + titleSize * 0.95);
+        ctx.globalAlpha = 1;
+      }
+
+      const bodyTop = cardY + bannerH;
+      const bodyHeight = cardH - bannerH;
+
+      const qrMaxByWidth = cardW - outerPadX * 1.5;
+      const qrMaxByHeight = bodyHeight - Math.round(H * 0.08);
+      const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
+
+      const qrX = cardX + (cardW - qrSize) / 2;
+      const qrY = bodyTop + (bodyHeight - qrSize) / 2 - Math.round(H * 0.01);
+
+      const qrPadding = Math.round(qrSize * 0.04);
+
+      roundedRect(
+        ctx,
+        qrX - qrPadding,
+        qrY - qrPadding,
+        qrSize + qrPadding * 2,
+        qrSize + qrPadding * 2,
+        Math.round(qrSize * 0.06),
+      );
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
+
+      const logoSize = Math.round(qrSize * 0.18);
+      const logoX = qrX + (qrSize - logoSize) / 2;
+      const logoY = qrY + (qrSize - logoSize) / 2;
+
+      if (centerType !== 'none') {
+        const logoPadding = Math.round(logoSize * 0.18);
+
+        roundedRect(
+          ctx,
+          logoX - logoPadding,
+          logoY - logoPadding,
+          logoSize + logoPadding * 2,
+          logoSize + logoPadding * 2,
+          Math.round(logoSize * 0.25),
+        );
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        if (centerType === 'emoji') {
+          ctx.font = `${Math.round(logoSize * 0.85)}px "Apple Color Emoji","Segoe UI Emoji",Inter,sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(centerEmoji, logoX + logoSize / 2, logoY + logoSize / 2 + logoSize * 0.05);
+        } else if (centerType === 'image' && centerImage) {
+          const image = await loadImage(centerImage);
+          const ratio = Math.min(logoSize / image.width, logoSize / image.height);
+          const imageWidth = image.width * ratio;
+          const imageHeight = image.height * ratio;
+
+          ctx.save();
+          roundedRect(ctx, logoX, logoY, logoSize, logoSize, Math.round(logoSize * 0.18));
+          ctx.clip();
+          ctx.drawImage(
+            image,
+            logoX + (logoSize - imageWidth) / 2,
+            logoY + (logoSize - imageHeight) / 2,
+            imageWidth,
+            imageHeight,
+          );
+          ctx.restore();
+        }
+      }
+
+      const footerSize = Math.round(W * 0.02);
+      ctx.fillStyle = 'rgba(15, 31, 23, 0.45)';
+      ctx.font = `500 ${footerSize}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('Powered by Zapora', centerX, cardY + cardH - Math.round(H * 0.025));
+    },
+    [banner, centerEmoji, centerImage, centerType, isReady, size, subtitle, title],
+  );
+
+  useEffect(() => {
+    renderPreview();
+  }, [renderPreview, finalContent, fg]);
+
+  const handleDownload = async () => {
+    if (!isReady) return;
+
+    await renderPreview();
+    const canvas = previewRef.current;
+    if (!canvas) return;
+
+    const mimeType = format === 'PNG' ? 'image/png' : 'image/jpeg';
+    const url = canvas.toDataURL(mimeType, 0.95);
+
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `zapora-qr-${size.name.toLowerCase().replace(/\s+/g, '-')}.${format.toLowerCase()}`;
+    anchor.click();
+  };
+
+  return (
+    <main className="min-h-screen bg-white py-8 sm:py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className="mb-6 rounded-[28px] border border-slate-200 bg-white px-5 py-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] sm:mb-8 sm:px-7 sm:py-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                Zapora Studio
+              </p>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                QR Code Editor
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Design and export a clean, premium, scannable QR in one place.
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">
+              <Palette className="h-3.5 w-3.5 text-violet-600" />
+              Premium editor
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
+          <div className="space-y-5">
+            <Section title="Content">
+              <Field label="Link or text">
+                <input
+                  value={rawContent}
+                  onChange={(event) => setRawContent(event.target.value)}
+                  placeholder="https://wa.me/91XXXXXXXXXX"
+                  className="zapora-input"
+                />
+              </Field>
+
+              <Field label="WhatsApp message">
+                <textarea
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={3}
+                  placeholder="Optional pre-filled WhatsApp message"
+                  className="zapora-input min-h-[96px] resize-none"
+                />
+              </Field>
+
+              <Field label="Title">
+                <input
+                  value={title}
+                  maxLength={40}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="zapora-input"
+                />
+              </Field>
+
+              <Field label="Subtitle">
+                <input
+                  value={subtitle}
+                  maxLength={60}
+                  onChange={(event) => setSubtitle(event.target.value)}
+                  className="zapora-input"
+                />
+              </Field>
+            </Section>
+
+            <Section title="Color">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {PRESETS.map((presetOption) => (
+                  <button
+                    key={presetOption.name}
+                    onClick={() => applyPreset(presetOption)}
+                    className={`rounded-xl border p-2.5 text-left transition ${
+                      preset.name === presetOption.name
+                        ? 'border-slate-900 bg-slate-50 shadow-sm'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex h-8 overflow-hidden rounded-md ring-1 ring-slate-200">
+                      <div className="flex-1" style={{ background: presetOption.banner }} />
+                      <div className="flex-1" style={{ background: presetOption.fg }} />
+                    </div>
+                    <p className="mt-1.5 text-xs font-medium text-slate-800">{presetOption.name}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+                <ColorField label="QR color" value={fg} onChange={setFg} />
+                <ColorField label="Banner" value={banner} onChange={setBanner} />
+              </div>
+            </Section>
+
+            <Section title="Center content">
+              <div className="grid grid-cols-3 gap-2">
+                {(['none', 'emoji', 'image'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setCenterType(type)}
+                    className={`rounded-xl border px-3 py-2 text-xs font-medium capitalize transition ${
+                      centerType === type
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {type === 'none' ? (
+                      'None'
+                    ) : type === 'emoji' ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Smile className="h-3.5 w-3.5" /> Emoji
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        <ImageIcon className="h-3.5 w-3.5" /> Image
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {centerType === 'emoji' ? (
+                <div className="mt-3 grid grid-cols-6 gap-1.5">
+                  {EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => setCenterEmoji(emoji)}
+                      className={`flex aspect-square items-center justify-center rounded-lg text-xl transition ${
+                        centerEmoji === emoji ? 'bg-emerald-50 ring-1 ring-emerald-500' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {centerType === 'image' ? (
+                <div className="mt-3 space-y-2">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600 transition hover:bg-slate-100">
+                    <ImageIcon className="h-4 w-4" />
+                    {centerImage ? 'Replace image' : 'Upload image (PNG, JPG, WEBP)'}
+                    <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
+                  </label>
+
+                  {centerImage ? (
+                    <button
+                      onClick={() => {
+                        setCenterImage(null);
+                        setCenterType('none');
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs text-slate-500 transition hover:text-red-600"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Remove image
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </Section>
+          </div>
+
+          <div className="xl:sticky xl:top-24 xl:self-start">
+            <div className="rounded-[30px] border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-5 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:p-6">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live preview</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {size.name} · {size.ratio}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {SIZES.map((sizeOption) => (
+                    <button
+                      key={sizeOption.name}
+                      onClick={() => setSize(sizeOption)}
+                      className={`rounded-xl border px-3 py-2 text-left transition ${
+                        size.name === sizeOption.name
+                          ? 'border-slate-900 bg-white text-slate-950 shadow-sm'
+                          : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
+                      }`}
+                    >
+                      <p className="text-[11px] font-semibold leading-tight">{sizeOption.name}</p>
+                      <p className="text-[10px] text-slate-500">{sizeOption.ratio}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-center rounded-[28px] border border-slate-200 bg-white/70 p-4 sm:p-6">
+                {isReady ? (
+                  <div
+                    className="overflow-hidden rounded-[24px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200"
+                    style={{
+                      aspectRatio: `${size.w}/${size.h}`,
+                      width: size.ratio === '9:16' ? '260px' : size.ratio === '4:5' ? '320px' : '380px',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    <canvas ref={previewRef} className="h-full w-full" />
+                  </div>
+                ) : (
+                  <div className="flex min-h-[420px] w-full items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 text-center text-sm text-slate-500">
+                    Add a link or text to generate your QR preview.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Download</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Export your QR in a clean, presentation-ready format.
+                    </p>
+                  </div>
+                  <ArrowUpRight className="h-4 w-4 text-slate-400" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {FORMATS.map((formatOption) => (
+                    <button
+                      key={formatOption}
+                      onClick={() => setFormat(formatOption)}
+                      className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                        format === formatOption
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {formatOption}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleDownload}
+                  disabled={!isReady}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#16a34a_0%,#059669_100%)] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" /> Download QR ({format})
+                </button>
+
+                <p className="mt-3 text-center text-xs text-slate-500">
+                  High error correction enabled · Safe scan area protected
+                </p>
+              </div>
+
+              {status ? <p className="mt-4 text-sm text-slate-500">{status}</p> : null}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <canvas ref={qrCanvasRef} className="hidden" />
+
+      <style>{`
+        .zapora-input {
+          width: 100%;
+          border-radius: 0.9rem;
+          border: 1px solid rgb(203 213 225);
+          background: #ffffff;
+          padding: 0.85rem 1rem;
+          font-size: 0.875rem;
+          color: rgb(15 23 42);
+          outline: none;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .zapora-input:focus {
+          border-color: rgb(16 185 129);
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+        }
+      `}</style>
+    </main>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className='rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'>
-      <h3 className='mb-3 text-sm font-semibold text-slate-900'>{title}</h3>
-      <div className='space-y-3'>{children}</div>
-    </section>
+    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.3)]">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</h3>
+      <div className="mt-4 space-y-3">{children}</div>
+    </div>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className='block'>
-      <span className='mb-1.5 block text-xs font-medium text-slate-600'>{label}</span>
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
       {children}
     </label>
   );
 }
 
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
-    <label className='flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2'>
-      <span className='text-xs font-medium text-slate-600'>{label}</span>
-      <input type='color' value={value} onChange={(e) => onChange(e.target.value)} className='h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent' />
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5">
+        <input
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-7 w-9 cursor-pointer rounded-md border-0 bg-transparent p-0"
+        />
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="flex-1 bg-transparent text-xs text-slate-700 outline-none"
+        />
+      </div>
     </label>
   );
 }
 
-const inputClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none';
-
-function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
-function drawTopRoundedBanner(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+function roundedRectTop(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
-  ctx.moveTo(x, y + h);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
   ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    image.crossOrigin = 'anonymous';
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Failed to load image'));
+    image.onerror = reject;
     image.src = src;
   });
 }
 
-function truncateString(value: string, max: number) {
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+function truncate(value: string, limit: number) {
+  return value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
 }
 
-function shadeColor(hex: string, amount: number) {
-  const normalized = hex.replace('#', '');
-  const safeHex = normalized.length === 3
-    ? normalized.split('').map((c) => `${c}${c}`).join('')
-    : normalized;
-  const n = Number.parseInt(safeHex, 16);
-  const clamp = (v: number) => Math.max(0, Math.min(255, v));
-  const r = clamp((n >> 16) + amount);
-  const g = clamp(((n >> 8) & 0x00ff) + amount);
-  const b = clamp((n & 0x0000ff) + amount);
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
+function shade(hex: string, percent: number) {
+  const cleanHex = hex.replace('#', '');
+  const normalized =
+    cleanHex.length === 3 ? cleanHex.split('').map((item) => item + item).join('') : cleanHex;
 
-export default function QrCodeEditorPage() {
-  const [targetLink, setTargetLink] = useState('');
-  const [message, setMessage] = useState('Hi! I found you on Zapora and wanted to connect.');
-  const [title, setTitle] = useState('Connect with us on WhatsApp');
-  const [subtitle, setSubtitle] = useState('Scan to start a conversation');
-  const [qrColor, setQrColor] = useState('#111827');
-  const [bannerColor, setBannerColor] = useState('#0f172a');
-  const [centerContent, setCenterContent] = useState<CenterContent>('none');
-  const [centerEmoji, setCenterEmoji] = useState('💬');
-  const [centerImageData, setCenterImageData] = useState('');
-  const [size, setSize] = useState<ExportSizeId>('square');
-  const [format, setFormat] = useState<ExportFormat>('png');
+  const numeric = parseInt(normalized, 16);
 
-  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const baseQrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  let red = (numeric >> 16) + Math.round((percent / 100) * 255);
+  let green = ((numeric >> 8) & 0xff) + Math.round((percent / 100) * 255);
+  let blue = (numeric & 0xff) + Math.round((percent / 100) * 255);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
-    if (stored) setTargetLink(stored);
-  }, []);
+  red = Math.max(0, Math.min(255, red));
+  green = Math.max(0, Math.min(255, green));
+  blue = Math.max(0, Math.min(255, blue));
 
-  const finalQrData = useMemo(() => {
-    const raw = targetLink.trim();
-    if (!raw) return '';
-
-    try {
-      const parsed = new URL(raw);
-      const host = parsed.hostname.toLowerCase();
-      const isWhatsApp = host.includes('wa.me') || host.includes('whatsapp.');
-      if (isWhatsApp && message.trim()) parsed.searchParams.set('text', message.trim());
-      return parsed.toString();
-    } catch {
-      return raw;
-    }
-  }, [targetLink, message]);
-
-  const renderComposition = useCallback(async () => {
-    const previewCanvas = previewCanvasRef.current;
-    const baseCanvas = baseQrCanvasRef.current;
-    if (!previewCanvas || !baseCanvas || !finalQrData) return;
-
-    const selectedSize = exportSizes[size];
-    previewCanvas.width = selectedSize.width;
-    previewCanvas.height = selectedSize.height;
-    baseCanvas.width = 1200;
-    baseCanvas.height = 1200;
-
-    await QRCode.toCanvas(baseCanvas, finalQrData, {
-      width: 1200,
-      margin: 1,
-      errorCorrectionLevel: 'H',
-      color: { dark: qrColor, light: '#ffffff' },
-    });
-
-    const ctx = previewCanvas.getContext('2d');
-    if (!ctx) return;
-
-    const { width, height } = previewCanvas;
-    ctx.clearRect(0, 0, width, height);
-
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(0, 0, width, height);
-
-    const outerPad = Math.round(Math.min(width, height) * 0.06);
-    const cardX = outerPad;
-    const cardY = outerPad;
-    const cardW = width - outerPad * 2;
-    const cardH = height - outerPad * 2;
-
-    ctx.save();
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
-    ctx.shadowBlur = 38;
-    ctx.shadowOffsetY = 12;
-    ctx.fillStyle = '#ffffff';
-    drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 32);
-    ctx.fill();
-    ctx.restore();
-
-    const bannerH = Math.round(cardH * 0.19);
-    const bannerBase = shadeColor(bannerColor, -18);
-    const bannerGradient = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + bannerH);
-    bannerGradient.addColorStop(0, bannerColor);
-    bannerGradient.addColorStop(1, bannerBase);
-    ctx.fillStyle = bannerGradient;
-    drawTopRoundedBanner(ctx, cardX, cardY, cardW, bannerH, 32);
-    ctx.fill();
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `${Math.round(height * 0.042)}px Inter, ui-sans-serif`;
-    ctx.fillText(truncateString(title.trim() || 'Scan me', 40), width / 2, cardY + bannerH * 0.48);
-
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.font = `${Math.round(height * 0.024)}px Inter, ui-sans-serif`;
-    ctx.fillText(truncateString(subtitle.trim() || 'Quick access', 54), width / 2, cardY + bannerH * 0.75);
-
-    const footerH = Math.round(cardH * 0.09);
-    const qrZoneTop = cardY + bannerH + Math.round(cardH * 0.045);
-    const qrZoneBottom = cardY + cardH - footerH - Math.round(cardH * 0.03);
-    const qrZoneH = qrZoneBottom - qrZoneTop;
-    const qrSize = Math.round(Math.min(cardW * 0.74, qrZoneH * 0.92));
-    const qrX = Math.round(cardX + (cardW - qrSize) / 2);
-    const qrY = Math.round(qrZoneTop + (qrZoneH - qrSize) / 2);
-
-    const qrPad = Math.round(qrSize * 0.07);
-    ctx.fillStyle = '#ffffff';
-    drawRoundedRect(ctx, qrX - qrPad, qrY - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2, 24);
-    ctx.fill();
-
-    ctx.drawImage(baseCanvas, qrX, qrY, qrSize, qrSize);
-
-    if (centerContent !== 'none') {
-      const overlay = Math.round(qrSize * 0.17);
-      const cx = qrX + qrSize / 2;
-      const cy = qrY + qrSize / 2;
-
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = Math.max(2, Math.round(overlay * 0.04));
-      ctx.beginPath();
-      ctx.arc(cx, cy, overlay / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      if (centerContent === 'emoji') {
-        ctx.textAlign = 'center';
-        ctx.font = `${Math.round(overlay * 0.5)}px Inter, ui-sans-serif`;
-        ctx.fillStyle = '#0f172a';
-        ctx.fillText(centerEmoji || '💬', cx, cy + overlay * 0.16);
-      }
-
-      if (centerContent === 'image' && centerImageData) {
-        try {
-          const logo = await loadImage(centerImageData);
-          const safe = overlay * 0.64;
-          const ratio = logo.width / logo.height;
-          const drawW = ratio >= 1 ? safe : safe * ratio;
-          const drawH = ratio >= 1 ? safe / ratio : safe;
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(cx, cy, overlay * 0.33, 0, Math.PI * 2);
-          ctx.clip();
-          ctx.drawImage(logo, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
-          ctx.restore();
-        } catch {
-          // ignore invalid image data silently for stable preview rendering
-        }
-      }
-    }
-
-    ctx.fillStyle = '#64748b';
-    ctx.textAlign = 'center';
-    ctx.font = `${Math.round(height * 0.017)}px Inter, ui-sans-serif`;
-    ctx.fillText('Powered by Zapora', width / 2, cardY + cardH - footerH * 0.35);
-  }, [bannerColor, centerContent, centerEmoji, centerImageData, finalQrData, qrColor, size, subtitle, title]);
-
-  useEffect(() => {
-    void renderComposition();
-  }, [renderComposition]);
-
-  const download = useCallback(() => {
-    const canvas = previewCanvasRef.current;
-    if (!canvas || !finalQrData) return;
-
-    const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
-    const ext = format === 'jpg' ? 'jpg' : 'png';
-    const quality = format === 'jpg' ? 0.95 : undefined;
-    const dataUrl = canvas.toDataURL(mimeType, quality);
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `zapora-qr-${size}.${ext}`;
-    link.click();
-  }, [finalQrData, format, size]);
-
-  return (
-    <main className='min-h-screen bg-white py-8 sm:py-12'>
-      <div className='mx-auto max-w-7xl px-4 lg:px-6'>
-        <header className='mb-6 rounded-3xl border border-slate-200 bg-white p-5 sm:mb-8 sm:p-7'>
-          <p className='mb-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600'>Zapora Studio</p>
-          <h1 className='text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl'>Premium QR Editor</h1>
-        </header>
-
-        <section className='grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(420px,520px)]'>
-          <div className='space-y-4'>
-            <Section title='Content'>
-              <Field label='Link or text'>
-                <input value={targetLink} onChange={(e) => setTargetLink(e.target.value)} className={inputClass} placeholder='Paste WhatsApp link, URL, or plain text' />
-              </Field>
-              <Field label='WhatsApp message'>
-                <textarea value={message} onChange={(e) => setMessage(e.target.value)} className={inputClass} rows={3} placeholder='Optional message appended to WhatsApp links' />
-              </Field>
-              <Field label='Title'>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder='Card title' />
-              </Field>
-              <Field label='Subtitle'>
-                <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className={inputClass} placeholder='Card subtitle' />
-              </Field>
-            </Section>
-
-            <Section title='Color'>
-              <div className='grid grid-cols-3 gap-2'>
-                {colorPresets.map((preset) => (
-                  <button
-                    key={preset.name}
-                    onClick={() => {
-                      setQrColor(preset.qr);
-                      setBannerColor(preset.banner);
-                    }}
-                    className='rounded-xl border border-slate-200 bg-white p-2 text-left transition hover:border-slate-300'
-                    type='button'
-                  >
-                    <div className='mb-1 flex gap-1.5'>
-                      <span className='h-4 w-4 rounded-full border border-white shadow-sm' style={{ backgroundColor: preset.qr }} />
-                      <span className='h-4 w-4 rounded-full border border-white shadow-sm' style={{ backgroundColor: preset.banner }} />
-                    </div>
-                    <p className='text-xs font-medium text-slate-700'>{preset.name}</p>
-                  </button>
-                ))}
-              </div>
-              <ColorField label='Custom QR color' value={qrColor} onChange={setQrColor} />
-              <ColorField label='Custom banner color' value={bannerColor} onChange={setBannerColor} />
-            </Section>
-
-            <Section title='Center content'>
-              <div className='grid grid-cols-3 gap-2'>
-                {(['none', 'emoji', 'image'] as CenterContent[]).map((option) => (
-                  <button
-                    key={option}
-                    type='button'
-                    onClick={() => setCenterContent(option)}
-                    className={`rounded-xl border px-3 py-2 text-sm capitalize transition ${centerContent === option ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'}`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-
-              {centerContent === 'emoji' && (
-                <Field label='Emoji'>
-                  <input value={centerEmoji} onChange={(e) => setCenterEmoji(e.target.value)} className={inputClass} maxLength={2} placeholder='💬' />
-                </Field>
-              )}
-
-              {centerContent === 'image' && (
-                <div className='space-y-2'>
-                  <label className='block cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-700'>
-                    Upload center image
-                    <input
-                      type='file'
-                      accept='image/png,image/jpeg,image/jpg,image/webp'
-                      className='hidden'
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = () => setCenterImageData(String(reader.result || ''));
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </label>
-                  {centerImageData && (
-                    <button type='button' onClick={() => setCenterImageData('')} className='text-xs font-medium text-slate-500 underline underline-offset-2'>
-                      Remove uploaded image
-                    </button>
-                  )}
-                </div>
-              )}
-            </Section>
-          </div>
-
-          <aside className='xl:sticky xl:top-6 xl:self-start'>
-            <div className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5'>
-              <div className='mb-4 grid gap-3 sm:grid-cols-2'>
-                <Field label='Size'>
-                  <select value={size} onChange={(e) => setSize(e.target.value as ExportSizeId)} className={inputClass}>
-                    {Object.entries(exportSizes).map(([id, config]) => (
-                      <option key={id} value={id}>{config.label} {config.ratio}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label='Format'>
-                  <select value={format} onChange={(e) => setFormat(e.target.value as ExportFormat)} className={inputClass}>
-                    <option value='png'>PNG</option>
-                    <option value='jpg'>JPG</option>
-                  </select>
-                </Field>
-              </div>
-
-              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-3'>
-                <canvas ref={previewCanvasRef} className='w-full rounded-xl border border-slate-200 bg-white' />
-                {!finalQrData && <p className='mt-2 text-center text-xs text-slate-500'>Enter a link or text to generate your QR preview.</p>}
-              </div>
-
-              <button
-                type='button'
-                onClick={download}
-                disabled={!finalQrData}
-                className='mt-4 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300'
-              >
-                Download QR ({format.toUpperCase()})
-              </button>
-            </div>
-          </aside>
-        </section>
-      </div>
-
-      <canvas ref={baseQrCanvasRef} className='hidden' />
-    </main>
-  );
+  return `#${((red << 16) | (green << 8) | blue).toString(16).padStart(6, '0')}`;
 }
 
 export { QR_EDITOR_STORAGE_KEY };
+export default QrCodeEditorPage;
