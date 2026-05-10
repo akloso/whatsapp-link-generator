@@ -1,193 +1,407 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Headset, MapPin, MessageCircle, Phone, ShoppingBag, Sparkles, Type, UploadCloud } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import QRCode from 'qrcode';
+
+type ExportSizeId = 'square' | 'story' | 'poster';
+type ExportFormat = 'png' | 'jpg';
+type CenterContent = 'none' | 'emoji' | 'image';
 
 const QR_EDITOR_STORAGE_KEY = 'zapora_qr_editor_link';
 
-type OutputStyle = 'plain' | 'whatsappCard';
-type ExportSizeId = 'squarePost' | 'portraitPost' | 'story' | 'poster' | 'visitingCard';
-type WorkspaceTab = 'content' | 'design';
-type ThemePack = 'zaporaClean' | 'minimalDark' | 'softGreen' | 'modernBlue' | 'boldPromo' | 'elegantBusiness';
-type ModuleStyle = 'classic' | 'square' | 'rounded';
-type EyeStyle = 'square' | 'rounded' | 'ring';
-type SurfaceStyle = 'white' | 'mist' | 'slate';
-type BadgeMode = 'none' | 'icon' | 'emoji' | 'image';
-
-const exportSizes = { squarePost: { label: 'Square Post', ratio: '1:1', w: 1200, h: 1200 }, portraitPost: { label: 'Portrait Post', ratio: '4:5', w: 1080, h: 1350 }, story: { label: 'Story', ratio: '9:16', w: 1080, h: 1920 }, poster: { label: 'Poster', ratio: '7:10', w: 1400, h: 2000 }, visitingCard: { label: 'Visiting Card', ratio: '7:4', w: 1400, h: 800 } } as const;
-const messageTemplates = { general: 'Hi, I’d like to know more about your services.', support: 'Hi, I need help regarding your service/product.', booking: 'Hi, I’d like to book an appointment.', pricing: 'Hi, I’d like to get pricing details.', order: 'Hi, I’d like to place an order.' } as const;
-const themePacks: Record<ThemePack, { label: string; color: string; gradient: boolean; style: OutputStyle; preview: [string, string] }> = {
-  zaporaClean: { label: 'Zapora', color: '#111827', gradient: false, style: 'whatsappCard', preview: ['#22c55e', '#0f172a'] },
-  minimalDark: { label: 'Dark', color: '#111827', gradient: false, style: 'plain', preview: ['#0f172a', '#334155'] },
-  softGreen: { label: 'Soft Green', color: '#166534', gradient: false, style: 'whatsappCard', preview: ['#16a34a', '#65a30d'] },
-  modernBlue: { label: 'Blue', color: '#1d4ed8', gradient: false, style: 'whatsappCard', preview: ['#2563eb', '#0ea5e9'] },
-  boldPromo: { label: 'Promo', color: '#7b61ff', gradient: true, style: 'whatsappCard', preview: ['#7b61ff', '#5ce1e6'] },
-  elegantBusiness: { label: 'Business', color: '#1f2937', gradient: true, style: 'whatsappCard', preview: ['#111827', '#6366f1'] },
+const exportSizes: Record<ExportSizeId, { label: string; ratio: string; width: number; height: number }> = {
+  square: { label: 'Square Post', ratio: '1:1', width: 1200, height: 1200 },
+  story: { label: 'Story', ratio: '9:16', width: 1080, height: 1920 },
+  poster: { label: 'Poster', ratio: '4:5', width: 1080, height: 1350 },
 };
 
-const baseInteractive = 'rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 focus-visible:ring-offset-2 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-40';
-const chipButton = (selected: boolean) => `${baseInteractive} ${selected ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50/40'}`;
+const colorPresets = [
+  { name: 'Classic', qr: '#111827', banner: '#0f172a' },
+  { name: 'WhatsApp', qr: '#075e54', banner: '#128c7e' },
+  { name: 'Midnight', qr: '#0b1220', banner: '#1e293b' },
+  { name: 'Royal', qr: '#312e81', banner: '#4338ca' },
+  { name: 'Sunset', qr: '#9a3412', banner: '#ea580c' },
+  { name: 'Berry', qr: '#831843', banner: '#be185d' },
+] as const;
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className='rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'>
+      <h3 className='mb-3 text-sm font-semibold text-slate-900'>{title}</h3>
+      <div className='space-y-3'>{children}</div>
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className='block'>
+      <span className='mb-1.5 block text-xs font-medium text-slate-600'>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className='flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2'>
+      <span className='text-xs font-medium text-slate-600'>{label}</span>
+      <input type='color' value={value} onChange={(e) => onChange(e.target.value)} className='h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent' />
+    </label>
+  );
+}
+
+const inputClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none';
+
+function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+}
+
+function drawTopRoundedBanner(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to load image'));
+    image.src = src;
+  });
+}
+
+function truncateString(value: string, max: number) {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+function shadeColor(hex: string, amount: number) {
+  const normalized = hex.replace('#', '');
+  const safeHex = normalized.length === 3
+    ? normalized.split('').map((c) => `${c}${c}`).join('')
+    : normalized;
+  const n = Number.parseInt(safeHex, 16);
+  const clamp = (v: number) => Math.max(0, Math.min(255, v));
+  const r = clamp((n >> 16) + amount);
+  const g = clamp(((n >> 8) & 0x00ff) + amount);
+  const b = clamp((n & 0x0000ff) + amount);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
 
 export default function QrCodeEditorPage() {
-  const [tab, setTab] = useState<WorkspaceTab>('content');
   const [targetLink, setTargetLink] = useState('');
-  const [msg, setMsg] = useState(messageTemplates.general);
+  const [message, setMessage] = useState('Hi! I found you on Zapora and wanted to connect.');
   const [title, setTitle] = useState('Connect with us on WhatsApp');
-  const [subtitle, setSubtitle] = useState('Scan to start a professional conversation');
-  const [titleBold, setTitleBold] = useState(false);
-  const [titleItalic, setTitleItalic] = useState(false);
-  const [subtitleBold, setSubtitleBold] = useState(false);
-  const [subtitleItalic, setSubtitleItalic] = useState(false);
-  const [style, setStyle] = useState<OutputStyle>('whatsappCard');
-  const [size, setSize] = useState<ExportSizeId>('squarePost');
-  const [color, setColor] = useState('#111827');
-  const [useGradient, setUseGradient] = useState(false);
-  const [theme, setTheme] = useState<ThemePack>('zaporaClean');
-  const [status, setStatus] = useState('');
-  const [moduleStyle, setModuleStyle] = useState<ModuleStyle>('classic');
-  const [eyeStyle, setEyeStyle] = useState<EyeStyle>('rounded');
-  const [surfaceStyle, setSurfaceStyle] = useState<SurfaceStyle>('white');
-  const [previewQr, setPreviewQr] = useState('');
-  const [badgeMode, setBadgeMode] = useState<BadgeMode>('none');
-  const [badgeIcon, setBadgeIcon] = useState('chat');
-  const [badgeEmoji, setBadgeEmoji] = useState('💬');
-  const [badgeImage, setBadgeImage] = useState('');
+  const [subtitle, setSubtitle] = useState('Scan to start a conversation');
+  const [qrColor, setQrColor] = useState('#111827');
+  const [bannerColor, setBannerColor] = useState('#0f172a');
+  const [centerContent, setCenterContent] = useState<CenterContent>('none');
+  const [centerEmoji, setCenterEmoji] = useState('💬');
+  const [centerImageData, setCenterImageData] = useState('');
+  const [size, setSize] = useState<ExportSizeId>('square');
+  const [format, setFormat] = useState<ExportFormat>('png');
+
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const baseQrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    const s = localStorage.getItem(QR_EDITOR_STORAGE_KEY); if (s) setTargetLink(s);
+    const stored = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
+    if (stored) setTargetLink(stored);
   }, []);
 
-  const valid = useMemo(() => { try { return !!targetLink.trim() && Boolean(new URL(targetLink)); } catch { return false; } }, [targetLink]);
-  const finalLink = useMemo(() => { if (!valid) return ''; const u = new URL(targetLink); if ((u.hostname.includes('wa.me') || u.hostname.includes('whatsapp')) && msg.trim()) u.searchParams.set('text', msg.trim()); return u.toString(); }, [valid, targetLink, msg]);
-  const qr = finalLink ? `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&ecc=H&color=${color.replace('#','')}&bgcolor=ffffff&data=${encodeURIComponent(finalLink)}` : '';
+  const finalQrData = useMemo(() => {
+    const raw = targetLink.trim();
+    if (!raw) return '';
 
-  const applyTheme = (next: ThemePack) => { const p = themePacks[next]; setTheme(next); setColor(p.color); setUseGradient(p.gradient); setStyle(p.style); };
-
-  const handleImportQr = async (file: File) => {
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result as string); fr.onerror = reject; fr.readAsDataURL(file); });
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = dataUrl; });
-      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-      const ctx = c.getContext('2d'); if (!ctx) throw new Error('ctx');
-      ctx.drawImage(img, 0, 0);
-      const detector = 'BarcodeDetector' in window ? new (window as any).BarcodeDetector({ formats: ['qr_code'] }) : null;
-      if (!detector) { setStatus('QR import is not supported in this browser yet.'); return; }
-      const codes = await detector.detect(c);
-      const rawValue = codes?.[0]?.rawValue;
-      if (!rawValue) { setStatus('We couldn’t read this QR. Try a clearer image or a standard QR code.'); return; }
-      setTargetLink(rawValue.trim());
-      setStatus('Imported QR rebuilt successfully.');
+      const parsed = new URL(raw);
+      const host = parsed.hostname.toLowerCase();
+      const isWhatsApp = host.includes('wa.me') || host.includes('whatsapp.');
+      if (isWhatsApp && message.trim()) parsed.searchParams.set('text', message.trim());
+      return parsed.toString();
     } catch {
-      setStatus('We couldn’t read this QR. Try a clearer image or a standard QR code.');
+      return raw;
     }
-  };
+  }, [targetLink, message]);
 
-  const drawStyledQr = async (ctx: CanvasRenderingContext2D, x: number, y: number, sizePx: number) => {
-    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.src = qr; i.onload = () => res(i); i.onerror = () => rej(); });
-    if (moduleStyle === 'classic') { ctx.drawImage(img, x, y, sizePx, sizePx); return; }
-    const m = 45;
-    const t = document.createElement('canvas'); t.width = m; t.height = m;
-    const tctx = t.getContext('2d'); if (!tctx) return;
-    tctx.drawImage(img, 0, 0, m, m);
-    const data = tctx.getImageData(0, 0, m, m).data;
-    const cell = sizePx / m;
-    ctx.fillStyle = color;
-    for (let r = 0; r < m; r++) for (let c = 0; c < m; c++) {
-      const idx = (r * m + c) * 4;
-      if (data[idx] >= 120) continue;
-      const px = x + c * cell; const py = y + r * cell;
-      const inEye = (r < 8 && c < 8) || (r < 8 && c > 36) || (r > 36 && c < 8);
-      if (inEye) continue;
-      if (moduleStyle === 'square') ctx.fillRect(px, py, cell, cell);
-      if (moduleStyle === 'rounded') { ctx.beginPath(); ctx.roundRect(px + cell * 0.08, py + cell * 0.08, cell * 0.84, cell * 0.84, cell * 0.25); ctx.fill(); }
-    }
-    const drawEye = (ex: number, ey: number) => {
-      const e = cell * 7; ctx.lineWidth = cell * 0.9; ctx.strokeStyle = color; ctx.fillStyle = color;
-      if (eyeStyle === 'square') { ctx.strokeRect(ex, ey, e, e); ctx.fillRect(ex + cell * 2.2, ey + cell * 2.2, cell * 2.6, cell * 2.6); }
-      else if (eyeStyle === 'rounded') { ctx.beginPath(); ctx.roundRect(ex, ey, e, e, cell * 1.2); ctx.stroke(); ctx.beginPath(); ctx.roundRect(ex + cell * 2.2, ey + cell * 2.2, cell * 2.6, cell * 2.6, cell * 0.8); ctx.fill(); }
-      else { ctx.beginPath(); ctx.arc(ex + e / 2, ey + e / 2, e / 2, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(ex + e / 2, ey + e / 2, e * 0.21, 0, Math.PI * 2); ctx.fill(); }
-    };
-    drawEye(x + cell, y + cell); drawEye(x + sizePx - cell * 8, y + cell); drawEye(x + cell, y + sizePx - cell * 8);
-  };
+  const renderComposition = useCallback(async () => {
+    const previewCanvas = previewCanvasRef.current;
+    const baseCanvas = baseQrCanvasRef.current;
+    if (!previewCanvas || !baseCanvas || !finalQrData) return;
 
-  const renderCanvas = async () => {
-    if (!qr) return null;
-    const cfg = exportSizes[size];
-    const c = document.createElement('canvas'); c.width = cfg.w; c.height = cfg.h;
-    const ctx = c.getContext('2d'); if (!ctx) return null;
-    ctx.fillStyle = { white: '#ffffff', mist: '#f8fafc', slate: '#f1f5f9' }[surfaceStyle]; ctx.fillRect(0, 0, c.width, c.height);
-    const pad = Math.round(Math.min(c.width, c.height) * 0.058); const w = c.width - pad * 2; const h = c.height - pad * 2;
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(pad, pad, w, h, 24); ctx.fill(); ctx.stroke();
-    const headerH = style === 'plain' ? 0 : Math.round(h * 0.215);
-    if (style !== 'plain') {
-      const g = ctx.createLinearGradient(pad, pad, c.width - pad, pad + 120); g.addColorStop(0, useGradient ? '#7b61ff' : color); g.addColorStop(1, useGradient ? '#5ce1e6' : '#111827');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(pad, pad, w, headerH, [24, 24, 18, 18]); ctx.fill();
-    }
-    const textZone = style === 'plain' ? Math.round(h * 0.055) : Math.round(h * 0.15);
-    const qrTop = pad + headerH + textZone;
-    const qrBottomSafe = pad + h - Math.round(h * 0.075);
-    const maxQrByHeight = Math.max(220, qrBottomSafe - qrTop);
-    const qs = Math.round(Math.min(Math.min(c.width, c.height) * 0.6, maxQrByHeight));
-    const qx = (c.width - qs) / 2;
-    const qy = qrTop;
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(qx - 16, qy - 16, qs + 32, qs + 32, 20); ctx.fill();
-    await drawStyledQr(ctx, qx, qy, qs);
+    const selectedSize = exportSizes[size];
+    previewCanvas.width = selectedSize.width;
+    previewCanvas.height = selectedSize.height;
+    baseCanvas.width = 1200;
+    baseCanvas.height = 1200;
 
-    const badgeSize = Math.round(qs * 0.14);
-    if (badgeMode !== 'none') {
-      const bx = qx + qs / 2; const by = qy + qs / 2;
-      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bx, by, badgeSize / 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      if (badgeMode === 'emoji') { ctx.font = `${Math.round(badgeSize * 0.46)}px Inter`; ctx.textAlign = 'center'; ctx.fillStyle = '#0f172a'; ctx.fillText(badgeEmoji, bx, by + badgeSize * 0.13); }
-      if (badgeMode === 'icon') { const map: Record<string, string> = { chat: '💬', phone: '☎', support: '✚', calendar: '📅', shop: '🛍', location: '⌖' }; ctx.font = `700 ${Math.round(badgeSize * 0.42)}px Inter`; ctx.textAlign = 'center'; ctx.fillStyle = '#0f172a'; ctx.fillText(map[badgeIcon] || '💬', bx, by + badgeSize * 0.12); }
-      if (badgeMode === 'image' && badgeImage) { try { const lg = await new Promise<HTMLImageElement>((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = badgeImage; }); ctx.save(); ctx.beginPath(); ctx.arc(bx, by, badgeSize * 0.34, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(lg, bx - badgeSize * 0.34, by - badgeSize * 0.34, badgeSize * 0.68, badgeSize * 0.68); ctx.restore(); } catch {} }
+    await QRCode.toCanvas(baseCanvas, finalQrData, {
+      width: 1200,
+      margin: 1,
+      errorCorrectionLevel: 'H',
+      color: { dark: qrColor, light: '#ffffff' },
+    });
+
+    const ctx = previewCanvas.getContext('2d');
+    if (!ctx) return;
+
+    const { width, height } = previewCanvas;
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, width, height);
+
+    const outerPad = Math.round(Math.min(width, height) * 0.06);
+    const cardX = outerPad;
+    const cardY = outerPad;
+    const cardW = width - outerPad * 2;
+    const cardH = height - outerPad * 2;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
+    ctx.shadowBlur = 38;
+    ctx.shadowOffsetY = 12;
+    ctx.fillStyle = '#ffffff';
+    drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 32);
+    ctx.fill();
+    ctx.restore();
+
+    const bannerH = Math.round(cardH * 0.19);
+    const bannerBase = shadeColor(bannerColor, -18);
+    const bannerGradient = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + bannerH);
+    bannerGradient.addColorStop(0, bannerColor);
+    bannerGradient.addColorStop(1, bannerBase);
+    ctx.fillStyle = bannerGradient;
+    drawTopRoundedBanner(ctx, cardX, cardY, cardW, bannerH, 32);
+    ctx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `${Math.round(height * 0.042)}px Inter, ui-sans-serif`;
+    ctx.fillText(truncateString(title.trim() || 'Scan me', 40), width / 2, cardY + bannerH * 0.48);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `${Math.round(height * 0.024)}px Inter, ui-sans-serif`;
+    ctx.fillText(truncateString(subtitle.trim() || 'Quick access', 54), width / 2, cardY + bannerH * 0.75);
+
+    const footerH = Math.round(cardH * 0.09);
+    const qrZoneTop = cardY + bannerH + Math.round(cardH * 0.045);
+    const qrZoneBottom = cardY + cardH - footerH - Math.round(cardH * 0.03);
+    const qrZoneH = qrZoneBottom - qrZoneTop;
+    const qrSize = Math.round(Math.min(cardW * 0.74, qrZoneH * 0.92));
+    const qrX = Math.round(cardX + (cardW - qrSize) / 2);
+    const qrY = Math.round(qrZoneTop + (qrZoneH - qrSize) / 2);
+
+    const qrPad = Math.round(qrSize * 0.07);
+    ctx.fillStyle = '#ffffff';
+    drawRoundedRect(ctx, qrX - qrPad, qrY - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2, 24);
+    ctx.fill();
+
+    ctx.drawImage(baseCanvas, qrX, qrY, qrSize, qrSize);
+
+    if (centerContent !== 'none') {
+      const overlay = Math.round(qrSize * 0.17);
+      const cx = qrX + qrSize / 2;
+      const cy = qrY + qrSize / 2;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = Math.max(2, Math.round(overlay * 0.04));
+      ctx.beginPath();
+      ctx.arc(cx, cy, overlay / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      if (centerContent === 'emoji') {
+        ctx.textAlign = 'center';
+        ctx.font = `${Math.round(overlay * 0.5)}px Inter, ui-sans-serif`;
+        ctx.fillStyle = '#0f172a';
+        ctx.fillText(centerEmoji || '💬', cx, cy + overlay * 0.16);
+      }
+
+      if (centerContent === 'image' && centerImageData) {
+        try {
+          const logo = await loadImage(centerImageData);
+          const safe = overlay * 0.64;
+          const ratio = logo.width / logo.height;
+          const drawW = ratio >= 1 ? safe : safe * ratio;
+          const drawH = ratio >= 1 ? safe / ratio : safe;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(cx, cy, overlay * 0.33, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(logo, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+          ctx.restore();
+        } catch {
+          // ignore invalid image data silently for stable preview rendering
+        }
+      }
     }
 
-    if (style !== 'plain') {
-      ctx.textAlign = 'center';
-      const titleY = pad + Math.round(headerH * 0.44);
-      ctx.font = `${titleItalic ? 'italic ' : ''}${titleBold ? '700' : '500'} ${Math.round(c.height * 0.041)}px Inter`;
-      ctx.fillStyle = '#ffffff'; ctx.fillText(title, c.width / 2, titleY);
-      ctx.font = `${subtitleItalic ? 'italic ' : ''}${subtitleBold ? '700' : '400'} ${Math.round(c.height * 0.024)}px Inter`;
-      ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillText(subtitle, c.width / 2, titleY + Math.round(headerH * 0.26));
-    }
-    return c;
-  };
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    ctx.font = `${Math.round(height * 0.017)}px Inter, ui-sans-serif`;
+    ctx.fillText('Powered by Zapora', width / 2, cardY + cardH - footerH * 0.35);
+  }, [bannerColor, centerContent, centerEmoji, centerImageData, finalQrData, qrColor, size, subtitle, title]);
 
   useEffect(() => {
-    let active = true;
-    (async () => { if (!valid || !qr) return setPreviewQr(''); const c = await renderCanvas(); if (c && active) setPreviewQr(c.toDataURL('image/png')); })();
-    return () => { active = false; };
-  }, [qr, valid, size, style, color, useGradient, title, subtitle, moduleStyle, eyeStyle, badgeMode, badgeIcon, badgeEmoji, badgeImage, titleBold, titleItalic, subtitleBold, subtitleItalic, surfaceStyle]);
+    void renderComposition();
+  }, [renderComposition]);
 
-  const downloadBlob = (blob: Blob, filename: string) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); };
-  const exportPNG = async () => { if (!valid) return; const c = await renderCanvas(); if (!c) return; c.toBlob((blob) => { if (!blob) return; downloadBlob(blob, `zapora-${style}-${size}.png`); }, 'image/png'); };
-  const exportSVG = async () => { if (!valid || !previewQr) return; const cfg = exportSizes[size]; const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${cfg.w}' height='${cfg.h}'><rect width='100%' height='100%' fill='#ffffff'/><image href='${previewQr}' x='0' y='0' width='${cfg.w}' height='${cfg.h}'/></svg>`; downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), `zapora-${style}-${size}.svg`); };
-  const exportPDF = async () => { if (!valid) return; const c = await renderCanvas(); if (!c) return; const w = window.open('', '_blank'); if (!w) return; w.document.write(`<img src='${c.toDataURL('image/png')}' style='width:100%;max-width:900px;display:block;margin:auto'/>`); w.document.close(); w.print(); };
+  const download = useCallback(() => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas || !finalQrData) return;
 
-  return <main className='min-h-screen bg-white py-8 sm:py-12'><div className='mx-auto max-w-7xl px-4 lg:px-6'><header className='mb-6 rounded-3xl border border-slate-200 bg-white p-5 sm:mb-8 sm:p-7'><p className='mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700'>Zapora Studio</p><h1 className='text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl'>QR Code Editor</h1></header>
-    <section className='grid gap-5 xl:grid-cols-[1fr_1fr]'><div className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 min-h-[760px]'><div className='mb-5 grid grid-cols-3 gap-2 rounded-2xl bg-slate-100/90 p-1.5 ring-1 ring-slate-200'>{([{ id: 'content', label: 'Content' }, { id: 'design', label: 'Style & Layout' }] as { id: WorkspaceTab; label: string }[]).map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`${baseInteractive} border-0 px-3 py-2.5 text-sm ${tab === item.id ? 'bg-white text-slate-950 shadow-md ring-2 ring-violet-200' : 'bg-transparent text-slate-600 hover:bg-white/80'}`}>{item.label}</button>)}</div>
-      {tab === 'content' && <div className='space-y-3'><label className='block cursor-pointer rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/60 p-4 text-sm text-emerald-900 hover:bg-emerald-50'><span className='mb-1 inline-flex items-center gap-2 font-semibold'><UploadCloud className='h-4 w-4' />Import QR</span><p className='text-xs'>Upload QR image (PNG, JPG, WEBP) to rebuild in studio.</p><input type='file' accept='image/png,image/jpeg,image/jpg,image/webp' className='hidden' onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportQr(f); }} /></label><input value={targetLink} onChange={(e) => setTargetLink(e.target.value)} className='w-full rounded-xl border border-slate-300 px-4 py-3 text-sm' placeholder='Paste your WhatsApp link or URL' /><textarea value={msg} onChange={(e) => setMsg(e.target.value)} className='w-full rounded-xl border border-slate-300 px-4 py-3 text-sm' rows={3} /></div>}
-      {tab === 'design' && <div className='space-y-4'>
-        <section className='rounded-2xl border border-slate-200 p-3'>
-          <p className='mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500'>QR style / design</p>
-          <div className='grid grid-cols-2 gap-2'>{(['classic', 'square', 'rounded'] as ModuleStyle[]).map((m) => <button key={m} onClick={() => setModuleStyle(m)} className={chipButton(moduleStyle === m)}>{m}</button>)}</div>
+    const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+    const ext = format === 'jpg' ? 'jpg' : 'png';
+    const quality = format === 'jpg' ? 0.95 : undefined;
+    const dataUrl = canvas.toDataURL(mimeType, quality);
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `zapora-qr-${size}.${ext}`;
+    link.click();
+  }, [finalQrData, format, size]);
+
+  return (
+    <main className='min-h-screen bg-white py-8 sm:py-12'>
+      <div className='mx-auto max-w-7xl px-4 lg:px-6'>
+        <header className='mb-6 rounded-3xl border border-slate-200 bg-white p-5 sm:mb-8 sm:p-7'>
+          <p className='mb-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600'>Zapora Studio</p>
+          <h1 className='text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl'>Premium QR Editor</h1>
+        </header>
+
+        <section className='grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(420px,520px)]'>
+          <div className='space-y-4'>
+            <Section title='Content'>
+              <Field label='Link or text'>
+                <input value={targetLink} onChange={(e) => setTargetLink(e.target.value)} className={inputClass} placeholder='Paste WhatsApp link, URL, or plain text' />
+              </Field>
+              <Field label='WhatsApp message'>
+                <textarea value={message} onChange={(e) => setMessage(e.target.value)} className={inputClass} rows={3} placeholder='Optional message appended to WhatsApp links' />
+              </Field>
+              <Field label='Title'>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder='Card title' />
+              </Field>
+              <Field label='Subtitle'>
+                <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className={inputClass} placeholder='Card subtitle' />
+              </Field>
+            </Section>
+
+            <Section title='Color'>
+              <div className='grid grid-cols-3 gap-2'>
+                {colorPresets.map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => {
+                      setQrColor(preset.qr);
+                      setBannerColor(preset.banner);
+                    }}
+                    className='rounded-xl border border-slate-200 bg-white p-2 text-left transition hover:border-slate-300'
+                    type='button'
+                  >
+                    <div className='mb-1 flex gap-1.5'>
+                      <span className='h-4 w-4 rounded-full border border-white shadow-sm' style={{ backgroundColor: preset.qr }} />
+                      <span className='h-4 w-4 rounded-full border border-white shadow-sm' style={{ backgroundColor: preset.banner }} />
+                    </div>
+                    <p className='text-xs font-medium text-slate-700'>{preset.name}</p>
+                  </button>
+                ))}
+              </div>
+              <ColorField label='Custom QR color' value={qrColor} onChange={setQrColor} />
+              <ColorField label='Custom banner color' value={bannerColor} onChange={setBannerColor} />
+            </Section>
+
+            <Section title='Center content'>
+              <div className='grid grid-cols-3 gap-2'>
+                {(['none', 'emoji', 'image'] as CenterContent[]).map((option) => (
+                  <button
+                    key={option}
+                    type='button'
+                    onClick={() => setCenterContent(option)}
+                    className={`rounded-xl border px-3 py-2 text-sm capitalize transition ${centerContent === option ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'}`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+
+              {centerContent === 'emoji' && (
+                <Field label='Emoji'>
+                  <input value={centerEmoji} onChange={(e) => setCenterEmoji(e.target.value)} className={inputClass} maxLength={2} placeholder='💬' />
+                </Field>
+              )}
+
+              {centerContent === 'image' && (
+                <div className='space-y-2'>
+                  <label className='block cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-700'>
+                    Upload center image
+                    <input
+                      type='file'
+                      accept='image/png,image/jpeg,image/jpg,image/webp'
+                      className='hidden'
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => setCenterImageData(String(reader.result || ''));
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                  {centerImageData && (
+                    <button type='button' onClick={() => setCenterImageData('')} className='text-xs font-medium text-slate-500 underline underline-offset-2'>
+                      Remove uploaded image
+                    </button>
+                  )}
+                </div>
+              )}
+            </Section>
+          </div>
+
+          <aside className='xl:sticky xl:top-6 xl:self-start'>
+            <div className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5'>
+              <div className='mb-4 grid gap-3 sm:grid-cols-2'>
+                <Field label='Size'>
+                  <select value={size} onChange={(e) => setSize(e.target.value as ExportSizeId)} className={inputClass}>
+                    {Object.entries(exportSizes).map(([id, config]) => (
+                      <option key={id} value={id}>{config.label} {config.ratio}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label='Format'>
+                  <select value={format} onChange={(e) => setFormat(e.target.value as ExportFormat)} className={inputClass}>
+                    <option value='png'>PNG</option>
+                    <option value='jpg'>JPG</option>
+                  </select>
+                </Field>
+              </div>
+
+              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-3'>
+                <canvas ref={previewCanvasRef} className='w-full rounded-xl border border-slate-200 bg-white' />
+                {!finalQrData && <p className='mt-2 text-center text-xs text-slate-500'>Enter a link or text to generate your QR preview.</p>}
+              </div>
+
+              <button
+                type='button'
+                onClick={download}
+                disabled={!finalQrData}
+                className='mt-4 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300'
+              >
+                Download QR ({format.toUpperCase()})
+              </button>
+            </div>
+          </aside>
         </section>
-        <section className='rounded-2xl border border-slate-200 p-3'>
-          <p className='mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500'>Colors</p>
-          <div className='grid grid-cols-6 gap-2'>{(Object.keys(themePacks) as ThemePack[]).map((k) => { const p = themePacks[k]; return <button key={k} title={p.label} onClick={() => applyTheme(k)} className={`h-7 w-7 rounded-full border ${theme === k ? 'ring-2 ring-emerald-500' : 'border-slate-200'}`} style={{ backgroundImage: `linear-gradient(135deg,${p.preview[0]},${p.preview[1]})` }} />; })}<button className='h-7 w-7 rounded-full border border-slate-200' style={{ backgroundImage: 'linear-gradient(135deg,#f97316,#fb7185)' }} onClick={() => { setColor('#f97316'); setUseGradient(true); }} /><button className='h-7 w-7 rounded-full border border-slate-200' style={{ backgroundImage: 'linear-gradient(135deg,#0891b2,#6366f1)' }} onClick={() => { setColor('#0891b2'); setUseGradient(true); }} /><button className='h-7 w-7 rounded-full border border-slate-200' style={{ backgroundImage: 'linear-gradient(135deg,#a855f7,#ec4899)' }} onClick={() => { setColor('#a855f7'); setUseGradient(true); }} /></div>
-          <label className='mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs'>Custom color <input type='color' value={color} onChange={(e) => setColor(e.target.value)} className='h-6 w-6 rounded border border-slate-300' /></label>
-          <button onClick={() => setUseGradient((v) => !v)} className={`${chipButton(useGradient)} mt-3`}>{useGradient ? 'Gradient On' : 'Gradient Off'}</button>
-        </section>
-        <section className='rounded-2xl border border-slate-200 p-3'>
-          <p className='mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500'>Title & subtitle</p>
-          <div className='flex gap-2 max-sm:flex-col'><input value={title} onChange={(e) => setTitle(e.target.value)} className='w-full rounded-xl border border-slate-300 px-3 py-2 text-sm' placeholder='Headline' /><input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className='w-full rounded-xl border border-slate-300 px-3 py-2 text-sm' placeholder='Subtitle' /></div>
-          <div className='mt-2 flex flex-wrap gap-2'><button onClick={() => setTitleBold((v) => !v)} className={chipButton(titleBold)}><Type className='mr-1 inline h-3 w-3' />Title Bold</button><button onClick={() => setTitleItalic((v) => !v)} className={chipButton(titleItalic)}>Title Italic</button><button onClick={() => setSubtitleBold((v) => !v)} className={chipButton(subtitleBold)}>Subtitle Bold</button><button onClick={() => setSubtitleItalic((v) => !v)} className={chipButton(subtitleItalic)}>Subtitle Italic</button></div>
-        </section>
-        <section className='rounded-2xl border border-slate-200 bg-slate-50/60 p-3'>
-          <div className='mb-2 flex items-center justify-between'><p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Center content</p><span className='text-[11px] text-slate-500'>Scan-safe badge</span></div>
-          <div className='mb-2 grid grid-cols-4 gap-2'>{(['none', 'icon', 'emoji', 'image'] as BadgeMode[]).map((m) => <button key={m} onClick={() => setBadgeMode(m)} className={`${chipButton(badgeMode === m)} capitalize`}>{m}</button>)}</div>{badgeMode === 'icon' && <div className='grid grid-cols-3 gap-2'>{[{ id: 'chat', label: 'Chat', icon: MessageCircle }, { id: 'phone', label: 'Phone', icon: Phone }, { id: 'support', label: 'Help', icon: Headset }, { id: 'calendar', label: 'Book', icon: CalendarDays }, { id: 'shop', label: 'Shop', icon: ShoppingBag }, { id: 'location', label: 'Visit', icon: MapPin }].map((opt) => <button key={opt.id} onClick={() => setBadgeIcon(opt.id)} className={`${chipButton(badgeIcon === opt.id)} flex items-center gap-1`}><opt.icon className='h-3 w-3' />{opt.label}</button>)}</div>}{badgeMode === 'emoji' && <div className='grid grid-cols-6 gap-2'>{['💬', '❤️', '⭐', '📅', '📍', '🛍️'].map((emo) => <button key={emo} onClick={() => setBadgeEmoji(emo)} className={`${chipButton(badgeEmoji === emo)} text-lg`}>{emo}</button>)}</div>}{badgeMode === 'image' && <label className='block cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs'>Upload center image<input type='file' accept='image/png,image/jpeg,image/jpg,image/webp' className='hidden' onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => setBadgeImage(fr.result as string); fr.readAsDataURL(f); }} /></label>}
-        </section>
-      </div>}
-    </div>
-      <div className='xl:sticky xl:top-5 xl:self-start'><section className='rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm sm:p-6'><div className='mb-4 flex items-center justify-between'><h2 className='inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-600'><Sparkles className='h-4 w-4 text-violet-500' />Live Canvas</h2><span className='rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700'>{exportSizes[size].label}</span></div>{valid && previewQr ? <div className='grid min-h-[500px] place-items-center rounded-3xl border border-slate-200 bg-slate-100/80 p-6'><div className='w-full max-w-lg rounded-[2rem] border border-slate-200 bg-white p-6 shadow-lg'><img src={previewQr} className='mx-auto block w-full max-w-[420px] rounded-2xl border border-slate-200 bg-white p-2 object-contain' alt='preview' /></div></div> : <div className='flex min-h-[500px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-100 text-center text-slate-700'><Sparkles className='mb-2 h-5 w-5 text-violet-500' /><p className='font-semibold'>Start with a link to preview and export</p></div>}{valid && <button onClick={exportPNG} disabled={!valid} className='mt-4 w-full rounded-xl border border-transparent bg-gradient-to-r from-violet-600 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50'>Download QR</button>}</section></div></section></div></main>;
+      </div>
+
+      <canvas ref={baseQrCanvasRef} className='hidden' />
+    </main>
+  );
 }
 
 export { QR_EDITOR_STORAGE_KEY };
