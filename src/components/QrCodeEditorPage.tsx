@@ -289,18 +289,18 @@ function QrCodeEditorPage() {
   };
 
   return (
-    <main className="min-h-screen bg-white py-8 sm:py-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <section className="mb-6 rounded-[28px] border border-slate-200 bg-white px-5 py-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] sm:mb-8 sm:px-7 sm:py-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <main className="min-h-screen bg-white py-5 sm:py-10">
+      <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8">
+        <section className="mb-4 rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] sm:mb-7 sm:px-7 sm:py-6">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              <p className="mb-1.5 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
                 Zapora Studio
               </p>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 QR Code Editor
               </h1>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-0.5 text-sm text-slate-600">
                 Design and export a clean, premium, scannable QR in one place.
               </p>
             </div>
@@ -312,8 +312,8 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-          <div className="space-y-5">
+        <section className="grid gap-4 sm:gap-5 xl:grid-cols-[420px_1fr] xl:gap-6">
+          <div className="space-y-3.5 sm:space-y-4.5">
             <Section title="Content">
               <Field label="Link or text">
                 <input
@@ -374,7 +374,7 @@ function QrCodeEditorPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2">
                 <ColorField label="QR color" value={fg} onChange={setFg} />
                 <ColorField label="Banner" value={banner} onChange={setBanner} />
               </div>
@@ -408,7 +408,7 @@ function QrCodeEditorPage() {
               </div>
 
               {centerType === 'emoji' ? (
-                <div className="mt-3 grid grid-cols-6 gap-1.5">
+                <div className="mt-2.5 grid grid-cols-6 gap-1.5">
                   {EMOJIS.map((emoji) => (
                     <button
                       key={emoji}
@@ -424,7 +424,7 @@ function QrCodeEditorPage() {
               ) : null}
 
               {centerType === 'image' ? (
-                <div className="mt-3 space-y-2">
+                <div className="mt-2.5 space-y-2">
                   <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600 transition hover:bg-slate-100">
                     <ImageIcon className="h-4 w-4" />
                     {centerImage ? 'Replace image' : 'Upload image (PNG, JPG, WEBP)'}
@@ -448,11 +448,11 @@ function QrCodeEditorPage() {
           </div>
 
           <div className="xl:sticky xl:top-24 xl:self-start">
-            <div className="rounded-[30px] border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-5 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:p-6">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:p-6">
+              <div className="mb-3 flex flex-col gap-2.5 sm:mb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live preview</p>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-0.5 text-sm text-slate-600">
                     {size.name} · {size.ratio}
                   </p>
                 </div>
@@ -475,30 +475,30 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="flex justify-center rounded-[28px] border border-slate-200 bg-white/70 p-4 sm:p-6">
+              <div className="flex justify-center rounded-[22px] border border-slate-200 bg-white/70 p-3 sm:rounded-[28px] sm:p-5">
                 {isReady ? (
                   <div
                     className="overflow-hidden rounded-[24px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200"
                     style={{
                       aspectRatio: `${size.w}/${size.h}`,
-                      width: size.ratio === '9:16' ? '260px' : size.ratio === '4:5' ? '320px' : '380px',
+                      width: size.ratio === '9:16' ? '220px' : size.ratio === '4:5' ? '280px' : '320px',
                       maxWidth: '100%',
                     }}
                   >
                     <canvas ref={previewRef} className="h-full w-full" />
                   </div>
                 ) : (
-                  <div className="flex min-h-[420px] w-full items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 text-center text-sm text-slate-500">
+                  <div className="flex min-h-[320px] w-full items-center justify-center rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500 sm:min-h-[420px] sm:px-6">
                     Add a link or text to generate your QR preview.
                   </div>
                 )}
               </div>
 
-              <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mt-3.5 rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-sm sm:mt-5 sm:rounded-[24px] sm:p-5">
+                <div className="mb-2.5 flex items-center justify-between gap-2.5 sm:mb-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Download</p>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-0.5 text-sm text-slate-600">
                       Export your QR in a clean, presentation-ready format.
                     </p>
                   </div>
@@ -524,12 +524,12 @@ function QrCodeEditorPage() {
                 <button
                   onClick={handleDownload}
                   disabled={!isReady}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#16a34a_0%,#059669_100%)] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#16a34a_0%,#059669_100%)] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" /> Download QR ({format})
                 </button>
 
-                <p className="mt-3 text-center text-xs text-slate-500">
+                <p className="mt-2.5 text-center text-xs text-slate-500">
                   High error correction enabled · Safe scan area protected
                 </p>
               </div>
@@ -548,8 +548,8 @@ function QrCodeEditorPage() {
           border-radius: 0.9rem;
           border: 1px solid rgb(203 213 225);
           background: #ffffff;
-          padding: 0.85rem 1rem;
-          font-size: 0.875rem;
+          padding: 0.72rem 0.9rem;
+          font-size: 0.82rem;
           color: rgb(15 23 42);
           outline: none;
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -559,6 +559,13 @@ function QrCodeEditorPage() {
           border-color: rgb(16 185 129);
           box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
         }
+      
+        @media (min-width: 640px) {
+          .zapora-input {
+            padding: 0.85rem 1rem;
+            font-size: 0.875rem;
+          }
+        }
       `}</style>
     </main>
   );
@@ -566,9 +573,9 @@ function QrCodeEditorPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.3)]">
+    <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.3)] sm:rounded-[24px] sm:p-5">
       <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</h3>
-      <div className="mt-4 space-y-3">{children}</div>
+      <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3">{children}</div>
     </div>
   );
 }
@@ -576,7 +583,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-slate-700">{label}</span>
       {children}
     </label>
   );
@@ -593,7 +600,7 @@ function ColorField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-slate-700">{label}</span>
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5">
         <input
           type="color"
