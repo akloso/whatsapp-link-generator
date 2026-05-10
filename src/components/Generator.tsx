@@ -1,5 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle } from 'lucide-react';
+import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle, ExternalLink } from 'lucide-react';
+import { saveSubmissionToSheet } from '../lib/saveSubmissionToSheet';
+import { trackEvent } from '../lib/trackEvent';
 
 type CountryOption = {
   code: string;
@@ -70,6 +72,15 @@ const countryOptions: CountryOption[] = [
   { code: '+977', country: 'Nepal' },
 ];
 
+const sortedCountryOptions = (() => {
+  const india = countryOptions.find((option) => option.country === 'India');
+  const others = countryOptions
+    .filter((option) => option.country !== 'India')
+    .sort((a, b) => a.country.localeCompare(b.country));
+
+  return india ? [india, ...others] : others;
+})();
+
 const MIN_PHONE_LENGTH = 6;
 const MAX_PHONE_LENGTH = 15;
 
@@ -96,7 +107,7 @@ const getPhoneError = (rawValue: string) => {
 };
 
 export default function Generator() {
-  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(sortedCountryOptions[0] ?? null);
   const [countrySearch, setCountrySearch] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
@@ -108,6 +119,7 @@ export default function Generator() {
   const [phoneError, setPhoneError] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const [honeypot, setHoneypot] = useState('');
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -121,9 +133,9 @@ export default function Generator() {
   const filteredCountries = useMemo(() => {
     const query = countrySearch.trim().toLowerCase();
 
-    if (!query) return countryOptions;
+    if (!query) return sortedCountryOptions;
 
-    return countryOptions.filter((option) => option.country.toLowerCase().includes(query) || option.code.toLowerCase().includes(query));
+    return sortedCountryOptions.filter((option) => option.country.toLowerCase().includes(query) || option.code.toLowerCase().includes(query));
   }, [countrySearch]);
 
   const digitsOnlyPhone = useMemo(() => phoneNumber.replace(/\D/g, ''), [phoneNumber]);
@@ -185,6 +197,21 @@ export default function Generator() {
     setDownloadStatus('idle');
     setShowCelebration(true);
     window.setTimeout(() => setShowCelebration(false), 1100);
+
+    trackEvent('generate_link', { country_code: selectedCountry.code });
+
+    if (trimmedMessage) {
+      trackEvent('message_added');
+    }
+
+    if (!honeypot) {
+      void saveSubmissionToSheet({
+        countryCode: selectedCountry.code,
+        phoneNumber: fullNumber,
+        message: trimmedMessage,
+        generatedLink: link,
+      });
+    }
   };
 
   const copyToClipboard = async () => {
@@ -193,6 +220,7 @@ export default function Generator() {
     try {
       await navigator.clipboard.writeText(generatedLink);
       setCopied(true);
+      trackEvent('copy_link');
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
@@ -220,6 +248,7 @@ export default function Generator() {
       link.remove();
       URL.revokeObjectURL(blobUrl);
       setDownloadStatus('success');
+      trackEvent('download_qr');
       window.setTimeout(() => setDownloadStatus('idle'), 2200);
     } catch {
       setDownloadStatus('error');
@@ -383,6 +412,16 @@ export default function Generator() {
               />
             </div>
 
+            <input
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+              aria-hidden="true"
+              className="sr-only"
+            />
+
             <button
               onClick={generateLink}
               disabled={!isFormValid}
@@ -432,6 +471,19 @@ export default function Generator() {
                     {downloadStatus === 'success' ? 'QR Downloaded' : 'Download QR'}
                   </button>
                 </div>
+
+                <button
+                  onClick={() => {
+                    if (!generatedLink) return;
+                    trackEvent('open_whatsapp');
+                    window.open(generatedLink, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 font-semibold text-white transition-all hover:bg-green-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 sm:col-span-2"
+                  aria-label="Open generated WhatsApp link"
+                >
+                  <ExternalLink className="h-5 w-5" />
+                  Open in WhatsApp
+                </button>
 
                 <p role="status" aria-live="polite" className="min-h-6 text-center text-sm text-gray-600">
                   {downloadStatus === 'success' && 'QR code downloaded successfully.'}

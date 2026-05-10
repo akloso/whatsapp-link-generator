@@ -109,12 +109,12 @@ function App() {
       <InfoPage
         icon={ShieldCheck}
         title="Privacy Policy"
-        subtitle="Last updated: March 29, 2026"
+        subtitle="Last updated: May 10, 2026"
         sections={[
           {
             heading: 'What this tool does',
             content:
-              'WhatsApp Link Generator helps you create a wa.me link and QR code in your browser. The information you type is used only to build your link and is not sent to our server for storage.',
+              'WhatsApp Link Generator helps you create a wa.me link and QR code in your browser. The information you enter is used to generate links, support service functionality, and may be stored in limited form for analytics and product improvement.',
           },
           {
             heading: 'Data we process',
@@ -134,7 +134,7 @@ function App() {
           {
             heading: 'Contact',
             content:
-              'For privacy questions or requests, email hello@zapora.in. We aim to respond within two business days.',
+              'For privacy questions or requests, email hizapora@gmail.com. We aim to respond within two business days.',
           },
         ]}
       />
@@ -144,7 +144,7 @@ function App() {
       <InfoPage
         icon={Scale}
         title="Terms of Use"
-        subtitle="Last updated: March 29, 2026"
+        subtitle="Last updated: May 10, 2026"
         sections={[
           {
             heading: 'Acceptance of terms',
@@ -154,7 +154,7 @@ function App() {
           {
             heading: 'Service scope',
             content:
-              'This tool is provided to generate WhatsApp links and QR codes. You are responsible for the phone numbers, messages, and campaigns you create.',
+              'This tool is provided to generate WhatsApp links and QR codes. Entered details may be stored in limited form for analytics, service functionality, and product improvement.',
           },
           {
             heading: 'Acceptable use',
