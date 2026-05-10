@@ -543,7 +543,7 @@ function QrCodeEditorPage() {
 
 
 
-        <section className="mt-16 rounded-[34px] border border-slate-200 bg-[#eef4ef] p-4 sm:p-6 lg:p-8">
+        <section className="mt-24 rounded-[34px] border border-slate-200 bg-[#eef4ef] p-4 sm:p-6 lg:p-8">
           <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_90px_-65px_rgba(15,23,42,0.35)]">
             <div className="grid lg:grid-cols-2">
               <div className="p-6 sm:p-9 lg:p-12">
@@ -572,7 +572,7 @@ function QrCodeEditorPage() {
                 <button
                   type="button"
                   onClick={() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  className="mt-8 inline-flex items-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-lg font-semibold text-white transition hover:bg-slate-800"
+                  className="mt-9 inline-flex items-center gap-2 rounded-full bg-slate-900/95 px-6 py-3 text-lg font-semibold text-white shadow-[0_14px_26px_-18px_rgba(15,23,42,0.55)] transition hover:bg-slate-800"
                 >
                   Customize QR Code <ArrowRight className="h-5 w-5" />
                 </button>
@@ -584,7 +584,7 @@ function QrCodeEditorPage() {
             </div>
           </div>
 
-          <div className="mt-16">
+          <div className="mt-20">
             <h3 className="text-center text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Built for every kind of conversation</h3>
             <p className="mt-4 text-center text-xl text-slate-600">From storefronts to social bios — Zapora fits anywhere a chat starts.</p>
 
@@ -682,12 +682,12 @@ function FeatureBullet({ text }: { text: string }) {
 
 function PromoMockup() {
   return (
-    <div className="mx-auto w-full max-w-[380px] rounded-[34px] border border-slate-200 bg-white p-5 shadow-[0_35px_80px_-55px_rgba(15,23,42,0.45)] sm:p-6">
-      <div className="rounded-[28px] bg-emerald-600 px-4 py-5 text-center text-white">
+    <div className="mx-auto w-full max-w-[390px] rounded-[34px] border border-slate-200/90 bg-white p-6 shadow-[0_42px_90px_-54px_rgba(15,23,42,0.52)] sm:p-7">
+      <div className="rounded-[28px] bg-emerald-600 px-5 py-[1.375rem] text-center text-white">
         <p className="text-4xl font-semibold">Scan to chat</p>
         <p className="mt-1 text-2xl text-emerald-50">@zapora.in</p>
       </div>
-      <div className="mt-4 rounded-[28px] border border-slate-200 bg-slate-100 p-8">
+      <div className="mt-5 rounded-[28px] border border-slate-200 bg-slate-100 p-[2.125rem]">
         <div className="mx-auto grid w-40 grid-cols-7 gap-2 sm:w-52">
           {Array.from({ length: 49 }).map((_, i) => (
             <span key={i} className={`h-3.5 w-3.5 rounded-full ${[0,1,2,7,9,14,15,21,23,28,29,35,36,37,42,44,45,46,47].includes(i) ? 'bg-slate-950' : 'bg-transparent'}`} />
@@ -701,11 +701,11 @@ function PromoMockup() {
 
 function UseCaseCard({ icon: Icon, title, className = '' }: { icon: React.ComponentType<{ className?: string }>; title: string; className?: string }) {
   return (
-    <article className={`rounded-[22px] border border-slate-200 bg-white p-6 text-center shadow-[0_16px_36px_-34px_rgba(15,23,42,0.28)] ${className}`}>
+    <article className={`rounded-[22px] border border-slate-200 bg-white p-5 text-center shadow-[0_14px_30px_-30px_rgba(15,23,42,0.25)] ${className}`}>
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
         <Icon className="h-7 w-7 text-emerald-600" />
       </div>
-      <p className="mt-4 text-2xl font-medium text-slate-900">{title}</p>
+      <p className="mt-3.5 text-xl font-medium text-slate-900">{title}</p>
     </article>
   );
 }
