@@ -96,7 +96,9 @@ const getPhoneError = (rawValue: string) => {
 };
 
 export default function Generator() {
-  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
+  const indiaOption = countryOptions.find((option) => option.country === 'India') ?? countryOptions[0];
+
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(indiaOption);
   const [countrySearch, setCountrySearch] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
@@ -124,11 +126,14 @@ export default function Generator() {
 
   const filteredCountries = useMemo(() => {
     const query = countrySearch.trim().toLowerCase();
+    const sortedCountries = [...countryOptions].sort((a, b) => a.country.localeCompare(b.country));
+    const nonIndiaCountries = sortedCountries.filter((option) => option.country !== 'India');
+    const orderedCountries = indiaOption ? [indiaOption, ...nonIndiaCountries] : nonIndiaCountries;
 
-    if (!query) return countryOptions;
+    if (!query) return orderedCountries;
 
-    return countryOptions.filter((option) => option.country.toLowerCase().includes(query) || option.code.toLowerCase().includes(query));
-  }, [countrySearch]);
+    return orderedCountries.filter((option) => option.country.toLowerCase().includes(query) || option.code.toLowerCase().includes(query));
+  }, [countrySearch, indiaOption]);
 
   const digitsOnlyPhone = useMemo(() => phoneNumber.replace(/\D/g, ''), [phoneNumber]);
   const phoneValidationError = useMemo(() => getPhoneError(phoneNumber), [phoneNumber]);
@@ -246,14 +251,14 @@ export default function Generator() {
   };
 
   return (
-    <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-14 sm:py-16">
+    <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-12 sm:py-14">
       <div className="absolute inset-0 opacity-60">
         <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-green-100 blur-3xl"></div>
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-50 blur-3xl"></div>
       </div>
 
-      <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 text-center sm:mb-10">
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-7 text-center sm:mb-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-100 bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm">
             <Sparkles className="h-4 w-4" />
             Fast, clean, and ready to share
@@ -264,11 +269,11 @@ export default function Generator() {
           </p>
         </div>
 
-        <div className="rounded-[32px] border border-gray-200 bg-white/95 p-5 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)] backdrop-blur sm:p-8 lg:p-10">
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
-            <div className="space-y-7">
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-3" ref={dropdownRef}>
+        <div className="rounded-[32px] border border-gray-200 bg-white/95 p-4 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.94fr_1.06fr] xl:gap-7">
+            <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2.5" ref={dropdownRef}>
                 <label htmlFor="country-dropdown" className="block text-sm font-semibold tracking-wide text-gray-900">
                   Country / Code <span className="font-medium text-gray-400">(Required)</span>
                 </label>
@@ -338,7 +343,7 @@ export default function Generator() {
                 {countryError ? <p className="flex items-start gap-2 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4" />{countryError}</p> : null}
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <label htmlFor="phone-number" className="block text-sm font-semibold tracking-wide text-gray-900">
                   Phone Number <span className="font-medium text-gray-400">(Required)</span>
                 </label>
@@ -374,7 +379,7 @@ export default function Generator() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <label htmlFor="prefilled-message" className="block text-sm font-semibold tracking-wide text-gray-900">
                 Pre-filled Message <span className="font-medium text-gray-400">(Optional)</span>
               </label>
@@ -383,7 +388,7 @@ export default function Generator() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Hi! I would like to know more about your service."
-                rows={5}
+                rows={4}
                 className="w-full resize-none rounded-2xl border border-gray-300 px-4 py-3.5 text-gray-900 outline-none transition-all hover:border-gray-400 focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20"
               />
             </div>
@@ -399,9 +404,9 @@ export default function Generator() {
 
             </div>
 
-            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 shadow-inner sm:p-6 ${generatedLink ? "block" : "hidden lg:block"} lg:min-h-[640px]`}>
+            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 shadow-inner sm:p-6 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[560px]`}>
               {!generatedLink ? (
-                <div className="hidden h-full flex-col items-center justify-center text-center lg:flex">
+                <div className="hidden h-full flex-col items-center justify-center text-center md:flex">
                   <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <Sparkles className="h-6 w-6 text-green-600" />
                   </div>
@@ -420,7 +425,7 @@ export default function Generator() {
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-5">
+                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4 sm:p-5">
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
@@ -461,29 +466,40 @@ export default function Generator() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                  <p className="mb-3 text-sm font-semibold text-gray-900">QR Foreground Color</p>
-                  <div className="mb-3 flex flex-wrap gap-2">
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">QR Foreground Color</p>
+                      <p className="text-xs text-gray-500">Choose a brand-safe dark tone for best scan quality.</p>
+                    </div>
+                    <div className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">White background fixed</div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-7">
                     {qrColorPresets.map((color) => (
                       <button
                         key={color}
                         type="button"
                         onClick={() => setQrForegroundColor(color)}
                         aria-label={`Use ${color} for QR code`}
-                        className={`h-8 w-8 rounded-full border-2 transition ${qrForegroundColor === color ? 'border-gray-900 scale-105' : 'border-white hover:scale-105'}`}
+                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === color ? 'border-gray-900 ring-2 ring-gray-900/15' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'}`}
                         style={{ backgroundColor: color }}
-                      />
+                      >
+                        {qrForegroundColor === color ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}
+                      </button>
                     ))}
                   </div>
-                  <label className="flex items-center justify-between gap-3 text-sm text-gray-600">
-                    Custom color
-                    <input
-                      type="color"
-                      value={qrForegroundColor}
-                      onChange={(event) => setQrForegroundColor(event.target.value)}
-                      className="h-9 w-14 cursor-pointer rounded-md border border-gray-200 bg-white p-1"
-                      aria-label="Pick custom QR foreground color"
-                    />
+                  <label className="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+                    <span className="font-medium">Custom color</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs uppercase text-gray-500">{qrForegroundColor}</span>
+                      <input
+                        type="color"
+                        value={qrForegroundColor}
+                        onChange={(event) => setQrForegroundColor(event.target.value)}
+                        className="h-9 w-12 cursor-pointer rounded-md border border-gray-300 bg-white p-1"
+                        aria-label="Pick custom QR foreground color"
+                      />
+                    </div>
                   </label>
                 </div>
 
