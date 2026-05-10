@@ -1,5 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle } from 'lucide-react';
+import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle, ExternalLink } from 'lucide-react';
+import { trackEvent } from '../lib/trackEvent';
+import { logToGoogleSheets } from '../lib/sheetsLogger';
 
 type CountryOption = {
   code: string;
@@ -120,9 +122,11 @@ export default function Generator() {
     { id: 'plum', type: 'solid', value: '#5f4d79' },
     { id: 'rosewood', type: 'solid', value: '#7a4b58' },
     { id: 'cocoa', type: 'solid', value: '#7a5d47' },
-    { id: 'midnight-emerald', type: 'blend', value: '#2c4953', swatch: 'linear-gradient(135deg, #111827 10%, #2f5d50 90%)' },
-    { id: 'indigo-mauve', type: 'blend', value: '#57507a', swatch: 'linear-gradient(135deg, #334155 12%, #6b5b95 88%)' },
-    { id: 'graphite-bronze', type: 'blend', value: '#5c5248', swatch: 'linear-gradient(135deg, #374151 12%, #8b6a4f 88%)' },
+    { id: 'aurora-purple', type: 'blend', value: '#7f72e3', swatch: 'linear-gradient(135deg, #7b61ff, #b16cea, #5ce1e6)' },
+    { id: 'sunset-candy', type: 'blend', value: '#de7ea2', swatch: 'linear-gradient(90deg, #ff6ec7, #ffb86c)' },
+    { id: 'ocean-cyan', type: 'blend', value: '#1e8ae6', swatch: 'linear-gradient(135deg, #00c6ff, #0072ff)' },
+    { id: 'lime-energy', type: 'blend', value: '#3fbb7f', swatch: 'linear-gradient(135deg, #bfff00, #00d9a6)' },
+    { id: 'royal-dark-mode', type: 'blend', value: '#3a3d7d', swatch: 'linear-gradient(135deg, #141e30, #243b55, #6a11cb)' },
   ] as const;
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -204,6 +208,16 @@ export default function Generator() {
     setCopied(false);
     setDownloadStatus('idle');
     setShowCelebration(true);
+    trackEvent('generate_link');
+    if (trimmedMessage) trackEvent('message_added');
+    logToGoogleSheets({
+      phone_number: digitsOnlyPhone,
+      country_code: selectedCountry.code,
+      message: trimmedMessage,
+      generated_link: link,
+      consent: true,
+      created_at: new Date().toISOString(),
+    });
     window.setTimeout(() => setShowCelebration(false), 1100);
   };
 
@@ -213,6 +227,7 @@ export default function Generator() {
     try {
       await navigator.clipboard.writeText(generatedLink);
       setCopied(true);
+      trackEvent('copy_link');
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
@@ -240,6 +255,7 @@ export default function Generator() {
       link.remove();
       URL.revokeObjectURL(blobUrl);
       setDownloadStatus('success');
+      trackEvent('download_qr');
       window.setTimeout(() => setDownloadStatus('idle'), 2200);
     } catch {
       setDownloadStatus('error');
@@ -259,6 +275,12 @@ export default function Generator() {
     setPhoneNumber(onlyDigits);
     if (!phoneTouched) return;
     setPhoneError(getPhoneError(onlyDigits));
+  };
+
+  const openWhatsApp = () => {
+    if (!generatedLink) return;
+    window.open(generatedLink, '_blank', 'noopener,noreferrer');
+    trackEvent('open_whatsapp');
   };
 
   return (
@@ -281,8 +303,8 @@ export default function Generator() {
         </div>
 
         <div className="rounded-[32px] border border-gray-200 bg-white/95 p-4 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.94fr_1.06fr] xl:gap-7">
-            <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.98fr_1.02fr] xl:gap-7">
+            <div className="flex flex-col justify-between space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2.5" ref={dropdownRef}>
                 <label htmlFor="country-dropdown" className="block text-sm font-semibold tracking-wide text-gray-900">
@@ -425,7 +447,7 @@ export default function Generator() {
                   <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
                 </div>
               ) : (
-                <div className="relative space-y-4">
+                <div className="relative space-y-3.5">
                 {showCelebration && (
                   <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center" aria-hidden="true">
                     <div className="success-confetti">
@@ -440,12 +462,13 @@ export default function Generator() {
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
-                  <div className="flex flex-col gap-3">
-                    <input id="generated-link" type="text" value={generatedLink} readOnly className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none" />
+                  <div className="flex flex-col gap-2.5">
+                    <input id="generated-link" type="text" value={generatedLink} readOnly className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-gray-700 outline-none" />
+                    <p className="break-all text-xs text-gray-500">{generatedLink}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                   <button
                     onClick={copyToClipboard}
                     className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
@@ -462,6 +485,14 @@ export default function Generator() {
                   >
                     {downloadStatus === 'success' ? <Check className="h-5 w-5 text-green-600" /> : <Download className="h-5 w-5" />}
                     {downloadStatus === 'success' ? 'QR Downloaded' : 'Download QR'}
+                  </button>
+                  <button
+                    onClick={openWhatsApp}
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
+                    aria-label="Open generated WhatsApp link"
+                  >
+                    <ExternalLink className="h-5 w-5" />
+                    Open WhatsApp
                   </button>
                 </div>
 
@@ -484,14 +515,14 @@ export default function Generator() {
                       <p className="text-xs text-gray-500">Choose a brand-safe dark tone for best scan quality.</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-7">
+                  <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8">
                     {qrColorPresets.map((preset) => (
                       <button
                         key={preset.id}
                         type="button"
                         onClick={() => setQrForegroundColor(preset.value)}
                         aria-label={`Use ${preset.id} for QR code`}
-                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'}`}
+                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'} ${preset.type === 'blend' ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_0_0_1px_rgba(0,0,0,0.03)]' : ''}`}
                         style={preset.type === 'blend' ? { backgroundImage: preset.swatch } : { backgroundColor: preset.value }}
                       >
                         {qrForegroundColor === preset.value ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}

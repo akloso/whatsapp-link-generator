@@ -119,12 +119,12 @@ function App() {
           {
             heading: 'Data we process',
             content:
-              'We process your selected country code, phone number, and optional message locally in your browser session to generate your link. We do not require account registration.',
+              'When you generate a link, we process your country code, phone number, and optional message. This is used to create your WhatsApp link and QR code.',
           },
           {
-            heading: 'Cookies and analytics',
+            heading: 'Why data is used',
             content:
-              'We may use basic analytics to understand site performance and reliability. We do not sell personal data. If analytics are used, they are intended for product improvement only.',
+              'We use this data only to run the tool, improve reliability, and measure basic product usage. We do not sell your personal data.',
           },
           {
             heading: 'Third-party services',
@@ -134,7 +134,7 @@ function App() {
           {
             heading: 'Contact',
             content:
-              'For privacy questions or requests, email hello@zapora.in. We aim to respond within two business days.',
+              'For privacy questions, email hizapora@gmail.com. We aim to respond within two business days.',
           },
         ]}
       />
@@ -154,7 +154,7 @@ function App() {
           {
             heading: 'Service scope',
             content:
-              'This tool is provided to generate WhatsApp links and QR codes. You are responsible for the phone numbers, messages, and campaigns you create.',
+              'This tool helps you generate WhatsApp links and QR codes. You are responsible for the numbers and messages you enter.',
           },
           {
             heading: 'Acceptable use',
@@ -167,14 +167,14 @@ function App() {
               'This project is an independent utility and is not affiliated with, endorsed by, or sponsored by WhatsApp or Meta Platforms, Inc.',
           },
           {
-            heading: 'Warranty and liability',
+            heading: 'Use at your discretion',
             content:
-              'The service is provided “as is” without warranties. We are not liable for direct or indirect losses resulting from use, interruption, or external third-party platform changes.',
+              'Please use this tool at your own discretion. The service is provided as-is and may depend on third-party platform behavior.',
           },
           {
-            heading: 'Changes to terms',
+            heading: 'Contact',
             content:
-              'We may update these terms to reflect product or legal changes. Updated terms are effective once published on this page.',
+              'For terms questions, contact hizapora@gmail.com.',
           },
         ]}
       />
