@@ -116,12 +116,6 @@ export default function Generator() {
 
   const qrColorPresets = [
     { id: 'black', type: 'solid', value: '#000000' },
-    { id: 'slate', type: 'solid', value: '#334155' },
-    { id: 'forest', type: 'solid', value: '#2f5d50' },
-    { id: 'ocean', type: 'solid', value: '#3f5f8a' },
-    { id: 'plum', type: 'solid', value: '#5f4d79' },
-    { id: 'rosewood', type: 'solid', value: '#7a4b58' },
-    { id: 'cocoa', type: 'solid', value: '#7a5d47' },
     { id: 'aurora-purple', type: 'blend', value: '#7f72e3', swatch: 'linear-gradient(135deg, #7b61ff, #b16cea, #5ce1e6)' },
     { id: 'sunset-candy', type: 'blend', value: '#de7ea2', swatch: 'linear-gradient(90deg, #ff6ec7, #ffb86c)' },
     { id: 'ocean-cyan', type: 'blend', value: '#1e8ae6', swatch: 'linear-gradient(135deg, #00c6ff, #0072ff)' },
@@ -437,7 +431,7 @@ export default function Generator() {
 
             </div>
 
-            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 shadow-inner sm:p-6 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[560px]`}>
+            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-inner sm:p-5 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[520px]`}>
               {!generatedLink ? (
                 <div className="hidden h-full flex-col items-center justify-center text-center md:flex">
                   <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
@@ -447,7 +441,7 @@ export default function Generator() {
                   <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
                 </div>
               ) : (
-                <div className="relative space-y-4">
+                <div className="relative space-y-3">
                 {showCelebration && (
                   <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center" aria-hidden="true">
                     <div className="success-confetti">
@@ -458,7 +452,7 @@ export default function Generator() {
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4 sm:p-5">
+                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
@@ -473,7 +467,7 @@ export default function Generator() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <button
                     onClick={copyToClipboard}
                     className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
@@ -496,7 +490,7 @@ export default function Generator() {
                     className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
                     aria-label="Open generated WhatsApp link"
                   >
-                    <ExternalLink className="h-5 w-5" />
+                    <ExternalLink className="h-5 w-5 shrink-0" />
                     Open WhatsApp
                   </button>
                 </div>
@@ -506,7 +500,7 @@ export default function Generator() {
                   {downloadStatus === 'error' && 'We could not download the QR code. Please try again.'}
                 </p>
 
-                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 text-center shadow-md sm:p-6">
+                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 text-center shadow-md sm:p-5">
                   <p className="mb-4 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                     <img src={qrImageUrl} alt="QR code for generated WhatsApp link" className="h-56 w-56 sm:h-60 sm:w-60" />
@@ -517,17 +511,16 @@ export default function Generator() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">QR Color Style</p>
-                      <p className="text-xs text-gray-500">Solid and gradient-inspired tones optimized for scan clarity.</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8">
+                  <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
                     {qrColorPresets.map((preset) => (
                       <button
                         key={preset.id}
                         type="button"
                         onClick={() => setQrForegroundColor(preset.value)}
                         aria-label={`Use ${preset.id} for QR code`}
-                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'} ${preset.type === 'blend' ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_0_0_1px_rgba(0,0,0,0.12)] after:absolute after:-right-1 after:-top-1 after:h-2.5 after:w-2.5 after:rounded-full after:border after:border-white after:bg-gray-900 after:content-[\"\"]' : ''}`}
+                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'} ${preset.type === 'blend' ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_0_0_1px_rgba(0,0,0,0.12)]' : ''}`}
                         style={preset.type === 'blend' ? { backgroundImage: preset.swatch } : { backgroundColor: preset.value }}
                       >
                         {qrForegroundColor === preset.value ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}
@@ -549,7 +542,6 @@ export default function Generator() {
                   </label>
                 </div>
 
-                <p className="text-center text-sm text-gray-600 sm:text-[15px]">Your link and QR are ready to share wherever your audience connects with you.</p>
                 </div>
               )}
             </div>
