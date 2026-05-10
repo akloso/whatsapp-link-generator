@@ -143,9 +143,9 @@ export default function QrCodeEditorPage() {
     if (style !== 'plain') {
       ctx.textAlign = 'center';
       const titleY = pad + Math.round(headerH * 0.44);
-      ctx.font = `${titleItalic ? 'italic ' : ''}${titleBold ? '700' : '500'} ${Math.round(c.height * 0.038)}px Inter`;
+      ctx.font = `${titleItalic ? 'italic ' : ''}${titleBold ? '700' : '500'} ${Math.round(c.height * 0.041)}px Inter`;
       ctx.fillStyle = '#ffffff'; ctx.fillText(title, c.width / 2, titleY);
-      ctx.font = `${subtitleItalic ? 'italic ' : ''}${subtitleBold ? '700' : '400'} ${Math.round(c.height * 0.022)}px Inter`;
+      ctx.font = `${subtitleItalic ? 'italic ' : ''}${subtitleBold ? '700' : '400'} ${Math.round(c.height * 0.024)}px Inter`;
       ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillText(subtitle, c.width / 2, titleY + Math.round(headerH * 0.26));
     }
     return c;
