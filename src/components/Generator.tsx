@@ -1,5 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle } from 'lucide-react';
+import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle, ExternalLink } from 'lucide-react';
+import { trackEvent } from '../lib/trackEvent';
+import { logToGoogleSheets } from '../lib/sheetsLogger';
 
 type CountryOption = {
   code: string;
@@ -96,7 +98,9 @@ const getPhoneError = (rawValue: string) => {
 };
 
 export default function Generator() {
-  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
+  const indiaOption = countryOptions.find((option) => option.country === 'India') ?? countryOptions[0];
+
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(indiaOption);
   const [countrySearch, setCountrySearch] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
@@ -108,6 +112,16 @@ export default function Generator() {
   const [phoneError, setPhoneError] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const [qrForegroundColor, setQrForegroundColor] = useState('#000000');
+
+  const qrColorPresets = [
+    { id: 'black', type: 'solid', value: '#000000' },
+    { id: 'aurora-purple', type: 'blend', value: '#7f72e3', swatch: 'linear-gradient(135deg, #7b61ff, #b16cea, #5ce1e6)' },
+    { id: 'sunset-candy', type: 'blend', value: '#de7ea2', swatch: 'linear-gradient(90deg, #ff6ec7, #ffb86c)' },
+    { id: 'ocean-cyan', type: 'blend', value: '#1e8ae6', swatch: 'linear-gradient(135deg, #00c6ff, #0072ff)' },
+    { id: 'lime-energy', type: 'blend', value: '#3fbb7f', swatch: 'linear-gradient(135deg, #bfff00, #00d9a6)' },
+    { id: 'royal-dark-mode', type: 'blend', value: '#3a3d7d', swatch: 'linear-gradient(135deg, #141e30, #243b55, #6a11cb)' },
+  ] as const;
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -115,16 +129,20 @@ export default function Generator() {
 
   const qrImageUrl = useMemo(() => {
     if (!generatedLink) return '';
-    return `https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(generatedLink)}`;
-  }, [generatedLink]);
+    const qrColor = qrForegroundColor.replace('#', '');
+    return `https://api.qrserver.com/v1/create-qr-code/?size=480x480&color=${qrColor}&bgcolor=ffffff&data=${encodeURIComponent(generatedLink)}`;
+  }, [generatedLink, qrForegroundColor]);
 
   const filteredCountries = useMemo(() => {
     const query = countrySearch.trim().toLowerCase();
+    const sortedCountries = [...countryOptions].sort((a, b) => a.country.localeCompare(b.country));
+    const nonIndiaCountries = sortedCountries.filter((option) => option.country !== 'India');
+    const orderedCountries = indiaOption ? [indiaOption, ...nonIndiaCountries] : nonIndiaCountries;
 
-    if (!query) return countryOptions;
+    if (!query) return orderedCountries;
 
-    return countryOptions.filter((option) => option.country.toLowerCase().includes(query) || option.code.toLowerCase().includes(query));
-  }, [countrySearch]);
+    return orderedCountries.filter((option) => option.country.toLowerCase().includes(query) || option.code.toLowerCase().includes(query));
+  }, [countrySearch, indiaOption]);
 
   const digitsOnlyPhone = useMemo(() => phoneNumber.replace(/\D/g, ''), [phoneNumber]);
   const phoneValidationError = useMemo(() => getPhoneError(phoneNumber), [phoneNumber]);
@@ -184,6 +202,16 @@ export default function Generator() {
     setCopied(false);
     setDownloadStatus('idle');
     setShowCelebration(true);
+    trackEvent('generate_link');
+    if (trimmedMessage) trackEvent('message_added');
+    logToGoogleSheets({
+      phone_number: digitsOnlyPhone,
+      country_code: selectedCountry.code,
+      message: trimmedMessage,
+      generated_link: link,
+      consent: true,
+      created_at: new Date().toISOString(),
+    });
     window.setTimeout(() => setShowCelebration(false), 1100);
   };
 
@@ -193,6 +221,7 @@ export default function Generator() {
     try {
       await navigator.clipboard.writeText(generatedLink);
       setCopied(true);
+      trackEvent('copy_link');
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
@@ -220,6 +249,7 @@ export default function Generator() {
       link.remove();
       URL.revokeObjectURL(blobUrl);
       setDownloadStatus('success');
+      trackEvent('download_qr');
       window.setTimeout(() => setDownloadStatus('idle'), 2200);
     } catch {
       setDownloadStatus('error');
@@ -241,15 +271,21 @@ export default function Generator() {
     setPhoneError(getPhoneError(onlyDigits));
   };
 
+  const openWhatsApp = () => {
+    if (!generatedLink) return;
+    window.open(generatedLink, '_blank', 'noopener,noreferrer');
+    trackEvent('open_whatsapp');
+  };
+
   return (
-    <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-14 sm:py-16">
+    <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-12 sm:py-14">
       <div className="absolute inset-0 opacity-60">
         <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-green-100 blur-3xl"></div>
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-50 blur-3xl"></div>
       </div>
 
-      <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 text-center sm:mb-10">
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-7 text-center sm:mb-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-100 bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm">
             <Sparkles className="h-4 w-4" />
             Fast, clean, and ready to share
@@ -260,10 +296,11 @@ export default function Generator() {
           </p>
         </div>
 
-        <div className="rounded-[32px] border border-gray-200 bg-white/95 p-5 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)] backdrop-blur sm:p-8 lg:p-10">
-          <div className="space-y-7">
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-3" ref={dropdownRef}>
+        <div className="rounded-[32px] border border-gray-200 bg-white/95 p-4 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.98fr_1.02fr] xl:gap-7">
+            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2.5" ref={dropdownRef}>
                 <label htmlFor="country-dropdown" className="block text-sm font-semibold tracking-wide text-gray-900">
                   Country / Code <span className="font-medium text-gray-400">(Required)</span>
                 </label>
@@ -333,7 +370,7 @@ export default function Generator() {
                 {countryError ? <p className="flex items-start gap-2 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4" />{countryError}</p> : null}
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <label htmlFor="phone-number" className="block text-sm font-semibold tracking-wide text-gray-900">
                   Phone Number <span className="font-medium text-gray-400">(Required)</span>
                 </label>
@@ -369,7 +406,7 @@ export default function Generator() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <label htmlFor="prefilled-message" className="block text-sm font-semibold tracking-wide text-gray-900">
                 Pre-filled Message <span className="font-medium text-gray-400">(Optional)</span>
               </label>
@@ -378,7 +415,7 @@ export default function Generator() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Hi! I would like to know more about your service."
-                rows={5}
+                rows={4}
                 className="w-full resize-none rounded-2xl border border-gray-300 px-4 py-3.5 text-gray-900 outline-none transition-all hover:border-gray-400 focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20"
               />
             </div>
@@ -392,8 +429,19 @@ export default function Generator() {
               Generate WhatsApp Link
             </button>
 
-            {generatedLink && (
-              <div className="relative space-y-5 border-t border-gray-200 pt-8">
+            </div>
+
+            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-inner sm:p-5 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[520px]`}>
+              {!generatedLink ? (
+                <div className="hidden h-full flex-col items-center justify-center text-center md:flex">
+                  <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
+                    <Sparkles className="h-6 w-6 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Your result appears here</h3>
+                  <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
+                </div>
+              ) : (
+                <div className="relative space-y-3">
                 {showCelebration && (
                   <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center" aria-hidden="true">
                     <div className="success-confetti">
@@ -404,16 +452,22 @@ export default function Generator() {
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-5 sm:p-6">
+                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
-                  <div className="flex flex-col gap-3">
-                    <input id="generated-link" type="text" value={generatedLink} readOnly className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none" />
+                  <div className="flex flex-col gap-2">
+                    <input
+                      id="generated-link"
+                      type="text"
+                      value={generatedLink}
+                      readOnly
+                      className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-gray-700 outline-none"
+                    />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <button
                     onClick={copyToClipboard}
                     className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
@@ -431,23 +485,66 @@ export default function Generator() {
                     {downloadStatus === 'success' ? <Check className="h-5 w-5 text-green-600" /> : <Download className="h-5 w-5" />}
                     {downloadStatus === 'success' ? 'QR Downloaded' : 'Download QR'}
                   </button>
+                  <button
+                    onClick={openWhatsApp}
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
+                    aria-label="Open generated WhatsApp link"
+                  >
+                    <ExternalLink className="h-5 w-5 shrink-0" />
+                    Open WhatsApp
+                  </button>
                 </div>
 
-                <p role="status" aria-live="polite" className="min-h-6 text-center text-sm text-gray-600">
+                <p role="status" aria-live="polite" className="min-h-5 text-center text-sm text-gray-600">
                   {downloadStatus === 'success' && 'QR code downloaded successfully.'}
                   {downloadStatus === 'error' && 'We could not download the QR code. Please try again.'}
                 </p>
 
-                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-6 text-center shadow-lg sm:p-8">
-                  <p className="mb-6 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
+                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 text-center shadow-md sm:p-5">
+                  <p className="mb-4 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                     <img src={qrImageUrl} alt="QR code for generated WhatsApp link" className="h-56 w-56 sm:h-60 sm:w-60" />
                   </div>
                 </div>
 
-                <p className="text-center text-sm text-gray-600 sm:text-[15px]">Your link and QR are ready to share wherever your audience connects with you.</p>
-              </div>
-            )}
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">QR Color Style</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+                    {qrColorPresets.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setQrForegroundColor(preset.value)}
+                        aria-label={`Use ${preset.id} for QR code`}
+                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'} ${preset.type === 'blend' ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_0_0_1px_rgba(0,0,0,0.12)]' : ''}`}
+                        style={preset.type === 'blend' ? { backgroundImage: preset.swatch } : { backgroundColor: preset.value }}
+                      >
+                        {qrForegroundColor === preset.value ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+                    <span className="font-medium">Custom color</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs uppercase text-gray-500">{qrForegroundColor}</span>
+                      <input
+                        type="color"
+                        value={qrForegroundColor}
+                        onChange={(event) => setQrForegroundColor(event.target.value)}
+                        className="h-9 w-12 cursor-pointer rounded-md border border-gray-300 bg-white p-1"
+                        aria-label="Pick custom QR foreground color"
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
