@@ -97,7 +97,11 @@ const getPhoneError = (rawValue: string) => {
   return '';
 };
 
-export default function Generator() {
+type GeneratorProps = {
+  onCustomizeQrCode?: (generatedLink: string) => void;
+};
+
+export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
   const indiaOption = countryOptions.find((option) => option.country === 'India') ?? countryOptions[0];
 
   const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(indiaOption);
@@ -494,6 +498,15 @@ export default function Generator() {
                     Open WhatsApp
                   </button>
                 </div>
+
+                <button
+                  onClick={() => onCustomizeQrCode?.(generatedLink)}
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 py-3.5 font-semibold text-emerald-800 transition-all hover:border-emerald-300 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20"
+                  aria-label="Customize QR code on dedicated editor page"
+                >
+                  <Sparkles className="h-5 w-5" />
+                  Customize QR Code
+                </button>
 
                 <p role="status" aria-live="polite" className="min-h-5 text-center text-sm text-gray-600">
                   {downloadStatus === 'success' && 'QR code downloaded successfully.'}

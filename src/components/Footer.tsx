@@ -1,4 +1,4 @@
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
 
 interface FooterProps {
   currentPage: PageKey;

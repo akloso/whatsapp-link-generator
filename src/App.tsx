@@ -7,13 +7,15 @@ import Features from './components/Features';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import Header from './components/Header';
+import QrCodeEditorPage, { QR_EDITOR_STORAGE_KEY } from './components/QrCodeEditorPage';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
 
 const routeToPage = (pathname: string): PageKey => {
   if (pathname === '/privacy') return 'privacy';
   if (pathname === '/terms') return 'terms';
   if (pathname === '/contact') return 'contact';
+  if (pathname === '/qr-code-editor') return 'qrCodeEditor';
   return 'home';
 };
 
@@ -36,6 +38,10 @@ const pageMetadata: Record<PageKey, { title: string; description: string }> = {
   contact: {
     title: 'Contact | Zapora',
     description: 'Contact Zapora for support, feedback, or business questions.',
+  },
+  qrCodeEditor: {
+    title: 'QR Code Editor | Zapora',
+    description: 'Advanced QR design page to customize and preview QR codes for WhatsApp links and URLs.',
   },
 };
 
@@ -69,7 +75,7 @@ function App() {
     setMeta('twitter:title', metadata.title, 'name');
     setMeta('twitter:description', metadata.description, 'name');
 
-    const canonicalPath = currentPage === 'home' ? '/' : `/${currentPage}`;
+    const canonicalPath = currentPage === 'home' ? '/' : currentPage === 'qrCodeEditor' ? '/qr-code-editor' : `/${currentPage}`;
     const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
 
     let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel=\"canonical\"]');
@@ -84,7 +90,7 @@ function App() {
   }, [currentPage]);
 
   const navigateTo = (page: PageKey) => {
-    const targetPath = page === 'home' ? '/' : `/${page}`;
+    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : `/${page}`;
     window.history.pushState({}, '', targetPath);
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -211,11 +217,18 @@ function App() {
         }
       />
     );
+  } else if (currentPage === 'qrCodeEditor') {
+    pageContent = <QrCodeEditorPage />;
   } else {
     pageContent = (
       <>
         <Hero onGetStarted={scrollToGenerator} />
-        <Generator />
+        <Generator
+          onCustomizeQrCode={(link) => {
+            localStorage.setItem(QR_EDITOR_STORAGE_KEY, link);
+            navigateTo('qrCodeEditor');
+          }}
+        />
         <HowItWorks />
         <Features />
         <FAQ />
