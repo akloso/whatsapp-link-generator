@@ -121,10 +121,13 @@ export default function QrCodeEditorPage() {
       const g = ctx.createLinearGradient(pad, pad, c.width - pad, pad + 120); g.addColorStop(0, useGradient ? '#7b61ff' : color); g.addColorStop(1, useGradient ? '#5ce1e6' : '#111827');
       ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(pad, pad, w, headerH, [24, 24, 18, 18]); ctx.fill();
     }
-    const qs = Math.round(Math.min(c.width, c.height) * 0.66);
+    const textZone = style === 'plain' ? Math.round(h * 0.04) : Math.round(h * 0.2);
+    const qrTop = pad + headerH + textZone;
+    const qrBottomSafe = pad + h - Math.round(h * 0.06);
+    const maxQrByHeight = Math.max(220, qrBottomSafe - qrTop);
+    const qs = Math.round(Math.min(Math.min(c.width, c.height) * 0.6, maxQrByHeight));
     const qx = (c.width - qs) / 2;
-    const textZone = style === 'plain' ? 0 : Math.round(h * 0.18);
-    const qy = pad + headerH + textZone;
+    const qy = qrTop;
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(qx - 16, qy - 16, qs + 32, qs + 32, 20); ctx.fill();
     await drawStyledQr(ctx, qx, qy, qs);
 
@@ -140,7 +143,7 @@ export default function QrCodeEditorPage() {
     if (style !== 'plain') {
       ctx.textAlign = 'center';
       ctx.font = `${titleItalic ? 'italic ' : ''}${titleBold ? '700' : '500'} ${Math.round(c.height * 0.038)}px Inter`;
-      ctx.fillStyle = '#0f172a'; ctx.fillText(title, c.width / 2, pad + headerH + Math.round(h * 0.09));
+      ctx.fillStyle = '#0f172a'; ctx.fillText(title, c.width / 2, pad + headerH + Math.round(h * 0.075));
       ctx.font = `${subtitleItalic ? 'italic ' : ''}${subtitleBold ? '700' : '400'} ${Math.round(c.height * 0.022)}px Inter`;
       ctx.fillStyle = '#475569'; ctx.fillText(subtitle, c.width / 2, pad + headerH + Math.round(h * 0.14));
     }
