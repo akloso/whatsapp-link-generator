@@ -543,21 +543,21 @@ function QrCodeEditorPage() {
 
 
 
-        <section className="mt-24 rounded-[34px] border border-slate-200 bg-[#eef4ef] p-4 sm:p-6 lg:p-8">
-          <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_90px_-65px_rgba(15,23,42,0.35)]">
-            <div className="grid lg:grid-cols-2">
-              <div className="p-6 sm:p-9 lg:p-12">
+        <section className="mt-20 rounded-[30px] border border-slate-200 bg-[#eef4ef] p-3 sm:p-5 lg:p-6">
+          <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_26px_70px_-58px_rgba(15,23,42,0.33)]">
+            <div className="grid gap-1 lg:grid-cols-2">
+              <div className="p-5 sm:p-7 lg:p-9">
                 <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">
                   <ScanLine className="h-4 w-4" /> QR Code Editor
                 </span>
-                <h2 className="mt-6 text-3xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950 sm:text-4xl lg:text-[2.7rem]">
                   Design QR codes worth scanning.
                 </h2>
-                <p className="mt-5 max-w-xl text-lg leading-9 text-slate-600">
+                <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600 sm:text-[1.05rem]">
                   A premium QR design studio built into Zapora. Add a title, subtitle, brand colors, and a center logo — all while keeping the QR safely scannable.
                 </p>
 
-                <div className="mt-7 space-y-3">
+                <div className="mt-6 space-y-2.5">
                   {[
                     'Color presets and custom picker',
                     'Title & subtitle on a soft top banner',
@@ -572,23 +572,23 @@ function QrCodeEditorPage() {
                 <button
                   type="button"
                   onClick={() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  className="mt-9 inline-flex items-center gap-2 rounded-full bg-slate-900/95 px-6 py-3 text-lg font-semibold text-white shadow-[0_14px_26px_-18px_rgba(15,23,42,0.55)] transition hover:bg-slate-800"
+                  className="mt-7 inline-flex items-center gap-2 rounded-full bg-slate-900/95 px-5 py-2.5 text-base font-semibold text-white shadow-[0_12px_24px_-18px_rgba(15,23,42,0.5)] transition hover:bg-slate-800"
                 >
                   Customize QR Code <ArrowRight className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.20),transparent_55%),radial-gradient(circle_at_90%_85%,rgba(56,189,248,0.25),transparent_40%)] p-6 sm:p-8 lg:p-10">
+              <div className="bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.20),transparent_55%),radial-gradient(circle_at_90%_85%,rgba(56,189,248,0.25),transparent_40%)] p-4 sm:p-6 lg:p-8">
                 <PromoMockup />
               </div>
             </div>
           </div>
 
-          <div className="mt-20">
-            <h3 className="text-center text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Built for every kind of conversation</h3>
-            <p className="mt-4 text-center text-xl text-slate-600">From storefronts to social bios — Zapora fits anywhere a chat starts.</p>
+          <div className="mt-14 sm:mt-16">
+            <h3 className="text-center text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Built for every kind of conversation</h3>
+            <p className="mt-3 text-center text-base text-slate-600 sm:text-lg">From storefronts to social bios — Zapora fits anywhere a chat starts.</p>
 
-            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <UseCaseCard icon={Store} title="Small businesses" />
               <UseCaseCard icon={Camera} title="Instagram sellers" />
               <UseCaseCard icon={ShoppingBag} title="Service providers" />
@@ -673,7 +673,7 @@ function ColorField({
 
 function FeatureBullet({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-3 text-2xl text-slate-700">
+    <div className="flex items-center gap-2.5 text-lg text-slate-700 sm:text-xl">
       <span className="text-emerald-600">✓</span>
       <span>{text}</span>
     </div>
@@ -682,30 +682,30 @@ function FeatureBullet({ text }: { text: string }) {
 
 function PromoMockup() {
   return (
-    <div className="mx-auto w-full max-w-[390px] rounded-[34px] border border-slate-200/90 bg-white p-6 shadow-[0_42px_90px_-54px_rgba(15,23,42,0.52)] sm:p-7">
-      <div className="rounded-[28px] bg-emerald-600 px-5 py-[1.375rem] text-center text-white">
-        <p className="text-4xl font-semibold">Scan to chat</p>
-        <p className="mt-1 text-2xl text-emerald-50">@zapora.in</p>
+    <div className="mx-auto w-full max-w-[290px] rounded-[30px] border border-slate-200/90 bg-white p-[1.125rem] shadow-[0_36px_80px_-56px_rgba(15,23,42,0.5)] sm:max-w-[340px] sm:p-6">
+      <div className="rounded-[24px] bg-emerald-600 px-4 py-4 text-center text-white">
+        <p className="text-2xl font-semibold sm:text-3xl">Scan to chat</p>
+        <p className="mt-1 text-lg text-emerald-50 sm:text-xl">@zapora.in</p>
       </div>
-      <div className="mt-5 rounded-[28px] border border-slate-200 bg-slate-100 p-[2.125rem]">
-        <div className="mx-auto grid w-40 grid-cols-7 gap-2 sm:w-52">
+      <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-100 p-5 sm:p-6">
+        <div className="mx-auto grid w-32 grid-cols-7 gap-1.5 sm:w-44 sm:gap-2">
           {Array.from({ length: 49 }).map((_, i) => (
             <span key={i} className={`h-3.5 w-3.5 rounded-full ${[0,1,2,7,9,14,15,21,23,28,29,35,36,37,42,44,45,46,47].includes(i) ? 'bg-slate-950' : 'bg-transparent'}`} />
           ))}
         </div>
       </div>
-      <p className="mt-4 text-center text-lg text-slate-500">Powered by Zapora</p>
+      <p className="mt-3 text-center text-sm text-slate-500 sm:text-base">Powered by Zapora</p>
     </div>
   );
 }
 
 function UseCaseCard({ icon: Icon, title, className = '' }: { icon: React.ComponentType<{ className?: string }>; title: string; className?: string }) {
   return (
-    <article className={`rounded-[22px] border border-slate-200 bg-white p-5 text-center shadow-[0_14px_30px_-30px_rgba(15,23,42,0.25)] ${className}`}>
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
-        <Icon className="h-7 w-7 text-emerald-600" />
+    <article className={`rounded-[20px] border border-slate-200 bg-white p-4 sm:p-[1.125rem] text-center shadow-[0_12px_24px_-28px_rgba(15,23,42,0.24)] ${className}`}>
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+        <Icon className="h-6 w-6 text-emerald-600" />
       </div>
-      <p className="mt-3.5 text-xl font-medium text-slate-900">{title}</p>
+      <p className="mt-3 text-lg font-medium text-slate-900">{title}</p>
     </article>
   );
 }
