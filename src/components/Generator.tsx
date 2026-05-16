@@ -448,10 +448,6 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
             >
               Generate WhatsApp Link
             </button>
-            <p className="text-xs leading-relaxed text-gray-500">
-              By clicking Generate, you agree that the details entered may be stored for a limited time to improve Zapora,
-              support analytics, and enhance the tool experience. We do not sell or share this data with third parties.
-            </p>
 
             </div>
 

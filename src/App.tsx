@@ -8,6 +8,7 @@ import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import Header from './components/Header';
 import QrCodeEditorPage from './components/QrCodeEditorPage';
+import SeoContent from './components/SeoContent';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
@@ -231,6 +232,7 @@ function App() {
           }}
         />
         <HowItWorks />
+        <SeoContent />
         <Features />
         <FAQ />
       </>
@@ -239,7 +241,11 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onHomeClick={() => navigateTo('home')} />
+      <Header
+        onHomeClick={() => navigateTo('home')}
+        onQrEditorClick={() => navigateTo('qrCodeEditor')}
+        currentPage={currentPage}
+      />
       {pageContent}
       <Footer currentPage={currentPage} onNavigate={navigateTo} onGetStarted={scrollToGenerator} />
     </div>
