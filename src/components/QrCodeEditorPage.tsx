@@ -56,6 +56,7 @@ function QrCodeEditorPage() {
   const [size, setSize] = useState<SizeOption>(SIZES[0]);
   const [format, setFormat] = useState<FormatOption>('PNG');
   const [status, setStatus] = useState('');
+  const [importStatus, setImportStatus] = useState('');
   const [isImportingQr, setIsImportingQr] = useState(false);
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,20 +109,18 @@ function QrCodeEditorPage() {
     reader.readAsDataURL(file);
   };
 
-  const importQrFromImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.currentTarget.value = '';
-    if (!file) return;
+  const handleImportQr = async (file: File) => {
+    setImportStatus('Reading QR image...');
 
     const acceptedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!acceptedTypes.includes(file.type)) {
-      setStatus('Please upload a PNG, JPG, or WEBP QR image.');
+      setImportStatus('Please upload a PNG, JPG, or WEBP QR image.');
       return;
     }
 
     const BarcodeDetectorClass = (window as unknown as { BarcodeDetector?: BarcodeDetectorLike }).BarcodeDetector;
     if (!BarcodeDetectorClass) {
-      setStatus('QR upload scanning is not supported in this browser yet. Please paste the QR link manually.');
+      setImportStatus('QR upload scanning is not supported in this browser yet. Please paste the QR link manually.');
       return;
     }
 
@@ -135,7 +134,7 @@ function QrCodeEditorPage() {
       const ctx = canvas.getContext('2d');
 
       if (!ctx) {
-        setStatus('We couldn’t read this QR. Please upload a clear QR image or paste the link manually.');
+        setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
         return;
       }
 
@@ -145,14 +144,17 @@ function QrCodeEditorPage() {
       const decodedValue = detections[0]?.rawValue;
 
       if (!decodedValue) {
-        setStatus('We couldn’t read this QR. Please upload a clear QR image or paste the link manually.');
+        setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
         return;
       }
 
-      setRawContent(decodedValue);
-      setStatus('QR imported successfully. You can now customize and export it.');
-    } catch {
-      setStatus('We couldn’t read this QR. Please upload a clear QR image or paste the link manually.');
+      setRawContent(decodedValue.trim());
+      setImportStatus('QR imported successfully. You can now customize and export it.');
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('QR import failed:', error);
+      }
+      setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
     } finally {
       setIsImportingQr(false);
     }
@@ -379,10 +381,19 @@ function QrCodeEditorPage() {
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/jpg,image/webp"
-                  onChange={importQrFromImage}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void handleImportQr(file);
+                    }
+                    event.currentTarget.value = '';
+                  }}
                   className="hidden"
                 />
               </label>
+              {importStatus ? (
+                <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">{importStatus}</p>
+              ) : null}
 
               <Field label="Link or text">
                 <input
