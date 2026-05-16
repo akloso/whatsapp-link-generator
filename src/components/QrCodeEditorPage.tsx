@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { ArrowUpRight, Download, Image as ImageIcon, Palette, Smile, Trash2 } from 'lucide-react';
-
-const QR_EDITOR_STORAGE_KEY = 'zapora_qr_editor_link';
+import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
 
 type Preset = {
   name: string;
@@ -664,5 +663,4 @@ function shade(hex: string, percent: number) {
   return `#${((red << 16) | (green << 8) | blue).toString(16).padStart(6, '0')}`;
 }
 
-export { QR_EDITOR_STORAGE_KEY };
 export default QrCodeEditorPage;
