@@ -241,11 +241,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header
-        onHomeClick={() => navigateTo('home')}
-        onQrEditorClick={() => navigateTo('qrCodeEditor')}
-        currentPage={currentPage}
-      />
+      <Header currentPage={currentPage} onNavigate={navigateTo} />
       {pageContent}
       <Footer currentPage={currentPage} onNavigate={navigateTo} onGetStarted={scrollToGenerator} />
     </div>
