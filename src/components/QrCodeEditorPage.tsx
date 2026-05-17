@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import jsQR from 'jsqr';
 import { ArrowUpRight, Download, Image as ImageIcon, Palette, Smile, Trash2 } from 'lucide-react';
 import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
 
@@ -118,12 +119,6 @@ function QrCodeEditorPage() {
       return;
     }
 
-    const BarcodeDetectorClass = (window as unknown as { BarcodeDetector?: BarcodeDetectorLike }).BarcodeDetector;
-    if (!BarcodeDetectorClass) {
-      setImportStatus('QR upload scanning is not supported in this browser yet. Please paste the QR link manually.');
-      return;
-    }
-
     setIsImportingQr(true);
     try {
       const imageDataUrl = await readFileAsDataUrl(file);
@@ -139,17 +134,36 @@ function QrCodeEditorPage() {
       }
 
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      const detector = new BarcodeDetectorClass({ formats: ['qr_code'] });
-      const detections = await detector.detect(canvas);
-      const decodedValue = detections[0]?.rawValue;
 
-      if (!decodedValue) {
-        setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
+      const BarcodeDetectorClass = (window as unknown as { BarcodeDetector?: BarcodeDetectorLike }).BarcodeDetector;
+      if (BarcodeDetectorClass) {
+        try {
+          const detector = new BarcodeDetectorClass({ formats: ['qr_code'] });
+          const detections = await detector.detect(canvas);
+          const decodedValue = detections[0]?.rawValue;
+
+          if (decodedValue) {
+            setRawContent(decodedValue.trim());
+            setImportStatus('QR imported successfully. You can now customize and export it.');
+            return;
+          }
+        } catch (barcodeError) {
+          if (import.meta.env.DEV) {
+            console.warn('BarcodeDetector QR import failed, trying jsQR fallback:', barcodeError);
+          }
+        }
+      }
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const decoded = jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (decoded?.data) {
+        setRawContent(decoded.data.trim());
+        setImportStatus('QR imported successfully. You can now customize and export it.');
         return;
       }
 
-      setRawContent(decodedValue.trim());
-      setImportStatus('QR imported successfully. You can now customize and export it.');
+      setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
     } catch (error) {
       if (import.meta.env.DEV) {
         console.warn('QR import failed:', error);
