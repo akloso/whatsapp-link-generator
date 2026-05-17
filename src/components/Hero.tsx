@@ -34,14 +34,14 @@ export default function Hero({ onGetStarted }: HeroProps) {
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <button
               onClick={onGetStarted}
-              className="group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-green-600 px-8 py-4 text-base font-semibold text-white shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 sm:px-10 sm:text-lg"
+              className="group liquid-glass-button relative flex items-center gap-3 overflow-hidden rounded-2xl px-8 py-4 text-base font-semibold text-white transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 sm:px-10 sm:text-lg"
             >
               <span>Start Generating</span>
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </button>
             <a
               href="#how"
-              className="rounded-2xl px-6 py-3.5 font-semibold text-gray-700 transition-colors hover:bg-white hover:text-green-600 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
+              className="liquid-glass-button-light rounded-2xl px-6 py-3.5 font-semibold text-gray-700 transition-colors hover:text-green-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
             >
               See How It Works
             </a>

@@ -503,9 +503,7 @@ function QrCodeEditorPage() {
                     key={type}
                     onClick={() => setCenterType(type)}
                     className={`rounded-xl border px-3 py-2 text-xs font-medium capitalize transition ${
-                      centerType === type
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                      centerType === type ? 'liquid-glass-dark text-white' : 'liquid-glass-button-light text-slate-700'
                     }`}
                   >
                     {type === 'none' ? (
@@ -626,9 +624,7 @@ function QrCodeEditorPage() {
                       key={formatOption}
                       onClick={() => setFormat(formatOption)}
                       className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
-                        format === formatOption
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                        format === formatOption ? 'liquid-glass-dark text-white' : 'liquid-glass-button-light text-slate-700'
                       }`}
                     >
                       {formatOption}
