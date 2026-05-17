@@ -1,3 +1,8 @@
+export type BlogInternalLink = {
+  href: '/' | '/qr-code-editor' | `/blog/${string}`;
+  label: string;
+};
+
 export type BlogPost = {
   slug: string;
   title: string;
@@ -6,6 +11,7 @@ export type BlogPost = {
   readTime: string;
   category: 'WhatsApp Links' | 'QR Codes';
   content: Array<{ heading: string; paragraphs: string[] }>;
+  internalLinks: BlogInternalLink[];
   showQrCta?: boolean;
 };
 
@@ -18,6 +24,11 @@ export const blogPosts: BlogPost[] = [
     date: 'May 17, 2026',
     readTime: '4 min read',
     category: 'WhatsApp Links',
+    internalLinks: [
+      { href: '/', label: 'create a WhatsApp link with Zapora' },
+      { href: '/qr-code-editor', label: 'customize your WhatsApp QR code' },
+      { href: '/blog/create-whatsapp-qr-code-for-business', label: 'read the WhatsApp QR code guide for businesses' },
+    ],
     content: [
       {
         heading: 'What is a WhatsApp link?',
@@ -50,6 +61,11 @@ export const blogPosts: BlogPost[] = [
     date: 'May 17, 2026',
     readTime: '4 min read',
     category: 'WhatsApp Links',
+    internalLinks: [
+      { href: '/', label: 'create a WhatsApp link with Zapora' },
+      { href: '/qr-code-editor', label: 'customize your WhatsApp QR code' },
+      { href: '/blog/how-to-create-whatsapp-link', label: 'learn the quick click to chat link setup' },
+    ],
     content: [
       {
         heading: 'Why use a WhatsApp link generator?',
@@ -83,6 +99,11 @@ export const blogPosts: BlogPost[] = [
     readTime: '5 min read',
     category: 'QR Codes',
     showQrCta: true,
+    internalLinks: [
+      { href: '/', label: 'create a WhatsApp link with Zapora' },
+      { href: '/qr-code-editor', label: 'customize your WhatsApp QR code' },
+      { href: '/blog/best-places-to-use-whatsapp-qr-code', label: 'read where to place a WhatsApp QR code' },
+    ],
     content: [
       {
         heading: 'Why businesses use WhatsApp QR codes',
@@ -116,6 +137,11 @@ export const blogPosts: BlogPost[] = [
     readTime: '4 min read',
     category: 'QR Codes',
     showQrCta: true,
+    internalLinks: [
+      { href: '/', label: 'create a WhatsApp link with Zapora' },
+      { href: '/qr-code-editor', label: 'customize your WhatsApp QR code' },
+      { href: '/blog/create-whatsapp-qr-code-for-business', label: 'read the setup guide for business QR flows' },
+    ],
     content: [
       {
         heading: 'In-store and physical locations',

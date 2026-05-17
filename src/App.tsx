@@ -257,6 +257,7 @@ function App() {
         onNavigateHome={() => navigateTo('home')}
         onNavigateBlog={() => navigateTo('blog')}
         onNavigateQrEditor={() => navigateTo('qrCodeEditor')}
+        onOpenPost={(slug) => navigateTo('blog', slug)}
       />
     );
   } else {
