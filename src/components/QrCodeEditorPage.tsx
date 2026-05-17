@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
-import { ArrowUpRight, Download, Image as ImageIcon, Palette, Smile, Trash2 } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Briefcase,
+  Download,
+  Headset,
+  Image as ImageIcon,
+  Megaphone,
+  Palette,
+  PartyPopper,
+  ScanBarcode,
+  Smile,
+  Store,
+  Ticket,
+  Trash2,
+} from 'lucide-react';
 import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
 
 type Preset = {
@@ -62,6 +76,7 @@ function QrCodeEditorPage() {
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
+  const editorSectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
@@ -379,6 +394,10 @@ function QrCodeEditorPage() {
     anchor.click();
   };
 
+  const scrollToEditor = () => {
+    editorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-white py-5 sm:py-12">
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8">
@@ -403,7 +422,7 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 sm:gap-6 xl:grid-cols-[420px_1fr]">
+        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 xl:grid-cols-[420px_1fr]">
           <div className="min-w-0 space-y-4 sm:space-y-5">
             <Section title="Content">
               <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
@@ -656,6 +675,61 @@ function QrCodeEditorPage() {
             </div>
           </div>
         </section>
+
+        <section className="mt-7 space-y-4 sm:mt-9 sm:space-y-6">
+          <div className="grid gap-4 rounded-2xl border border-emerald-100 bg-[linear-gradient(180deg,#ffffff_0%,#f7fdf9_100%)] p-4 shadow-[0_22px_55px_-45px_rgba(5,150,105,0.45)] sm:rounded-[26px] sm:p-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="min-w-0">
+              <p className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                QR Code Editor
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[1.9rem]">
+                Design QR codes worth scanning.
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                A premium QR design studio built into Zapora. Add a title, subtitle, brand colors, and a center
+                logo — all while keeping the QR safely scannable.
+              </p>
+
+              <div className="mt-4 grid gap-2 text-sm text-slate-700">
+                <FeatureBullet text="Color presets and custom picker" />
+                <FeatureBullet text="Title & subtitle on a soft top banner" />
+                <FeatureBullet text="Center emoji, icon, or uploaded logo" />
+                <FeatureBullet text="Export sizes: Square, Story, Poster" />
+                <FeatureBullet text="Always optimized for safe scanning" />
+              </div>
+
+              <button
+                onClick={scrollToEditor}
+                className="mt-5 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_30px_-20px_rgba(5,150,105,0.8)] transition hover:bg-emerald-700"
+              >
+                Customize QR Code
+              </button>
+            </div>
+
+            <div className="hidden min-h-[220px] items-center justify-center lg:flex">
+              <PromoMockup />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
+              Built for every kind of conversation
+            </h3>
+            <p className="mt-1.5 text-sm text-slate-600 sm:text-[15px]">
+              From storefronts to social bios — Zapora fits anywhere a chat starts.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:mt-5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
+              <UseCaseCard icon={Store} title="Small businesses" />
+              <UseCaseCard icon={ImageIcon} title="Instagram sellers" />
+              <UseCaseCard icon={Briefcase} title="Service providers" />
+              <UseCaseCard icon={PartyPopper} title="Events" />
+              <UseCaseCard icon={Ticket} title="Flyers & posters" />
+              <UseCaseCard icon={Headset} title="Customer support" />
+              <UseCaseCard icon={Megaphone} title="Marketing campaigns" />
+            </div>
+          </div>
+        </section>
       </div>
 
       <canvas ref={qrCanvasRef} className="hidden" />
@@ -679,6 +753,51 @@ function QrCodeEditorPage() {
         }
       `}</style>
     </main>
+  );
+}
+
+function FeatureBullet({ text }: { text: string }) {
+  return (
+    <p className="inline-flex items-start gap-2">
+      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+      <span>{text}</span>
+    </p>
+  );
+}
+
+function PromoMockup() {
+  return (
+    <div className="relative w-full max-w-[290px] rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_22px_45px_-38px_rgba(15,23,42,0.55)]">
+      <div className="mb-3 rounded-xl bg-emerald-500 px-3 py-2 text-center text-xs font-semibold text-white">
+        Scan to chat
+      </div>
+      <div className="rounded-2xl border border-slate-200 p-4">
+        <div className="aspect-square rounded-xl bg-slate-100 p-3">
+          <div className="grid h-full grid-cols-7 gap-1.5">
+            {Array.from({ length: 49 }).map((_, idx) => (
+              <span
+                key={idx}
+                className={`rounded-[3px] ${idx % 3 === 0 || idx % 5 === 0 ? 'bg-slate-900' : 'bg-white ring-1 ring-slate-200'}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="absolute -right-2 -top-2 rounded-full border border-emerald-200 bg-emerald-50 p-2">
+        <ScanBarcode className="h-4 w-4 text-emerald-700" />
+      </div>
+    </div>
+  );
+}
+
+function UseCaseCard({ icon: Icon, title }: { icon: React.ComponentType<{ className?: string }>; title: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_14px_25px_-22px_rgba(15,23,42,0.35)] sm:rounded-2xl sm:px-3.5">
+      <div className="rounded-full bg-emerald-50 p-2 ring-1 ring-emerald-100">
+        <Icon className="h-4 w-4 text-emerald-700" />
+      </div>
+      <p className="text-sm font-medium text-slate-800">{title}</p>
+    </div>
   );
 }
 
