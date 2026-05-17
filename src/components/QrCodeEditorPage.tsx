@@ -66,7 +66,12 @@ function QrCodeEditorPage() {
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
     if (saved) {
-      setRawContent(saved);
+      const normalizedSaved = saved.trim();
+      setRawContent(normalizedSaved);
+      const extractedMessage = extractWhatsAppMessage(normalizedSaved);
+      if (extractedMessage) {
+        setMessage(extractedMessage);
+      }
       return;
     }
     setRawContent('https://wa.me/919999999999');
