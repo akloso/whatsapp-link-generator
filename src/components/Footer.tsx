@@ -1,4 +1,4 @@
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog';
 
 interface FooterProps {
   currentPage: PageKey;
@@ -37,6 +37,10 @@ export default function Footer({ currentPage, onNavigate, onGetStarted }: Footer
           <div className="w-full border-t border-gray-200 pt-8">
             <nav aria-label="Footer" className="mb-4">
               <div className="flex flex-col items-center justify-center gap-2 text-sm text-gray-600 sm:flex-row sm:gap-4">
+                <button type="button" onClick={() => onNavigate('blog')} className={linkClass} aria-current={currentPage === 'blog' ? 'page' : undefined}>
+                  Blog
+                </button>
+                <span className="hidden sm:inline">•</span>
                 <button type="button" onClick={() => onNavigate('privacy')} className={linkClass} aria-current={currentPage === 'privacy' ? 'page' : undefined}>
                   Privacy
                 </button>
