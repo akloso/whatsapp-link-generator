@@ -17,6 +17,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
+import { trackEvent } from '../lib/trackEvent';
 
 type Preset = {
   name: string;
@@ -392,6 +393,10 @@ function QrCodeEditorPage() {
     anchor.href = url;
     anchor.download = `zapora-qr-${size.name.toLowerCase().replace(/\s+/g, '-')}.${format.toLowerCase()}`;
     anchor.click();
+    trackEvent('download_qr', {
+      source: 'qr_editor',
+      export_format: format.toLowerCase(),
+    });
   };
 
   const scrollToEditor = () => {
