@@ -411,12 +411,12 @@ function QrCodeEditorPage() {
         <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <div className="space-y-5">
             <Section title="Content">
-              <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
+              <label className="glass-button-secondary block rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-left transition">
                 <span className="text-sm font-semibold text-slate-900">Upload existing QR</span>
                 <span className="mt-1 block text-xs text-slate-600">
                   Upload a QR image to rebuild it as an editable Zapora QR.
                 </span>
-                <span className="mt-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                <span className="glass-button-secondary mt-2 inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-700">
                   <ImageIcon className="h-3.5 w-3.5" /> {isImportingQr ? 'Importing…' : 'Choose QR image'}
                 </span>
                 <input
@@ -480,10 +480,10 @@ function QrCodeEditorPage() {
                   <button
                     key={presetOption.name}
                     onClick={() => applyPreset(presetOption)}
-                    className={`rounded-xl border p-2.5 text-left transition ${
+                    className={`glass-button-secondary rounded-xl p-2.5 text-left transition ${
                       preset.name === presetOption.name
-                        ? 'border-slate-900 bg-slate-50 shadow-sm'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'glass-button-dark text-white shadow-sm'
+                        : 'text-slate-800'
                     }`}
                   >
                     <div className="flex h-8 overflow-hidden rounded-md ring-1 ring-slate-200">
@@ -507,10 +507,10 @@ function QrCodeEditorPage() {
                   <button
                     key={type}
                     onClick={() => setCenterType(type)}
-                    className={`rounded-xl border px-3 py-2 text-xs font-medium capitalize transition ${
+                    className={`rounded-xl px-3 py-2 text-xs font-medium capitalize transition glass-button-secondary ${
                       centerType === type
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                        ? 'glass-button-dark text-white'
+                        : 'text-slate-700'
                     }`}
                   >
                     {type === 'none' ? (
@@ -583,10 +583,10 @@ function QrCodeEditorPage() {
                     <button
                       key={sizeOption.name}
                       onClick={() => setSize(sizeOption)}
-                      className={`rounded-xl border px-3 py-2 text-left transition ${
+                      className={`rounded-xl px-3 py-2 text-left transition glass-button-secondary ${
                         size.name === sizeOption.name
-                          ? 'border-slate-900 bg-white text-slate-950 shadow-sm'
-                          : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
+                          ? 'text-slate-950 shadow-sm ring-1 ring-emerald-300/45'
+                          : 'text-slate-700'
                       }`}
                     >
                       <p className="text-[11px] font-semibold leading-tight">{sizeOption.name}</p>
@@ -631,10 +631,10 @@ function QrCodeEditorPage() {
                     <button
                       key={formatOption}
                       onClick={() => setFormat(formatOption)}
-                      className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                      className={`rounded-xl px-3 py-2.5 text-sm font-medium transition glass-button-secondary ${
                         format === formatOption
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                          ? 'glass-button-dark text-white'
+                          : 'text-slate-700'
                       }`}
                     >
                       {formatOption}
@@ -645,7 +645,7 @@ function QrCodeEditorPage() {
                 <button
                   onClick={handleDownload}
                   disabled={!isReady}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#16a34a_0%,#059669_100%)] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="glass-button-primary mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" /> Download QR ({format})
                 </button>

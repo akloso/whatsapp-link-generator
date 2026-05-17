@@ -445,7 +445,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
               onClick={generateLink}
               disabled={!isFormValid}
               aria-disabled={!isFormValid}
-              className="w-full rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:text-lg"
+              className="w-full rounded-2xl glass-button-primary px-6 py-4 text-base font-semibold transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:text-lg"
             >
               Generate WhatsApp Link
             </button>
@@ -473,7 +473,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
+                <div className="glass-surface-soft rounded-3xl p-4">
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
@@ -491,7 +491,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <button
                     onClick={copyToClipboard}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
+                    className="glass-button-secondary flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
                     aria-label="Copy generated WhatsApp link"
                   >
                     <Copy className="h-5 w-5" />
@@ -500,7 +500,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
 
                   <button
                     onClick={downloadQrCode}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
+                    className="glass-button-secondary flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
                     aria-label="Download QR code"
                   >
                     {downloadStatus === 'success' ? <Check className="h-5 w-5 text-green-600" /> : <Download className="h-5 w-5" />}
@@ -508,7 +508,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                   </button>
                   <button
                     onClick={openWhatsApp}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
+                    className="glass-button-secondary flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
                     aria-label="Open generated WhatsApp link"
                   >
                     <ExternalLink className="h-5 w-5 shrink-0" />
@@ -518,7 +518,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
 
                 <button
                   onClick={() => onCustomizeQrCode?.(generatedLink)}
-                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 py-3.5 font-semibold text-emerald-800 transition-all hover:border-emerald-300 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20"
+                  className="glass-button-primary flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20"
                   aria-label="Customize QR code on dedicated editor page"
                 >
                   <Sparkles className="h-5 w-5" />
@@ -530,14 +530,14 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                   {downloadStatus === 'error' && 'We could not download the QR code. Please try again.'}
                 </p>
 
-                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 text-center shadow-md sm:p-5">
+                <div className="glass-surface-soft flex flex-col items-center rounded-3xl p-4 text-center sm:p-5">
                   <p className="mb-4 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="glass-surface-soft rounded-2xl p-4">
                     <img src={qrImageUrl} alt="QR code for generated WhatsApp link" className="h-56 w-56 sm:h-60 sm:w-60" />
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+                <div className="glass-surface-soft rounded-2xl p-4 sm:p-5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">QR Color Style</p>

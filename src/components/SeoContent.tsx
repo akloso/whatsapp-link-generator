@@ -13,7 +13,7 @@ export default function SeoContent() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <article className="glass-surface-soft rounded-2xl p-5">
             <h3 className="text-base font-semibold text-gray-900">What is a WhatsApp link generator?</h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
               A WhatsApp link generator creates a direct chat link for your number, so people can message you without
@@ -22,7 +22,7 @@ export default function SeoContent() {
             </p>
           </article>
 
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <article className="glass-surface-soft rounded-2xl p-5">
             <h3 className="text-base font-semibold text-gray-900">How to create a WhatsApp link?</h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
               Enter your phone number, choose the correct country code, add an optional pre-filled message, and click
@@ -30,7 +30,7 @@ export default function SeoContent() {
             </p>
           </article>
 
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <article className="glass-surface-soft rounded-2xl p-5">
             <h3 className="text-base font-semibold text-gray-900">Why use a WhatsApp QR code?</h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
               A WhatsApp QR code makes it easier for people to start a chat from offline or visual places like flyers,
@@ -39,7 +39,7 @@ export default function SeoContent() {
             </p>
           </article>
 
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <article className="glass-surface-soft rounded-2xl p-5">
             <h3 className="text-base font-semibold text-gray-900">Can I customize my QR code?</h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
               Yes. Use Zapora’s QR Code Editor to add brand colors, a title, subtitle, center emoji or logo, and
@@ -47,7 +47,7 @@ export default function SeoContent() {
             </p>
             <a
               href="/qr-code-editor"
-              className="mt-3 inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+              className="glass-button-primary mt-3 inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-semibold transition"
             >
               Customize your QR code
             </a>

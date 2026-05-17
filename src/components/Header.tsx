@@ -52,8 +52,8 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                 }}
                 className={`rounded-xl px-3 py-2 text-sm transition ${
                   isActive
-                    ? 'bg-emerald-50 font-semibold text-emerald-800'
-                    : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'
+                    ? 'glass-button-secondary font-semibold text-emerald-900'
+                    : 'font-medium text-gray-700 hover:bg-gray-50/80 hover:text-emerald-800'
                 }`}
               >
                 {item.label}
@@ -90,8 +90,8 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                   }}
                   className={`rounded-xl px-3 py-2.5 text-sm transition ${
                     isActive
-                      ? 'bg-emerald-50 font-semibold text-emerald-800'
-                      : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'
+                      ? 'glass-button-secondary font-semibold text-emerald-900'
+                      : 'font-medium text-gray-700 hover:bg-gray-50/80 hover:text-emerald-800'
                   }`}
                 >
                   {item.label}
