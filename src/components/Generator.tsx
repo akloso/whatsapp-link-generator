@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle, ExternalLink } from 'lucide-react';
+import QRCode from 'qrcode';
 import { trackEvent } from '../lib/trackEvent';
 import { logToGoogleSheets } from '../lib/sheetsLogger';
 
@@ -131,10 +132,25 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
 
-  const qrImageUrl = useMemo(() => {
-    if (!generatedLink) return '';
-    const qrColor = qrForegroundColor.replace('#', '');
-    return `https://api.qrserver.com/v1/create-qr-code/?size=480x480&color=${qrColor}&bgcolor=ffffff&data=${encodeURIComponent(generatedLink)}`;
+  const [qrImageUrl, setQrImageUrl] = useState('');
+
+  useEffect(() => {
+    if (!generatedLink) {
+      setQrImageUrl('');
+      return;
+    }
+
+    QRCode.toDataURL(generatedLink, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 480,
+      color: {
+        dark: qrForegroundColor,
+        light: '#ffffff',
+      },
+    })
+      .then((url) => setQrImageUrl(url))
+      .catch(() => setQrImageUrl(''));
   }, [generatedLink, qrForegroundColor]);
 
   const filteredCountries = useMemo(() => {
@@ -213,7 +229,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
       country_code: selectedCountry.code,
       message: trimmedMessage,
       generated_link: link,
-      consent: true,
+      user_action_consent: true,
       created_at: new Date().toISOString(),
     });
     window.setTimeout(() => setShowCelebration(false), 1100);

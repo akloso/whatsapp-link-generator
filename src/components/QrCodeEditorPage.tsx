@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import jsQR from 'jsqr';
 import { ArrowUpRight, Download, Image as ImageIcon, Palette, Smile, Trash2 } from 'lucide-react';
-
-const QR_EDITOR_STORAGE_KEY = 'zapora_qr_editor_link';
+import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
 
 type Preset = {
   name: string;
@@ -39,6 +39,9 @@ const SIZES: SizeOption[] = [
 const FORMATS: FormatOption[] = ['PNG', 'JPG'];
 
 const EMOJIS = ['💬', '📱', '🛍️', '❤️', '✨', '🎉', '📷', '🍔', '☕', '🎵', '🚀', '🌟'];
+type BarcodeDetectorLike = new (options: { formats: string[] }) => {
+  detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue?: string }>>;
+};
 
 function QrCodeEditorPage() {
   const [rawContent, setRawContent] = useState('');
@@ -54,6 +57,8 @@ function QrCodeEditorPage() {
   const [size, setSize] = useState<SizeOption>(SIZES[0]);
   const [format, setFormat] = useState<FormatOption>('PNG');
   const [status, setStatus] = useState('');
+  const [importStatus, setImportStatus] = useState('');
+  const [isImportingQr, setIsImportingQr] = useState(false);
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -61,7 +66,12 @@ function QrCodeEditorPage() {
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
     if (saved) {
-      setRawContent(saved);
+      const normalizedSaved = saved.trim();
+      setRawContent(normalizedSaved);
+      const extractedMessage = extractWhatsAppMessage(normalizedSaved);
+      if (extractedMessage) {
+        setMessage(extractedMessage);
+      }
       return;
     }
     setRawContent('https://wa.me/919999999999');
@@ -71,18 +81,11 @@ function QrCodeEditorPage() {
     const value = rawContent.trim();
     if (!value) return '';
 
-    try {
-      const url = new URL(value);
-      const isWhatsAppLink = url.hostname.includes('wa.me') || url.hostname.includes('whatsapp');
-
-      if (isWhatsAppLink && message.trim()) {
-        url.searchParams.set('text', message.trim());
-      }
-
-      return url.toString();
-    } catch {
-      return value;
+    if (isWhatsAppUrl(value)) {
+      return syncWhatsAppMessageInUrl(value, message);
     }
+
+    return value;
   }, [message, rawContent]);
 
   const isReady = useMemo(() => finalContent.trim().length > 0, [finalContent]);
@@ -103,6 +106,94 @@ function QrCodeEditorPage() {
       setCenterType('image');
     };
     reader.readAsDataURL(file);
+  };
+
+  const applyDecodedQrContent = (decodedValue: string) => {
+    const nextValue = decodedValue.trim();
+    setRawContent(nextValue);
+    const extractedMessage = extractWhatsAppMessage(nextValue);
+    if (extractedMessage) {
+      setMessage(extractedMessage);
+    }
+  };
+
+  const handleRawContentChange = (nextValue: string) => {
+    setRawContent(nextValue);
+    const extractedMessage = extractWhatsAppMessage(nextValue);
+    if (extractedMessage) {
+      setMessage(extractedMessage);
+    }
+  };
+
+  const handleMessageChange = (nextMessage: string) => {
+    setMessage(nextMessage);
+    if (isWhatsAppUrl(rawContent)) {
+      setRawContent((currentValue) => syncWhatsAppMessageInUrl(currentValue, nextMessage));
+    }
+  };
+
+  const handleImportQr = async (file: File) => {
+    setImportStatus('Reading QR image...');
+
+    const acceptedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!acceptedTypes.includes(file.type)) {
+      setImportStatus('Please upload a PNG, JPG, or WEBP QR image.');
+      return;
+    }
+
+    setIsImportingQr(true);
+    try {
+      const imageDataUrl = await readFileAsDataUrl(file);
+      const image = await loadImage(imageDataUrl);
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth || image.width;
+      canvas.height = image.naturalHeight || image.height;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
+        return;
+      }
+
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      const BarcodeDetectorClass = (window as unknown as { BarcodeDetector?: BarcodeDetectorLike }).BarcodeDetector;
+      if (BarcodeDetectorClass) {
+        try {
+          const detector = new BarcodeDetectorClass({ formats: ['qr_code'] });
+          const detections = await detector.detect(canvas);
+          const decodedValue = detections[0]?.rawValue;
+
+          if (decodedValue) {
+            applyDecodedQrContent(decodedValue);
+            setImportStatus('QR imported successfully. You can now customize and export it.');
+            return;
+          }
+        } catch (barcodeError) {
+          if (import.meta.env.DEV) {
+            console.warn('BarcodeDetector QR import failed, trying jsQR fallback:', barcodeError);
+          }
+        }
+      }
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const decoded = jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (decoded?.data) {
+        applyDecodedQrContent(decoded.data);
+        setImportStatus('QR imported successfully. You can now customize and export it.');
+        return;
+      }
+
+      setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('QR import failed:', error);
+      }
+      setImportStatus('We couldn’t read this QR. Please upload a clearer QR image or paste the link manually.');
+    } finally {
+      setIsImportingQr(false);
+    }
   };
 
   useEffect(() => {
@@ -315,10 +406,35 @@ function QrCodeEditorPage() {
         <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <div className="space-y-5">
             <Section title="Content">
+              <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
+                <span className="text-sm font-semibold text-slate-900">Upload existing QR</span>
+                <span className="mt-1 block text-xs text-slate-600">
+                  Upload a QR image to rebuild it as an editable Zapora QR.
+                </span>
+                <span className="mt-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                  <ImageIcon className="h-3.5 w-3.5" /> {isImportingQr ? 'Importing…' : 'Choose QR image'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void handleImportQr(file);
+                    }
+                    event.currentTarget.value = '';
+                  }}
+                  className="hidden"
+                />
+              </label>
+              {importStatus ? (
+                <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">{importStatus}</p>
+              ) : null}
+
               <Field label="Link or text">
                 <input
                   value={rawContent}
-                  onChange={(event) => setRawContent(event.target.value)}
+                  onChange={(event) => handleRawContentChange(event.target.value)}
                   placeholder="https://wa.me/91XXXXXXXXXX"
                   className="zapora-input"
                 />
@@ -327,7 +443,7 @@ function QrCodeEditorPage() {
               <Field label="WhatsApp message">
                 <textarea
                   value={message}
-                  onChange={(event) => setMessage(event.target.value)}
+                  onChange={(event) => handleMessageChange(event.target.value)}
                   rows={3}
                   placeholder="Optional pre-filled WhatsApp message"
                   className="zapora-input min-h-[96px] resize-none"
@@ -642,6 +758,49 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function isWhatsAppUrl(value: string) {
+  try {
+    const url = new URL(value.trim());
+    return url.hostname.includes('wa.me') || url.hostname.includes('whatsapp');
+  } catch {
+    return false;
+  }
+}
+
+function extractWhatsAppMessage(value: string) {
+  try {
+    const url = new URL(value.trim());
+    if (!isWhatsAppUrl(value)) return '';
+    return url.searchParams.get('text') || '';
+  } catch {
+    return '';
+  }
+}
+
+function syncWhatsAppMessageInUrl(value: string, nextMessage: string) {
+  try {
+    const url = new URL(value.trim());
+    if (!isWhatsAppUrl(value)) return value;
+    if (nextMessage.trim()) {
+      url.searchParams.set('text', nextMessage.trim());
+    } else {
+      url.searchParams.delete('text');
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 function truncate(value: string, limit: number) {
   return value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
 }
@@ -664,5 +823,4 @@ function shade(hex: string, percent: number) {
   return `#${((red << 16) | (green << 8) | blue).toString(16).padStart(6, '0')}`;
 }
 
-export { QR_EDITOR_STORAGE_KEY };
 export default QrCodeEditorPage;
