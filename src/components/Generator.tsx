@@ -299,9 +299,10 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
 
   return (
     <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-12 sm:py-14">
-      <div className="absolute inset-0 opacity-60">
-        <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-green-100 blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-50 blur-3xl"></div>
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(167,243,208,0.22),transparent_56%),radial-gradient(circle_at_80%_72%,rgba(186,230,253,0.2),transparent_54%)]"></div>
+        <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-green-100/55 blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-200/35 blur-3xl"></div>
       </div>
 
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">

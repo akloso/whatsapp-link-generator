@@ -380,8 +380,13 @@ function QrCodeEditorPage() {
   };
 
   return (
-    <main className="min-h-screen bg-white py-8 sm:py-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-white via-emerald-50/30 to-white py-8 sm:py-12">
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <div className="absolute left-10 top-12 h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl"></div>
+        <div className="absolute bottom-0 right-10 h-80 w-80 rounded-full bg-cyan-100/30 blur-3xl"></div>
+      </div>
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <section className="glass-surface mb-6 rounded-[28px] px-5 py-5 sm:mb-8 sm:px-7 sm:py-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
