@@ -9,16 +9,21 @@ import Footer from './components/Footer';
 import Header from './components/Header';
 import QrCodeEditorPage from './components/QrCodeEditorPage';
 import SeoContent from './components/SeoContent';
+import BlogListPage from './components/BlogListPage';
+import BlogPostPage from './components/BlogPostPage';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
+import { blogPostsBySlug } from './data/blogPosts';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost';
 
-const routeToPage = (pathname: string): PageKey => {
-  if (pathname === '/privacy') return 'privacy';
-  if (pathname === '/terms') return 'terms';
-  if (pathname === '/contact') return 'contact';
-  if (pathname === '/qr-code-editor') return 'qrCodeEditor';
-  return 'home';
+const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
+  if (pathname === '/privacy') return { page: 'privacy' };
+  if (pathname === '/terms') return { page: 'terms' };
+  if (pathname === '/contact') return { page: 'contact' };
+  if (pathname === '/qr-code-editor') return { page: 'qrCodeEditor' };
+  if (pathname === '/blog') return { page: 'blog' };
+  if (pathname.startsWith('/blog/')) return { page: 'blogPost', slug: pathname.replace('/blog/', '') };
+  return { page: 'home' };
 };
 
 const pageMetadata: Record<PageKey, { title: string; description: string }> = {
@@ -41,6 +46,14 @@ const pageMetadata: Record<PageKey, { title: string; description: string }> = {
     title: 'Contact | Zapora',
     description: 'Contact Zapora for support, feedback, or business questions.',
   },
+  blog: {
+    title: 'Zapora Blog | WhatsApp Guides',
+    description: 'Simple guides to help you create WhatsApp links, QR codes, and better chat flows.',
+  },
+  blogPost: {
+    title: 'Blog | Zapora',
+    description: 'Helpful WhatsApp link and QR code guides from Zapora.',
+  },
   qrCodeEditor: {
     title: 'QR Code Editor | Zapora',
     description: 'Advanced QR design page to customize and preview QR codes for WhatsApp links and URLs.',
@@ -48,16 +61,25 @@ const pageMetadata: Record<PageKey, { title: string; description: string }> = {
 };
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<PageKey>(() => routeToPage(window.location.pathname));
+  const initialRoute = routeToPage(window.location.pathname);
+  const [currentPage, setCurrentPage] = useState<PageKey>(initialRoute.page);
+  const [currentBlogSlug, setCurrentBlogSlug] = useState<string | undefined>(initialRoute.slug);
 
   useEffect(() => {
-    const onPopState = () => setCurrentPage(routeToPage(window.location.pathname));
+    const onPopState = () => {
+      const route = routeToPage(window.location.pathname);
+      setCurrentPage(route.page);
+      setCurrentBlogSlug(route.slug);
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   useEffect(() => {
-    const metadata = pageMetadata[currentPage];
+    const blogPost = currentPage === 'blogPost' && currentBlogSlug ? blogPostsBySlug.get(currentBlogSlug) : null;
+    const metadata = currentPage === 'blogPost' && blogPost
+      ? { title: `${blogPost.title} | Zapora Blog`, description: blogPost.excerpt }
+      : pageMetadata[currentPage];
     document.title = metadata.title;
 
     const setMeta = (selector: string, content: string, attr: 'name' | 'property') => {
@@ -77,7 +99,11 @@ function App() {
     setMeta('twitter:title', metadata.title, 'name');
     setMeta('twitter:description', metadata.description, 'name');
 
-    const canonicalPath = currentPage === 'home' ? '/' : currentPage === 'qrCodeEditor' ? '/qr-code-editor' : `/${currentPage}`;
+    const canonicalPath = currentPage === 'home' ? '/'
+      : currentPage === 'qrCodeEditor' ? '/qr-code-editor'
+      : currentPage === 'blog' ? '/blog'
+      : currentPage === 'blogPost' ? `/blog/${currentBlogSlug ?? ''}`
+      : `/${currentPage}`;
     const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
 
     let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
@@ -89,12 +115,13 @@ function App() {
     canonicalTag.setAttribute('href', absoluteUrl);
 
     setMeta('og:url', absoluteUrl, 'property');
-  }, [currentPage]);
+  }, [currentBlogSlug, currentPage]);
 
-  const navigateTo = (page: PageKey) => {
-    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : `/${page}`;
+  const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
+    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
     window.history.pushState({}, '', targetPath);
-    setCurrentPage(page);
+    setCurrentPage(page === 'blog' && blogSlug ? 'blogPost' : page);
+    setCurrentBlogSlug(blogSlug);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -221,6 +248,18 @@ function App() {
     );
   } else if (currentPage === 'qrCodeEditor') {
     pageContent = <QrCodeEditorPage />;
+  } else if (currentPage === 'blog') {
+    pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
+  } else if (currentPage === 'blogPost') {
+    pageContent = (
+      <BlogPostPage
+        post={currentBlogSlug ? blogPostsBySlug.get(currentBlogSlug) ?? null : null}
+        onNavigateHome={() => navigateTo('home')}
+        onNavigateBlog={() => navigateTo('blog')}
+        onNavigateQrEditor={() => navigateTo('qrCodeEditor')}
+        onOpenPost={(slug) => navigateTo('blog', slug)}
+      />
+    );
   } else {
     pageContent = (
       <>
@@ -241,9 +280,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header currentPage={currentPage} onNavigate={navigateTo} />
+      <Header currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} />
       {pageContent}
-      <Footer currentPage={currentPage} onNavigate={navigateTo} onGetStarted={scrollToGenerator} />
+      <Footer currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />
     </div>
   );
 }

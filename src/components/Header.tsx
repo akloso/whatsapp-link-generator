@@ -1,7 +1,7 @@
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog';
 
 type HeaderProps = {
   currentPage: PageKey;
@@ -11,6 +11,7 @@ type HeaderProps = {
 const navItems: Array<{ label: string; page: PageKey }> = [
   { label: 'Home', page: 'home' },
   { label: 'QR Code Editor', page: 'qrCodeEditor' },
+  { label: 'Blog', page: 'blog' },
   { label: 'Privacy', page: 'privacy' },
   { label: 'Contact', page: 'contact' },
 ];
