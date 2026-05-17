@@ -1,17 +1,23 @@
-const GOOGLE_SHEETS_WEBHOOK_URL =
-  'https://script.google.com/macros/s/AKfycbzf7n0X0dLTY51Djnrr_bhXa4q4azIim9IyAa1p1wm9g82N-qeqSN85jntH2y6urNmyUQ/exec';
+import { appConfig, isGoogleSheetsLoggingEnabled } from '../config';
 
 type SheetsPayload = {
   phone_number: string;
   country_code: string;
   message: string;
   generated_link: string;
-  consent: boolean;
+  user_action_consent: boolean;
   created_at: string;
 };
 
 export const logToGoogleSheets = (payload: SheetsPayload) => {
-  fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+  if (!isGoogleSheetsLoggingEnabled()) {
+    if (import.meta.env.DEV) {
+      console.warn('Google Sheets logging skipped: VITE_GOOGLE_SHEETS_WEBHOOK_URL is not set.');
+    }
+    return;
+  }
+
+  fetch(appConfig.googleSheetsWebhookUrl, {
     method: 'POST',
     mode: 'no-cors',
     body: JSON.stringify(payload),
@@ -19,4 +25,3 @@ export const logToGoogleSheets = (payload: SheetsPayload) => {
     console.warn('Google Sheets logging failed:', error);
   });
 };
-

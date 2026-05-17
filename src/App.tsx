@@ -7,7 +7,9 @@ import Features from './components/Features';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import Header from './components/Header';
-import QrCodeEditorPage, { QR_EDITOR_STORAGE_KEY } from './components/QrCodeEditorPage';
+import QrCodeEditorPage from './components/QrCodeEditorPage';
+import SeoContent from './components/SeoContent';
+import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor';
 
@@ -28,7 +30,7 @@ const pageMetadata: Record<PageKey, { title: string; description: string }> = {
   privacy: {
     title: 'Privacy Policy | Zapora',
     description:
-      'Read how Zapora handles your data. We keep processing in your browser and do not store generated numbers or messages.',
+      'Read how Zapora handles your data when you generate links and QR codes.',
   },
   terms: {
     title: 'Terms of Use | Zapora',
@@ -78,7 +80,7 @@ function App() {
     const canonicalPath = currentPage === 'home' ? '/' : currentPage === 'qrCodeEditor' ? '/qr-code-editor' : `/${currentPage}`;
     const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
 
-    let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel=\"canonical\"]');
+    let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonicalTag) {
       canonicalTag = document.createElement('link');
       canonicalTag.setAttribute('rel', 'canonical');
@@ -125,7 +127,7 @@ function App() {
           {
             heading: 'Data we process',
             content:
-              'When you generate a link, we process your country code, phone number, and optional message. This is used to create your WhatsApp link and QR code.',
+              'When you click Generate, the phone number, country code, optional message, and generated link may be stored for a limited time for service improvement, analytics, and training/improvement purposes. We do not sell or share this data with third parties.',
           },
           {
             heading: 'Why data is used',
@@ -135,7 +137,7 @@ function App() {
           {
             heading: 'Third-party services',
             content:
-              'QR images are generated through a third-party QR service endpoint when you create a code. Please avoid including sensitive personal data in pre-filled messages.',
+              'QR codes are generated to support your link workflow. Please avoid including sensitive personal data in pre-filled messages.',
           },
           {
             heading: 'Contact',
@@ -230,6 +232,7 @@ function App() {
           }}
         />
         <HowItWorks />
+        <SeoContent />
         <Features />
         <FAQ />
       </>
@@ -238,7 +241,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onHomeClick={() => navigateTo('home')} />
+      <Header currentPage={currentPage} onNavigate={navigateTo} />
       {pageContent}
       <Footer currentPage={currentPage} onNavigate={navigateTo} onGetStarted={scrollToGenerator} />
     </div>
