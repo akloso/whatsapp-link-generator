@@ -76,18 +76,11 @@ function QrCodeEditorPage() {
     const value = rawContent.trim();
     if (!value) return '';
 
-    try {
-      const url = new URL(value);
-      const isWhatsAppLink = url.hostname.includes('wa.me') || url.hostname.includes('whatsapp');
-
-      if (isWhatsAppLink && message.trim()) {
-        url.searchParams.set('text', message.trim());
-      }
-
-      return url.toString();
-    } catch {
-      return value;
+    if (isWhatsAppUrl(value)) {
+      return syncWhatsAppMessageInUrl(value, message);
     }
+
+    return value;
   }, [message, rawContent]);
 
   const isReady = useMemo(() => finalContent.trim().length > 0, [finalContent]);
@@ -108,6 +101,30 @@ function QrCodeEditorPage() {
       setCenterType('image');
     };
     reader.readAsDataURL(file);
+  };
+
+  const applyDecodedQrContent = (decodedValue: string) => {
+    const nextValue = decodedValue.trim();
+    setRawContent(nextValue);
+    const extractedMessage = extractWhatsAppMessage(nextValue);
+    if (extractedMessage) {
+      setMessage(extractedMessage);
+    }
+  };
+
+  const handleRawContentChange = (nextValue: string) => {
+    setRawContent(nextValue);
+    const extractedMessage = extractWhatsAppMessage(nextValue);
+    if (extractedMessage) {
+      setMessage(extractedMessage);
+    }
+  };
+
+  const handleMessageChange = (nextMessage: string) => {
+    setMessage(nextMessage);
+    if (isWhatsAppUrl(rawContent)) {
+      setRawContent((currentValue) => syncWhatsAppMessageInUrl(currentValue, nextMessage));
+    }
   };
 
   const handleImportQr = async (file: File) => {
@@ -143,7 +160,7 @@ function QrCodeEditorPage() {
           const decodedValue = detections[0]?.rawValue;
 
           if (decodedValue) {
-            setRawContent(decodedValue.trim());
+            applyDecodedQrContent(decodedValue);
             setImportStatus('QR imported successfully. You can now customize and export it.');
             return;
           }
@@ -158,7 +175,7 @@ function QrCodeEditorPage() {
       const decoded = jsQR(imageData.data, imageData.width, imageData.height);
 
       if (decoded?.data) {
-        setRawContent(decoded.data.trim());
+        applyDecodedQrContent(decoded.data);
         setImportStatus('QR imported successfully. You can now customize and export it.');
         return;
       }
@@ -412,7 +429,7 @@ function QrCodeEditorPage() {
               <Field label="Link or text">
                 <input
                   value={rawContent}
-                  onChange={(event) => setRawContent(event.target.value)}
+                  onChange={(event) => handleRawContentChange(event.target.value)}
                   placeholder="https://wa.me/91XXXXXXXXXX"
                   className="zapora-input"
                 />
@@ -421,7 +438,7 @@ function QrCodeEditorPage() {
               <Field label="WhatsApp message">
                 <textarea
                   value={message}
-                  onChange={(event) => setMessage(event.target.value)}
+                  onChange={(event) => handleMessageChange(event.target.value)}
                   rows={3}
                   placeholder="Optional pre-filled WhatsApp message"
                   className="zapora-input min-h-[96px] resize-none"
@@ -743,6 +760,40 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
+}
+
+function isWhatsAppUrl(value: string) {
+  try {
+    const url = new URL(value.trim());
+    return url.hostname.includes('wa.me') || url.hostname.includes('whatsapp');
+  } catch {
+    return false;
+  }
+}
+
+function extractWhatsAppMessage(value: string) {
+  try {
+    const url = new URL(value.trim());
+    if (!isWhatsAppUrl(value)) return '';
+    return url.searchParams.get('text') || '';
+  } catch {
+    return '';
+  }
+}
+
+function syncWhatsAppMessageInUrl(value: string, nextMessage: string) {
+  try {
+    const url = new URL(value.trim());
+    if (!isWhatsAppUrl(value)) return value;
+    if (nextMessage.trim()) {
+      url.searchParams.set('text', nextMessage.trim());
+    } else {
+      url.searchParams.delete('text');
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
 }
 
 function truncate(value: string, limit: number) {
