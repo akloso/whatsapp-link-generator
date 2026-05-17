@@ -316,7 +316,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
           </p>
         </div>
 
-        <div className="rounded-[32px] border border-gray-200 bg-white/95 p-4 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
+        <div className="glass-surface rounded-[32px] p-4 sm:p-6 lg:p-7">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.98fr_1.02fr] xl:gap-7">
             <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

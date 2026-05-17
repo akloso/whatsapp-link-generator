@@ -36,7 +36,7 @@ export default function HowItWorks() {
           {steps.map((step, index) => (
             <div key={index} className="group relative">
               <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-600 to-emerald-600 opacity-0 transition-all duration-300 group-hover:opacity-5"></div>
-              <div className="relative h-full rounded-2xl border border-gray-200 bg-white p-5 shadow-md transition-all duration-300 group-hover:border-green-200 group-hover:shadow-lg sm:p-6">
+              <div className="glass-surface-soft relative h-full rounded-2xl p-5 transition-all duration-300 group-hover:border-green-200 group-hover:shadow-lg sm:p-6">
                 <div className="flex h-full flex-col items-center text-center">
                   <div className="relative mb-4">
                     <div className="absolute inset-0 rounded-2xl bg-green-500 opacity-20 blur-lg"></div>

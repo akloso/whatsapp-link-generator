@@ -87,3 +87,44 @@
     transform: translate(calc(-50% + var(--x)), -34px) scale(1);
   }
 }
+
+
+@layer components {
+  .glass-surface {
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 20px 60px -36px rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .glass-surface-soft {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    box-shadow: 0 16px 42px -34px rgba(15, 23, 42, 0.24);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-surface {
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .glass-surface-soft {
+      background: rgba(255, 255, 255, 0.96);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .glass-surface {
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .glass-surface-soft {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+  }
+}

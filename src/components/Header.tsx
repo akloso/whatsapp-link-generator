@@ -25,7 +25,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
   const getPath = (page: PageKey) => (page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : `/${page}`);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+    <header className="glass-surface sticky top-0 z-40 border-b border-gray-100">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <a
           href="/"
@@ -75,7 +75,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
       </div>
 
       {isMobileOpen ? (
-        <nav id="mobile-nav" className="border-t border-gray-100 bg-white px-4 py-3 sm:hidden" aria-label="Mobile primary">
+        <nav id="mobile-nav" className="glass-surface border-t border-gray-100 px-4 py-3 sm:hidden" aria-label="Mobile primary">
           <div className="flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive = currentPage === item.page;

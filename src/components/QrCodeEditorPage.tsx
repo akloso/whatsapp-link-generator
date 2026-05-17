@@ -382,7 +382,7 @@ function QrCodeEditorPage() {
   return (
     <main className="min-h-screen bg-white py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <section className="mb-6 rounded-[28px] border border-slate-200 bg-white px-5 py-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] sm:mb-8 sm:px-7 sm:py-6">
+        <section className="glass-surface mb-6 rounded-[28px] px-5 py-5 sm:mb-8 sm:px-7 sm:py-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
@@ -564,7 +564,7 @@ function QrCodeEditorPage() {
           </div>
 
           <div className="xl:sticky xl:top-24 xl:self-start">
-            <div className="rounded-[30px] border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-5 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:p-6">
+            <div className="glass-surface rounded-[30px] p-5 sm:p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live preview</p>
@@ -591,7 +591,7 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="flex justify-center rounded-[28px] border border-slate-200 bg-white/70 p-4 sm:p-6">
+              <div className="glass-surface-soft flex justify-center rounded-[28px] p-4 sm:p-6">
                 {isReady ? (
                   <div
                     className="overflow-hidden rounded-[24px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200"
@@ -682,7 +682,7 @@ function QrCodeEditorPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.3)]">
+    <div className="glass-surface-soft rounded-[24px] p-5">
       <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</h3>
       <div className="mt-4 space-y-3">{children}</div>
     </div>
