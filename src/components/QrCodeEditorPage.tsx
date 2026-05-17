@@ -380,9 +380,9 @@ function QrCodeEditorPage() {
   };
 
   return (
-    <main className="min-h-screen bg-white py-8 sm:py-12">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-white via-sky-50/60 to-emerald-50/40 py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <section className="mb-6 rounded-[28px] border border-slate-200 bg-white px-5 py-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] sm:mb-8 sm:px-7 sm:py-6">
+        <section className="liquid-glass mb-6 rounded-[28px] px-5 py-5 sm:mb-8 sm:px-7 sm:py-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
@@ -580,8 +580,7 @@ function QrCodeEditorPage() {
                       onClick={() => setSize(sizeOption)}
                       className={`rounded-xl border px-3 py-2 text-left transition ${
                         size.name === sizeOption.name
-                          ? 'border-slate-900 bg-white text-slate-950 shadow-sm'
-                          : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
+                          ? 'liquid-glass-dark text-white' : 'liquid-glass-button-light text-slate-700'
                       }`}
                     >
                       <p className="text-[11px] font-semibold leading-tight">{sizeOption.name}</p>
@@ -682,7 +681,7 @@ function QrCodeEditorPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.3)]">
+    <div className="liquid-glass rounded-[24px] p-5">
       <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</h3>
       <div className="mt-4 space-y-3">{children}</div>
     </div>

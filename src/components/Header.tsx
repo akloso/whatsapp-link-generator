@@ -25,7 +25,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
   const getPath = (page: PageKey) => (page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : `/${page}`);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+    <header className="sticky top-0 z-40 border-b border-gray-100 liquid-glass">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <a
           href="/"
@@ -51,9 +51,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                   onNavigate(item.page);
                 }}
                 className={`rounded-xl px-3 py-2 text-sm transition ${
-                  isActive
-                    ? 'bg-emerald-50 font-semibold text-emerald-800'
-                    : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'
+                  isActive ? 'liquid-glass-dark font-semibold' : 'liquid-glass-button-light font-medium text-gray-700 hover:text-emerald-800'
                 }`}
               >
                 {item.label}
@@ -65,7 +63,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
         <button
           type="button"
           onClick={() => setIsMobileOpen((value) => !value)}
-          className="inline-flex items-center justify-center rounded-xl border border-gray-200 p-2 text-gray-700 transition hover:bg-gray-50 sm:hidden"
+          className="inline-flex items-center justify-center liquid-glass-button-light rounded-xl p-2 text-gray-700 transition sm:hidden"
           aria-expanded={isMobileOpen}
           aria-controls="mobile-nav"
           aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
@@ -75,7 +73,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
       </div>
 
       {isMobileOpen ? (
-        <nav id="mobile-nav" className="border-t border-gray-100 bg-white px-4 py-3 sm:hidden" aria-label="Mobile primary">
+        <nav id="mobile-nav" className="border-t border-white/50 liquid-glass mx-4 mb-3 rounded-2xl px-4 py-3 sm:hidden" aria-label="Mobile primary">
           <div className="flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive = currentPage === item.page;
@@ -90,8 +88,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                   }}
                   className={`rounded-xl px-3 py-2.5 text-sm transition ${
                     isActive
-                      ? 'bg-emerald-50 font-semibold text-emerald-800'
-                      : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'
+                      ? 'liquid-glass-dark font-semibold' : 'liquid-glass-button-light font-medium text-gray-700 hover:text-emerald-800'
                   }`}
                 >
                   {item.label}

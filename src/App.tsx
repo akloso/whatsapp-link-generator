@@ -212,7 +212,7 @@ function App() {
         extra={
           <a
             href="mailto:hizapora@gmail.com"
-            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
+            className="inline-flex items-center justify-center rounded-2xl liquid-glass-button px-6 py-3.5 text-base font-semibold text-white shadow-lg transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
           >
             Email Support
           </a>

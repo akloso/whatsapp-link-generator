@@ -6,7 +6,7 @@ interface HeroProps {
 
 export default function Hero({ onGetStarted }: HeroProps) {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-white via-green-50 to-white py-10 sm:py-12">
+    <section className="relative overflow-hidden bg-gradient-to-b from-white via-cyan-50/60 to-emerald-50/40 py-10 sm:py-12">
       <div className="absolute inset-0 opacity-40">
         <div className="absolute right-10 top-20 h-72 w-72 rounded-full bg-green-100 blur-3xl"></div>
         <div className="absolute bottom-0 left-20 h-80 w-80 rounded-full bg-emerald-50 blur-3xl"></div>

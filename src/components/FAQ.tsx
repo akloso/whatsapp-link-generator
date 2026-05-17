@@ -53,7 +53,7 @@ export default function FAQ() {
             const buttonId = `faq-button-${index}`;
 
             return (
-              <div key={faq.question} className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:border-green-300 hover:shadow-lg">
+              <div key={faq.question} className="group overflow-hidden liquid-glass-soft rounded-2xl transition-all duration-300">
                 <button
                   id={buttonId}
                   onClick={() => toggleFAQ(index)}
