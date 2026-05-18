@@ -222,8 +222,18 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
     setCopied(false);
     setDownloadStatus('idle');
     setShowCelebration(true);
-    trackEvent('generate_link');
-    if (trimmedMessage) trackEvent('message_added');
+    trackEvent('generate_link', {
+      source: 'homepage_generator',
+      has_message: Boolean(trimmedMessage),
+      country_code: selectedCountry.code,
+    });
+    if (trimmedMessage) {
+      trackEvent('message_added', {
+        source: 'homepage_generator',
+        has_message: true,
+        country_code: selectedCountry.code,
+      });
+    }
     logToGoogleSheets({
       phone_number: digitsOnlyPhone,
       country_code: selectedCountry.code,
@@ -241,7 +251,10 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
     try {
       await navigator.clipboard.writeText(generatedLink);
       setCopied(true);
-      trackEvent('copy_link');
+      trackEvent('copy_link', {
+        source: 'homepage_generator',
+        has_message: generatedLink.includes('?text='),
+      });
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
@@ -269,7 +282,10 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
       link.remove();
       URL.revokeObjectURL(blobUrl);
       setDownloadStatus('success');
-      trackEvent('download_qr');
+      trackEvent('download_qr', {
+        source: 'homepage_generator',
+        export_format: 'png',
+      });
       window.setTimeout(() => setDownloadStatus('idle'), 2200);
     } catch {
       setDownloadStatus('error');
@@ -294,7 +310,10 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
   const openWhatsApp = () => {
     if (!generatedLink) return;
     window.open(generatedLink, '_blank', 'noopener,noreferrer');
-    trackEvent('open_whatsapp');
+    trackEvent('open_whatsapp', {
+      source: 'homepage_generator',
+      has_message: generatedLink.includes('?text='),
+    });
   };
 
   return (
