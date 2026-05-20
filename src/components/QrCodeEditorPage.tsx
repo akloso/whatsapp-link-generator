@@ -78,6 +78,8 @@ function QrCodeEditorPage() {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const editorSectionRef = useRef<HTMLElement>(null);
+  const previewSectionRef = useRef<HTMLDivElement>(null);
+  const [showMobilePreviewBar, setShowMobilePreviewBar] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
@@ -379,6 +381,22 @@ function QrCodeEditorPage() {
     renderPreview();
   }, [renderPreview, finalContent, fg]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      if (!previewSectionRef.current) return;
+      const rect = previewSectionRef.current.getBoundingClientRect();
+      setShowMobilePreviewBar(rect.bottom < 72);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
   const handleDownload = async () => {
     if (!isReady) return;
 
@@ -403,8 +421,12 @@ function QrCodeEditorPage() {
     editorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const scrollToPreview = () => {
+    previewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
-    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-white py-5 sm:py-12">
+    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-white py-5 pb-24 sm:py-12 sm:pb-12">
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8">
         <section className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] sm:mb-8 sm:rounded-[28px] sm:px-7 sm:py-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -587,8 +609,11 @@ function QrCodeEditorPage() {
             </Section>
           </div>
 
-          <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
-            <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
+          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+            <div
+              ref={previewSectionRef}
+              className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6"
+            >
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live preview</p>
@@ -736,6 +761,23 @@ function QrCodeEditorPage() {
           </div>
         </section>
       </div>
+
+      {showMobilePreviewBar ? (
+        <div className="fixed inset-x-0 bottom-3 z-40 px-3 lg:hidden">
+          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 px-3.5 py-2.5 shadow-[0_18px_40px_-22px_rgba(15,23,42,0.35)] backdrop-blur">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Live preview</p>
+              <p className="truncate text-xs text-slate-700">{size.name} · {size.ratio}</p>
+            </div>
+            <button
+              onClick={scrollToPreview}
+              className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-[0_12px_24px_-18px_rgba(5,150,105,0.8)] transition hover:bg-emerald-700"
+            >
+              View QR
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <canvas ref={qrCanvasRef} className="hidden" />
 
