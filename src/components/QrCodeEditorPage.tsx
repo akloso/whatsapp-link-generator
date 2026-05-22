@@ -74,6 +74,7 @@ function QrCodeEditorPage() {
   const [status, setStatus] = useState('');
   const [importStatus, setImportStatus] = useState('');
   const [isImportingQr, setIsImportingQr] = useState(false);
+  const [previewThumb, setPreviewThumb] = useState('');
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -373,6 +374,8 @@ function QrCodeEditorPage() {
       ctx.font = `500 ${footerSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText('Powered by Zapora', centerX, cardY + cardH - Math.round(H * 0.025));
+
+      setPreviewThumb(canvas.toDataURL('image/png'));
     },
     [banner, centerEmoji, centerImage, centerType, isReady, size, subtitle, title],
   );
@@ -449,7 +452,7 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 xl:grid-cols-[420px_1fr]">
+        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
           <div className="min-w-0 space-y-4 sm:space-y-5">
             <Section title="Content">
               <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
@@ -607,6 +610,42 @@ function QrCodeEditorPage() {
                 </div>
               ) : null}
             </Section>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:rounded-[24px] sm:p-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Download</p>
+                  <p className="mt-1 text-sm text-slate-600">Export your QR in a clean, presentation-ready format.</p>
+                </div>
+                <ArrowUpRight className="h-4 w-4 text-slate-400" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {FORMATS.map((formatOption) => (
+                  <button
+                    key={formatOption}
+                    onClick={() => setFormat(formatOption)}
+                    className={`min-w-0 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                      format === formatOption
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {formatOption}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={handleDownload}
+                disabled={!isReady}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#16a34a_0%,#059669_100%)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-4 sm:py-3.5"
+              >
+                <Download className="h-4 w-4" /> Download QR ({format})
+              </button>
+
+              <p className="mt-3 text-center text-xs text-slate-500">High error correction enabled · Safe scan area protected</p>
+            </div>
           </div>
 
           <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
@@ -659,46 +698,6 @@ function QrCodeEditorPage() {
                   </div>
                 )}
                 </div>
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:mt-5 sm:rounded-[24px] sm:p-5">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Download</p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Export your QR in a clean, presentation-ready format.
-                    </p>
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-slate-400" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {FORMATS.map((formatOption) => (
-                    <button
-                      key={formatOption}
-                      onClick={() => setFormat(formatOption)}
-                      className={`min-w-0 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
-                        format === formatOption
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {formatOption}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={handleDownload}
-                  disabled={!isReady}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#16a34a_0%,#059669_100%)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-4 sm:py-3.5"
-                >
-                  <Download className="h-4 w-4" /> Download QR ({format})
-                </button>
-
-                <p className="mt-3 text-center text-xs text-slate-500">
-                  High error correction enabled · Safe scan area protected
-                </p>
               </div>
 
               {status ? <p className="mt-4 text-sm text-slate-500">{status}</p> : null}
@@ -766,6 +765,15 @@ function QrCodeEditorPage() {
         <div className="fixed inset-x-0 bottom-3 z-40 px-3 lg:hidden">
           <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 px-3.5 py-2.5 shadow-[0_18px_40px_-22px_rgba(15,23,42,0.35)] backdrop-blur">
             <div className="min-w-0">
+              {previewThumb ? (
+                <img
+                  src={previewThumb}
+                  alt="Live QR thumbnail"
+                  className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-white object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-slate-100" />
+              )}
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Live preview</p>
               <p className="truncate text-xs text-slate-700">{size.name} · {size.ratio}</p>
             </div>
