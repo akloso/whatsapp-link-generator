@@ -41,10 +41,6 @@ export default function Footer({ currentPage, onNavigate, onGetStarted }: Footer
                   Blog
                 </button>
                 <span className="hidden sm:inline">•</span>
-                <button type="button" onClick={() => onNavigate('whatsappButtonMaker')} className={linkClass} aria-current={currentPage === 'whatsappButtonMaker' ? 'page' : undefined}>
-                  WhatsApp Button Maker
-                </button>
-                <span className="hidden sm:inline">•</span>
                 <button type="button" onClick={() => onNavigate('privacy')} className={linkClass} aria-current={currentPage === 'privacy' ? 'page' : undefined}>
                   Privacy
                 </button>
