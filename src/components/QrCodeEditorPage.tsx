@@ -514,27 +514,27 @@ function QrCodeEditorPage() {
             </Section>
 
             <Section title="Color">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 {PRESETS.map((presetOption) => (
                   <button
                     key={presetOption.name}
                     onClick={() => applyPreset(presetOption)}
-                    className={`min-w-0 rounded-xl border p-2.5 text-left transition ${
+                    className={`min-w-0 rounded-lg border p-2 text-left transition ${
                       preset.name === presetOption.name
                         ? 'border-slate-900 bg-slate-50 shadow-sm'
                         : 'border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex h-8 overflow-hidden rounded-md ring-1 ring-slate-200">
+                    <div className="flex h-6 overflow-hidden rounded-md ring-1 ring-slate-200">
                       <div className="flex-1" style={{ background: presetOption.banner }} />
                       <div className="flex-1" style={{ background: presetOption.fg }} />
                     </div>
-                    <p className="mt-1.5 text-xs font-medium text-slate-800">{presetOption.name}</p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-800 sm:text-xs">{presetOption.name}</p>
                   </button>
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2.5 pt-1.5 sm:gap-3">
                 <ColorField label="QR color" value={fg} onChange={setFg} />
                 <ColorField label="Banner" value={banner} onChange={setBanner} />
               </div>

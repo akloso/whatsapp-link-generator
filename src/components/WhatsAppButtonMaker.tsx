@@ -1,5 +1,5 @@
-import { type CSSProperties, useMemo, useState } from 'react';
-import { Check, Copy, MessageCircle } from 'lucide-react';
+import { type CSSProperties, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, Copy, MessageCircle, Search } from 'lucide-react';
 import { countryOptions } from '../data/countryOptions';
 import { trackEvent } from '../lib/trackEvent';
 
@@ -51,9 +51,26 @@ export default function WhatsAppButtonMaker() {
   const [iconStyle, setIconStyle] = useState<IconStyle>('whatsapp');
   const [placement, setPlacement] = useState<PlacementStyle>('inline');
   const [copyState, setCopyState] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isCountryOpen, setIsCountryOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
+  const countryDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const phoneError = getPhoneError(phoneNumber);
   const digitsOnlyPhone = phoneNumber.replace(/\D/g, '');
+  const selectedCountry = useMemo(
+    () => countryOptions.find((option) => option.code === countryCode) ?? indiaOption,
+    [countryCode, indiaOption],
+  );
+  const filteredCountries = useMemo(() => {
+    const normalizedQuery = countrySearch.trim().toLowerCase();
+    if (!normalizedQuery) return countryOptions;
+    return countryOptions.filter((option) => {
+      const normalizedCode = option.code.toLowerCase();
+      const normalizedCodeDigits = normalizedCode.replace('+', '');
+      const queryDigits = normalizedQuery.replace('+', '');
+      return option.country.toLowerCase().includes(normalizedQuery) || normalizedCode.includes(normalizedQuery) || normalizedCodeDigits.includes(queryDigits);
+    });
+  }, [countrySearch]);
 
   const waLink = useMemo(() => {
     const base = `https://wa.me/${countryCode.replace('+', '')}${digitsOnlyPhone}`;
@@ -83,14 +100,21 @@ export default function WhatsAppButtonMaker() {
     try { await navigator.clipboard.writeText(htmlSnippet); setCopyState('success'); setTimeout(() => setCopyState('idle'), 1800); } catch { setCopyState('error'); }
   };
 
-  return (<main className="bg-gradient-to-b from-white via-green-50/40 to-white py-10 sm:py-14"><section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  return (<main className="overflow-x-hidden bg-gradient-to-b from-white via-green-50/40 to-white py-10 sm:py-14"><section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <header className="mb-8 space-y-2"><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">WhatsApp Click-to-Chat Button Maker</h1></header>
-    <div className="grid gap-6 lg:grid-cols-2"><article className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><div className="space-y-4">
+    <div className="grid gap-6 lg:grid-cols-2"><article className="min-w-0 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><div className="space-y-4">
       <label className="block text-sm font-semibold tracking-wide text-gray-900">Country Code</label>
-      <div className="rounded-2xl border border-gray-300 bg-white px-1.5 py-1.5 shadow-sm transition-all hover:border-gray-400 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20">
-        <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="max-h-52 w-full rounded-xl border-none bg-transparent px-3 py-2 text-sm text-gray-900 outline-none">
-          {countryOptions.map((o) => <option key={`${o.country}-${o.code}`} value={o.code}>{o.country} ({o.code})</option>)}
-        </select>
+      <div ref={countryDropdownRef} className="relative">
+        <button type="button" onClick={() => setIsCountryOpen((prev) => !prev)} className="flex w-full items-center justify-between rounded-2xl border border-gray-300 bg-white px-4 py-3 text-left shadow-sm transition-all hover:border-gray-400 focus-visible:border-green-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/20" aria-expanded={isCountryOpen} aria-haspopup="listbox">
+          <span className="min-w-0"><span className="block truncate text-sm font-semibold text-gray-900">{selectedCountry.country}</span><span className="block text-sm text-gray-500">{selectedCountry.code}</span></span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isCountryOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {isCountryOpen ? <div className="absolute left-0 z-20 mt-2 w-full max-w-full rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+          <div className="relative mb-3"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input value={countrySearch} onChange={(e) => setCountrySearch(e.target.value)} placeholder="Search country or +code" className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none transition-all focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20" /></div>
+          <div role="listbox" className="max-h-60 overflow-y-auto rounded-xl border border-gray-100">
+            {filteredCountries.length ? filteredCountries.map((option) => <button key={`${option.country}-${option.code}`} type="button" onClick={() => { setCountryCode(option.code); setIsCountryOpen(false); setCountrySearch(''); }} className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors ${countryCode === option.code ? 'bg-green-50 text-green-700' : 'text-gray-700 hover:bg-gray-50'}`}><span className="font-medium">{option.country}</span><span>{option.code}</span></button>) : <p className="px-3 py-3 text-sm text-gray-500">No country found.</p>}
+          </div>
+        </div> : null}
       </div>
       <label className="block text-sm font-semibold tracking-wide text-gray-900">WhatsApp phone number</label><div className="flex items-center rounded-2xl border border-gray-300 bg-white px-4 shadow-sm transition-all hover:border-gray-400 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20"><span className="pr-3 text-sm font-semibold text-gray-500">{countryCode}</span><input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} className="w-full border-none bg-transparent py-3 text-gray-900 outline-none" /></div>
       {phoneNumber && phoneError ? <p className="text-sm text-red-600">{phoneError}</p> : null}
@@ -99,7 +123,7 @@ export default function WhatsAppButtonMaker() {
       <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={iconOnly} onChange={(e) => setIconOnly(e.target.checked)} /> Icon-only button</label>
       <div className="grid gap-3 sm:grid-cols-2"><SelectField label="Button style" value={buttonStyle} onChange={(v) => setButtonStyle(v as ButtonStyle)} options={['primary','dark','light','outline','minimal']} /><SelectField label="Button shape" value={buttonShape} onChange={(v) => setButtonShape(v as ButtonShape)} options={['rounded','pill','square-soft']} /><SelectField label="Icon style" value={iconStyle} onChange={(v) => setIconStyle(v as IconStyle)} options={['whatsapp','chat','none']} /><SelectField label="Placement style" value={placement} onChange={(v) => setPlacement(v as PlacementStyle)} options={['inline','floating-right','floating-left']} /><label className="block text-sm font-medium text-gray-700"><span className="mb-1.5 block">Custom primary color</span><input type="color" value={customColor} onChange={(e) => setCustomColor(e.target.value)} className="h-10 w-full rounded-xl border border-gray-300" /></label></div>
     </div></article>
-    <article className="space-y-6"><div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="mb-4 text-lg font-semibold text-gray-900">Live preview</h2><div className="relative h-72 overflow-hidden rounded-2xl border border-gray-300 bg-gray-50 p-4"><div className="absolute inset-x-0 top-0 h-9 border-b border-gray-200 bg-white" /><div className="absolute left-3 top-3 flex gap-1.5"> <span className="h-2.5 w-2.5 rounded-full bg-red-300" /> <span className="h-2.5 w-2.5 rounded-full bg-amber-300" /> <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div><div className="absolute inset-x-4 top-14 h-5 rounded bg-white/80" /><div className="absolute inset-x-4 top-24 h-24 rounded bg-white/80" /><div className={`absolute ${placement === 'inline' ? 'left-5 top-16' : placement === 'floating-right' ? 'right-5 bottom-5' : 'left-5 bottom-5'}`}><a href={phoneError ? '#' : waLink} target="_blank" rel="noopener noreferrer" onClick={(e) => phoneError && e.preventDefault()} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold shadow-sm" style={previewStyle}>{iconStyle === 'none' ? null : iconStyle === 'whatsapp' ? <WhatsAppIcon /> : <MessageCircle className="h-4 w-4" />}{iconOnly ? null : <span>{safeLabel}</span>}</a></div></div></div>
+    <article className="min-w-0 space-y-6"><div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="mb-4 text-lg font-semibold text-gray-900">Live preview</h2><div className="relative h-72 overflow-hidden rounded-2xl border border-gray-300 bg-gray-50 p-4"><div className="absolute inset-x-0 top-0 h-9 border-b border-gray-200 bg-white" /><div className="absolute left-3 top-3 flex gap-1.5"> <span className="h-2.5 w-2.5 rounded-full bg-red-300" /> <span className="h-2.5 w-2.5 rounded-full bg-amber-300" /> <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div><div className="absolute inset-x-4 top-14 h-5 rounded bg-white/80" /><div className="absolute inset-x-4 top-24 h-24 rounded bg-white/80" /><div className={`absolute max-w-[calc(100%-2.5rem)] ${placement === 'inline' ? 'left-5 top-16' : placement === 'floating-right' ? 'right-5 bottom-5' : 'left-5 bottom-5'}`}><a href={phoneError ? '#' : waLink} target="_blank" rel="noopener noreferrer" onClick={(e) => phoneError && e.preventDefault()} className="inline-flex max-w-full items-center gap-2 px-4 py-3 text-sm font-semibold shadow-sm" style={previewStyle}>{iconStyle === 'none' ? null : iconStyle === 'whatsapp' ? <WhatsAppIcon /> : <MessageCircle className="h-4 w-4" />}{iconOnly ? null : <span className="truncate">{safeLabel}</span>}</a></div></div></div>
     <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><pre className="mt-2 max-h-56 overflow-auto rounded-2xl bg-gray-950 p-4 text-xs text-green-200"><code>{htmlSnippet}</code></pre><button type="button" onClick={copyHtml} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700" disabled={Boolean(phoneError)}>{copyState === 'success' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copyState === 'success' ? 'Copied' : 'Copy HTML'}</button>{copyState === 'error' ? <p className="mt-2 text-sm text-amber-700">Clipboard access failed. Please copy manually.</p> : null}</div>
     </article></div></section></main>);
 }
