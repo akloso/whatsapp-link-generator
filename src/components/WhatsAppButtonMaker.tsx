@@ -86,8 +86,13 @@ export default function WhatsAppButtonMaker() {
   return (<main className="bg-gradient-to-b from-white via-green-50/40 to-white py-10 sm:py-14"><section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <header className="mb-8 space-y-2"><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">WhatsApp Click-to-Chat Button Maker</h1></header>
     <div className="grid gap-6 lg:grid-cols-2"><article className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><div className="space-y-4">
-      <label className="block text-sm font-medium text-gray-700">Country code</label><div className="rounded-xl border border-gray-300 bg-white p-2"><select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="max-h-52 w-full rounded-lg border border-gray-200 px-3 py-2">{countryOptions.map((o) => <option key={`${o.country}-${o.code}`} value={o.code}>{o.country} ({o.code})</option>)}</select></div>
-      <label className="block text-sm font-medium text-gray-700">WhatsApp phone number</label><input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} className="w-full rounded-xl border border-gray-300 px-3 py-2" />
+      <label className="block text-sm font-semibold tracking-wide text-gray-900">Country Code</label>
+      <div className="rounded-2xl border border-gray-300 bg-white px-1.5 py-1.5 shadow-sm transition-all hover:border-gray-400 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20">
+        <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="max-h-52 w-full rounded-xl border-none bg-transparent px-3 py-2 text-sm text-gray-900 outline-none">
+          {countryOptions.map((o) => <option key={`${o.country}-${o.code}`} value={o.code}>{o.country} ({o.code})</option>)}
+        </select>
+      </div>
+      <label className="block text-sm font-semibold tracking-wide text-gray-900">WhatsApp phone number</label><div className="flex items-center rounded-2xl border border-gray-300 bg-white px-4 shadow-sm transition-all hover:border-gray-400 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20"><span className="pr-3 text-sm font-semibold text-gray-500">{countryCode}</span><input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} className="w-full border-none bg-transparent py-3 text-gray-900 outline-none" /></div>
       {phoneNumber && phoneError ? <p className="text-sm text-red-600">{phoneError}</p> : null}
       <label className="block text-sm font-medium text-gray-700">Pre-filled message (optional)</label><textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} className="w-full rounded-xl border border-gray-300 px-3 py-2" />
       <label className="block text-sm font-medium text-gray-700">Button label (optional)</label><input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full rounded-xl border border-gray-300 px-3 py-2" />
