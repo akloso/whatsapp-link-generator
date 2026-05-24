@@ -3,6 +3,7 @@ import { Mail, MessageCircle, Scale, ShieldCheck } from 'lucide-react';
 import Hero from './components/Hero';
 import Generator from './components/Generator';
 import HowItWorks from './components/HowItWorks';
+import BulkLinkGenerator from './components/BulkLinkGenerator';
 import Features from './components/Features';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
@@ -280,6 +281,7 @@ function App() {
           }}
         />
         <HowItWorks />
+        <BulkLinkGenerator />
         <SeoContent />
         <Features />
         <FAQ />

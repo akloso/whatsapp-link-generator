@@ -66,3 +66,6 @@ export const countryOptions: CountryOption[] = [
   { code: '+974', country: 'Qatar' },
   { code: '+977', country: 'Nepal' },
 ];
+
+export const MIN_PHONE_LENGTH = 6;
+export const MAX_PHONE_LENGTH = 15;
