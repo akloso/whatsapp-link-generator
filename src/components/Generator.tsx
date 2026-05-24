@@ -536,10 +536,10 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
 
                 <button
                   onClick={() => onCustomizeQrCode?.(generatedLink)}
-                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 py-3.5 font-semibold text-emerald-800 transition-all hover:border-emerald-300 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20"
+                  className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-500/70 bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-500 py-3.5 font-semibold text-white shadow-[0_18px_35px_-20px_rgba(16,185,129,0.85)] transition-all hover:-translate-y-0.5 hover:from-emerald-700 hover:via-emerald-600 hover:to-green-600 hover:shadow-[0_22px_45px_-24px_rgba(5,150,105,0.95)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/30"
                   aria-label="Customize QR code on dedicated editor page"
                 >
-                  <Sparkles className="h-5 w-5" />
+                  <Sparkles className="h-5 w-5 transition-transform group-hover:rotate-6" />
                   Customize QR Code
                 </button>
 

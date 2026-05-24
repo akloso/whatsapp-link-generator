@@ -74,10 +74,16 @@ function QrCodeEditorPage() {
   const [status, setStatus] = useState('');
   const [importStatus, setImportStatus] = useState('');
   const [isImportingQr, setIsImportingQr] = useState(false);
+  const [showFloatingPreview, setShowFloatingPreview] = useState(false);
+  const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
+  const [previewThumbnailUrl, setPreviewThumbnailUrl] = useState('');
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
+  const mobilePreviewRef = useRef<HTMLCanvasElement>(null);
   const editorSectionRef = useRef<HTMLElement>(null);
+  const mainPreviewCardRef = useRef<HTMLDivElement>(null);
+  const mobileMainPreviewCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
@@ -231,7 +237,7 @@ function QrCodeEditorPage() {
 
   const renderPreview = useMemo(
     () => async () => {
-      const canvas = previewRef.current;
+      const canvas = previewRef.current ?? mobilePreviewRef.current;
       const qrCanvas = qrCanvasRef.current;
 
       if (!canvas || !qrCanvas || !isReady) return;
@@ -379,6 +385,32 @@ function QrCodeEditorPage() {
     renderPreview();
   }, [renderPreview, finalContent, fg]);
 
+  useEffect(() => {
+    const previewCanvas = previewRef.current ?? mobilePreviewRef.current;
+    if (!previewCanvas || !isReady) {
+      setPreviewThumbnailUrl('');
+      return;
+    }
+
+    const nextThumb = previewCanvas.toDataURL('image/png', 0.9);
+    setPreviewThumbnailUrl(nextThumb);
+  }, [banner, centerEmoji, centerImage, centerType, fg, finalContent, isReady, size, subtitle, title]);
+
+  useEffect(() => {
+    const node = mobileMainPreviewCardRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowFloatingPreview(!entry.isIntersecting);
+      },
+      { threshold: 0.25 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const handleDownload = async () => {
     if (!isReady) return;
 
@@ -427,8 +459,28 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 xl:grid-cols-[420px_1fr]">
+        <section ref={editorSectionRef} className="grid gap-4 pb-24 sm:gap-6 sm:pb-0 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0 space-y-4 sm:space-y-5">
+            <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.28)] lg:hidden">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live preview</p>
+              <div className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/70 p-3">
+                <div className="flex w-full justify-center">
+                  {isReady ? (
+                    <div
+                      ref={mobileMainPreviewCardRef}
+                      className="w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200"
+                      style={{ aspectRatio: `${size.w}/${size.h}`, width: 'min(100%, 270px)', maxWidth: '100%' }}
+                    >
+                      <canvas ref={mobilePreviewRef} className="h-full w-full" />
+                    </div>
+                  ) : (
+                    <div className="flex min-h-[260px] w-full items-center justify-center rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500">
+                      Add a link or text to generate your QR preview.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
             <Section title="Content">
               <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
                 <span className="text-sm font-semibold text-slate-900">Upload existing QR</span>
@@ -494,22 +546,23 @@ function QrCodeEditorPage() {
             </Section>
 
             <Section title="Color">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-3">
                 {PRESETS.map((presetOption) => (
                   <button
                     key={presetOption.name}
                     onClick={() => applyPreset(presetOption)}
-                    className={`min-w-0 rounded-xl border p-2.5 text-left transition ${
+                    className={`min-w-0 rounded-2xl border bg-white p-3 text-left transition ${
                       preset.name === presetOption.name
-                        ? 'border-slate-900 bg-slate-50 shadow-sm'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'border-emerald-400 ring-2 ring-emerald-200 shadow-[0_14px_30px_-22px_rgba(16,185,129,0.7)]'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
                     }`}
                   >
-                    <div className="flex h-8 overflow-hidden rounded-md ring-1 ring-slate-200">
+                    <div className="mb-2 h-2.5 w-16 rounded-full bg-slate-200" style={{ backgroundColor: presetOption.banner }} />
+                    <div className="flex h-10 overflow-hidden rounded-lg ring-1 ring-slate-200">
                       <div className="flex-1" style={{ background: presetOption.banner }} />
                       <div className="flex-1" style={{ background: presetOption.fg }} />
                     </div>
-                    <p className="mt-1.5 text-xs font-medium text-slate-800">{presetOption.name}</p>
+                    <p className="mt-2 text-xs font-semibold text-slate-800">{presetOption.name}</p>
                   </button>
                 ))}
               </div>
@@ -587,7 +640,7 @@ function QrCodeEditorPage() {
             </Section>
           </div>
 
-          <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
+          <div className="hidden min-w-0 lg:sticky lg:top-24 lg:block lg:self-start">
             <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -619,6 +672,7 @@ function QrCodeEditorPage() {
                 <div className="flex w-full justify-center">
                 {isReady ? (
                   <div
+                    ref={mainPreviewCardRef}
                     className="w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200 sm:rounded-[24px]"
                     style={{
                       aspectRatio: `${size.w}/${size.h}`,
@@ -680,6 +734,33 @@ function QrCodeEditorPage() {
             </div>
           </div>
         </section>
+        {showFloatingPreview && isReady ? (
+          <button
+            type="button"
+            onClick={() => setIsMobilePreviewOpen(true)}
+            className="fixed bottom-4 right-4 z-30 rounded-2xl border border-emerald-200 bg-white/95 p-2 shadow-[0_16px_40px_-24px_rgba(15,23,42,0.55)] backdrop-blur lg:hidden"
+            aria-label="Open larger live QR preview"
+          >
+            <img src={previewThumbnailUrl} alt="Live QR preview thumbnail" className="h-20 w-20 rounded-lg border border-slate-200 object-cover" />
+          </button>
+        ) : null}
+
+        {isMobilePreviewOpen && isReady ? (
+          <div className="fixed inset-0 z-40 flex items-end bg-slate-950/50 lg:hidden" role="dialog" aria-modal="true" aria-label="Live QR preview">
+            <button type="button" className="absolute inset-0" onClick={() => setIsMobilePreviewOpen(false)} aria-label="Close live preview overlay" />
+            <div className="relative w-full rounded-t-3xl bg-white p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-900">Live QR preview</p>
+                <button type="button" onClick={() => setIsMobilePreviewOpen(false)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  Close
+                </button>
+              </div>
+              <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-slate-200">
+                <img src={previewThumbnailUrl} alt="Larger live QR preview" className="h-auto w-full" />
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <section className="mt-7 space-y-4 sm:mt-9 sm:space-y-6">
           <div className="grid gap-4 rounded-2xl border border-emerald-100 bg-[linear-gradient(180deg,#ffffff_0%,#f7fdf9_100%)] p-4 shadow-[0_22px_55px_-45px_rgba(5,150,105,0.45)] sm:rounded-[26px] sm:p-6 lg:grid-cols-[1.2fr_0.8fr]">
