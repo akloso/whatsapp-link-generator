@@ -587,7 +587,7 @@ function QrCodeEditorPage() {
             </Section>
           </div>
 
-          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <div className="min-w-0 lg:sticky lg:top-20 lg:self-start">
             <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
