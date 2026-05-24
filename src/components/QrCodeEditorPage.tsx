@@ -427,7 +427,7 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 xl:grid-cols-[420px_1fr]">
+        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 lg:grid-cols-[420px_1fr]">
           <div className="min-w-0 space-y-4 sm:space-y-5">
             <Section title="Content">
               <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
@@ -587,7 +587,7 @@ function QrCodeEditorPage() {
             </Section>
           </div>
 
-          <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
+          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
