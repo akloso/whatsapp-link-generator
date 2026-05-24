@@ -33,8 +33,8 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-        <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex items-center" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-9 w-auto sm:h-10" /></a>
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3 sm:px-6 lg:px-8">
+        <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex h-10 items-center" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-10" /></a>
 
         <nav className="hidden items-center gap-2 sm:flex" aria-label="Primary">
           <div ref={toolsRef} onMouseEnter={() => { clearCloseTimer(); setToolsOpen(true); }} onMouseLeave={scheduleClose} className="relative">
@@ -44,7 +44,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
           {navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); }} className={`rounded-xl px-3 py-2 text-sm transition ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'}`}>{item.label}</a>)}
         </nav>
 
-        <button type="button" onClick={() => setIsMobileOpen((v) => !v)} className="inline-flex items-center justify-center rounded-xl border border-gray-200 p-2 text-gray-700 transition hover:bg-gray-50 sm:hidden">{isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+        <button type="button" onClick={() => setIsMobileOpen((v) => !v)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 p-2 text-gray-700 transition hover:bg-gray-50 sm:hidden">{isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
       </div>
 
       {isMobileOpen ? <nav className="border-t border-gray-100 bg-white px-4 py-3 sm:hidden"><div className="space-y-1">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{t.label}</a>)}{navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}</div></nav> : null}
