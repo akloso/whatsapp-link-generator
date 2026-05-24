@@ -996,11 +996,12 @@ async function buildSvgExport({
   const qrSvg = await QRCode.toString(finalContent, {
     type: 'svg',
     margin: 1,
-    width: Math.round(layout.qrSize),
     errorCorrectionLevel: 'H',
     color: { dark: fg, light: '#ffffff' },
   });
   const qrInner = extractSvgInnerMarkup(qrSvg);
+  const qrViewBox = getSvgViewBoxSize(qrSvg);
+  const qrScale = qrViewBox.width > 0 ? layout.qrSize / qrViewBox.width : 1;
   const escapedTitle = escapeXml(truncate(title, 40));
   const escapedSubtitle = escapeXml(truncate(subtitle, 60));
   const gradientEnd = shade(banner, -15);
@@ -1033,7 +1034,7 @@ async function buildSvgExport({
   <text x="${layout.centerX}" y="${layout.titleY - (subtitle ? layout.titleSize * 0.55 : 0)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="${layout.titleSize}" font-family="Inter, system-ui, sans-serif" font-weight="600">${escapedTitle}</text>
   ${subtitle ? `<text x="${layout.centerX}" y="${layout.titleY + layout.titleSize * 0.4}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" fill-opacity="0.9" font-size="${layout.subtitleSize}" font-family="Inter, system-ui, sans-serif" font-weight="400">${escapedSubtitle}</text>` : ''}
   <rect x="${layout.qrX - layout.qrPadding}" y="${layout.qrY - layout.qrPadding}" width="${layout.qrSize + layout.qrPadding * 2}" height="${layout.qrSize + layout.qrPadding * 2}" rx="${Math.round(layout.qrSize * 0.06)}" fill="#ffffff" />
-  <g transform="translate(${layout.qrX} ${layout.qrY})">${qrInner}</g>
+  <g transform="translate(${layout.qrX} ${layout.qrY}) scale(${qrScale})">${qrInner}</g>
   ${centerMarkup}
   <text x="${layout.centerX}" y="${footerY}" text-anchor="middle" fill="rgba(15,31,23,0.45)" font-size="${layout.footerSize}" font-family="Inter, system-ui, sans-serif" font-weight="500">Powered by Zapora</text>
 </svg>`;
@@ -1068,6 +1069,18 @@ function getQrLayout(W: number, H: number) {
 
 function extractSvgInnerMarkup(svg: string) {
   return svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+}
+
+function getSvgViewBoxSize(svg: string) {
+  const viewBoxMatch = svg.match(/viewBox="([^"]+)"/i);
+  if (!viewBoxMatch) {
+    return { width: 0, height: 0 };
+  }
+  const parts = viewBoxMatch[1].trim().split(/[\s,]+/).map(Number);
+  if (parts.length !== 4 || parts.some(Number.isNaN)) {
+    return { width: 0, height: 0 };
+  }
+  return { width: parts[2], height: parts[3] };
 }
 
 function escapeXml(value: string) {

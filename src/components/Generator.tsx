@@ -400,6 +400,12 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
             >
               Generate WhatsApp Link
             </button>
+            <a
+              href="/bulk-whatsapp-link-generator"
+              className="inline-flex w-full items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100 sm:text-base"
+            >
+              Try Bulk WhatsApp Links
+            </a>
 
             </div>
 
@@ -530,11 +536,6 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
         </div>
       </div>
 
-      <div className="relative mx-auto mt-6 max-w-6xl px-4 sm:px-6 lg:px-8">
-        <a href="/bulk-whatsapp-link-generator" className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100">
-          Try Bulk WhatsApp Links
-        </a>
-      </div>
     </section>
   );
 }
