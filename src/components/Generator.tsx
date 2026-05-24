@@ -76,6 +76,13 @@ const countryOptions: CountryOption[] = [
 const MIN_PHONE_LENGTH = 6;
 const MAX_PHONE_LENGTH = 15;
 
+const buildWhatsAppLink = (countryCode: string, digitsOnlyPhone: string, rawMessage: string) => {
+  const fullNumber = `${countryCode.replace('+', '')}${digitsOnlyPhone}`;
+  const trimmedMessage = rawMessage.trim();
+
+  return trimmedMessage ? `https://wa.me/${fullNumber}?text=${encodeURIComponent(trimmedMessage)}` : `https://wa.me/${fullNumber}`;
+};
+
 const getPhoneError = (rawValue: string) => {
   if (!rawValue) {
     return 'Enter your WhatsApp number to continue.';
@@ -134,25 +141,6 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
 
   const [qrImageUrl, setQrImageUrl] = useState('');
 
-  useEffect(() => {
-    if (!generatedLink) {
-      setQrImageUrl('');
-      return;
-    }
-
-    QRCode.toDataURL(generatedLink, {
-      errorCorrectionLevel: 'H',
-      margin: 1,
-      width: 480,
-      color: {
-        dark: qrForegroundColor,
-        light: '#ffffff',
-      },
-    })
-      .then((url) => setQrImageUrl(url))
-      .catch(() => setQrImageUrl(''));
-  }, [generatedLink, qrForegroundColor]);
-
   const filteredCountries = useMemo(() => {
     const query = countrySearch.trim().toLowerCase();
     const sortedCountries = [...countryOptions].sort((a, b) => a.country.localeCompare(b.country));
@@ -167,6 +155,33 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
   const digitsOnlyPhone = useMemo(() => phoneNumber.replace(/\D/g, ''), [phoneNumber]);
   const phoneValidationError = useMemo(() => getPhoneError(phoneNumber), [phoneNumber]);
   const isFormValid = Boolean(selectedCountry) && !phoneValidationError;
+  const livePreviewLink = useMemo(() => {
+    if (!selectedCountry || phoneValidationError) {
+      return '';
+    }
+
+    return buildWhatsAppLink(selectedCountry.code, digitsOnlyPhone, message);
+  }, [selectedCountry, phoneValidationError, digitsOnlyPhone, message]);
+  const qrSourceLink = generatedLink || livePreviewLink;
+
+  useEffect(() => {
+    if (!qrSourceLink) {
+      setQrImageUrl('');
+      return;
+    }
+
+    QRCode.toDataURL(qrSourceLink, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 480,
+      color: {
+        dark: qrForegroundColor,
+        light: '#ffffff',
+      },
+    })
+      .then((url) => setQrImageUrl(url))
+      .catch(() => setQrImageUrl(''));
+  }, [qrSourceLink, qrForegroundColor]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -212,11 +227,8 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
       return;
     }
 
-    const fullNumber = `${selectedCountry.code.replace('+', '')}${digitsOnlyPhone}`;
     const trimmedMessage = message.trim();
-    const encodedMessage = encodeURIComponent(trimmedMessage);
-
-    const link = trimmedMessage ? `https://wa.me/${fullNumber}?text=${encodedMessage}` : `https://wa.me/${fullNumber}`;
+    const link = buildWhatsAppLink(selectedCountry.code, digitsOnlyPhone, trimmedMessage);
 
     setGeneratedLink(link);
     setCopied(false);
@@ -470,14 +482,25 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
 
             </div>
 
-            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-inner sm:p-5 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[520px]`}>
+            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-inner sm:p-5 ${generatedLink || phoneNumber ? "block" : "hidden md:block"} md:min-h-[520px]`}>
               {!generatedLink ? (
-                <div className="hidden h-full flex-col items-center justify-center text-center md:flex">
-                  <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
-                    <Sparkles className="h-6 w-6 text-green-600" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Your result appears here</h3>
-                  <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
+                <div className="h-full">
+                  {livePreviewLink ? (
+                    <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-gray-200 bg-white p-4 text-center shadow-sm sm:p-5">
+                      <p className="mb-4 text-sm font-medium text-gray-600">Live QR preview updates as you type. Click Generate to unlock actions.</p>
+                      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <img src={qrImageUrl} alt="Live QR preview for WhatsApp link" className="h-56 w-56 sm:h-60 sm:w-60" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="hidden h-full flex-col items-center justify-center text-center md:flex">
+                      <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
+                        <Sparkles className="h-6 w-6 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Your result appears here</h3>
+                      <p className="mt-2 max-w-xs text-sm text-gray-600">{phoneNumber ? 'Enter a valid number to preview your QR.' : 'Generate a link to preview your QR, copy the URL, and download a share-ready code.'}</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="relative space-y-3">
