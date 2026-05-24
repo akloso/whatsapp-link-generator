@@ -3,75 +3,8 @@ import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle, Exte
 import QRCode from 'qrcode';
 import { trackEvent } from '../lib/trackEvent';
 import { logToGoogleSheets } from '../lib/sheetsLogger';
+import { countryOptions, type CountryOption } from '../data/countryOptions';
 
-type CountryOption = {
-  code: string;
-  country: string;
-};
-
-const countryOptions: CountryOption[] = [
-  { code: '+1', country: 'United States' },
-  { code: '+1', country: 'Canada' },
-  { code: '+7', country: 'Russia' },
-  { code: '+20', country: 'Egypt' },
-  { code: '+27', country: 'South Africa' },
-  { code: '+31', country: 'Netherlands' },
-  { code: '+32', country: 'Belgium' },
-  { code: '+33', country: 'France' },
-  { code: '+34', country: 'Spain' },
-  { code: '+39', country: 'Italy' },
-  { code: '+41', country: 'Switzerland' },
-  { code: '+43', country: 'Austria' },
-  { code: '+44', country: 'United Kingdom' },
-  { code: '+45', country: 'Denmark' },
-  { code: '+46', country: 'Sweden' },
-  { code: '+47', country: 'Norway' },
-  { code: '+48', country: 'Poland' },
-  { code: '+49', country: 'Germany' },
-  { code: '+52', country: 'Mexico' },
-  { code: '+55', country: 'Brazil' },
-  { code: '+60', country: 'Malaysia' },
-  { code: '+61', country: 'Australia' },
-  { code: '+62', country: 'Indonesia' },
-  { code: '+63', country: 'Philippines' },
-  { code: '+64', country: 'New Zealand' },
-  { code: '+65', country: 'Singapore' },
-  { code: '+66', country: 'Thailand' },
-  { code: '+81', country: 'Japan' },
-  { code: '+82', country: 'South Korea' },
-  { code: '+84', country: 'Vietnam' },
-  { code: '+86', country: 'China' },
-  { code: '+90', country: 'Turkey' },
-  { code: '+91', country: 'India' },
-  { code: '+92', country: 'Pakistan' },
-  { code: '+93', country: 'Afghanistan' },
-  { code: '+94', country: 'Sri Lanka' },
-  { code: '+95', country: 'Myanmar' },
-  { code: '+98', country: 'Iran' },
-  { code: '+212', country: 'Morocco' },
-  { code: '+213', country: 'Algeria' },
-  { code: '+216', country: 'Tunisia' },
-  { code: '+218', country: 'Libya' },
-  { code: '+234', country: 'Nigeria' },
-  { code: '+254', country: 'Kenya' },
-  { code: '+255', country: 'Tanzania' },
-  { code: '+256', country: 'Uganda' },
-  { code: '+264', country: 'Namibia' },
-  { code: '+351', country: 'Portugal' },
-  { code: '+352', country: 'Luxembourg' },
-  { code: '+353', country: 'Ireland' },
-  { code: '+358', country: 'Finland' },
-  { code: '+380', country: 'Ukraine' },
-  { code: '+420', country: 'Czech Republic' },
-  { code: '+421', country: 'Slovakia' },
-  { code: '+880', country: 'Bangladesh' },
-  { code: '+960', country: 'Maldives' },
-  { code: '+966', country: 'Saudi Arabia' },
-  { code: '+971', country: 'United Arab Emirates' },
-  { code: '+972', country: 'Israel' },
-  { code: '+974', country: 'Qatar' },
-  { code: '+977', country: 'Nepal' },
-];
 
 const MIN_PHONE_LENGTH = 6;
 const MAX_PHONE_LENGTH = 15;

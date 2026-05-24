@@ -11,10 +11,11 @@ import QrCodeEditorPage from './components/QrCodeEditorPage';
 import SeoContent from './components/SeoContent';
 import BlogListPage from './components/BlogListPage';
 import BlogPostPage from './components/BlogPostPage';
+import WhatsAppButtonMaker from './components/WhatsAppButtonMaker';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 import { blogPostsBySlug } from './data/blogPosts';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker';
 
 const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/privacy') return { page: 'privacy' };
@@ -22,6 +23,7 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/contact') return { page: 'contact' };
   if (pathname === '/qr-code-editor') return { page: 'qrCodeEditor' };
   if (pathname === '/blog') return { page: 'blog' };
+  if (pathname === '/whatsapp-button-maker') return { page: 'whatsappButtonMaker' };
   if (pathname.startsWith('/blog/')) return { page: 'blogPost', slug: pathname.replace('/blog/', '') };
   return { page: 'home' };
 };
@@ -57,6 +59,10 @@ const pageMetadata: Record<PageKey, { title: string; description: string }> = {
   qrCodeEditor: {
     title: 'QR Code Editor | Zapora',
     description: 'Advanced QR design page to customize and preview QR codes for WhatsApp links and URLs.',
+  },
+  whatsappButtonMaker: {
+    title: 'WhatsApp Click-to-Chat Button Maker | Zapora',
+    description: 'Create and customize a WhatsApp website chat button and copy a ready-to-use HTML snippet.',
   },
 };
 
@@ -102,6 +108,7 @@ function App() {
     const canonicalPath = currentPage === 'home' ? '/'
       : currentPage === 'qrCodeEditor' ? '/qr-code-editor'
       : currentPage === 'blog' ? '/blog'
+      : currentPage === 'whatsappButtonMaker' ? '/whatsapp-button-maker'
       : currentPage === 'blogPost' ? `/blog/${currentBlogSlug ?? ''}`
       : `/${currentPage}`;
     const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
@@ -118,7 +125,7 @@ function App() {
   }, [currentBlogSlug, currentPage]);
 
   const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
-    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
+    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
     window.history.pushState({}, '', targetPath);
     setCurrentPage(page === 'blog' && blogSlug ? 'blogPost' : page);
     setCurrentBlogSlug(blogSlug);
@@ -248,6 +255,8 @@ function App() {
     );
   } else if (currentPage === 'qrCodeEditor') {
     pageContent = <QrCodeEditorPage />;
+  } else if (currentPage === 'whatsappButtonMaker') {
+    pageContent = <WhatsAppButtonMaker />;
   } else if (currentPage === 'blog') {
     pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
   } else if (currentPage === 'blogPost') {
