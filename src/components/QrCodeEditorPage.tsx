@@ -74,14 +74,10 @@ function QrCodeEditorPage() {
   const [status, setStatus] = useState('');
   const [importStatus, setImportStatus] = useState('');
   const [isImportingQr, setIsImportingQr] = useState(false);
-  const [isMainPreviewVisible, setIsMainPreviewVisible] = useState(true);
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-  const [previewImageUrl, setPreviewImageUrl] = useState('');
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const editorSectionRef = useRef<HTMLElement>(null);
-  const mainPreviewCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
@@ -380,15 +376,8 @@ function QrCodeEditorPage() {
   );
 
   useEffect(() => {
-    void renderPreview().then(() => {
-      const canvas = previewRef.current;
-      if (!canvas || !isReady) {
-        setPreviewImageUrl('');
-        return;
-      }
-      setPreviewImageUrl(canvas.toDataURL('image/png', 0.92));
-    });
-  }, [renderPreview, finalContent, fg, isReady]);
+    renderPreview();
+  }, [renderPreview, finalContent, fg]);
 
   const handleDownload = async () => {
     if (!isReady) return;
@@ -414,38 +403,6 @@ function QrCodeEditorPage() {
     editorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const isFloatingPreviewVisible = !isMainPreviewVisible && Boolean(previewImageUrl);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return;
-
-    const target = mainPreviewCardRef.current;
-    if (!target) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsMainPreviewVisible(entry.isIntersecting);
-      },
-      { threshold: 0.2 },
-    );
-
-    observer.observe(target);
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    if (!isPreviewModalOpen) return;
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [isPreviewModalOpen]);
-
   return (
     <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-white py-5 sm:py-12">
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8">
@@ -470,7 +427,7 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section ref={editorSectionRef} className="grid gap-4 pb-28 sm:gap-6 sm:pb-24 lg:grid-cols-[420px_1fr] lg:pb-10">
+        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 lg:grid-cols-[420px_1fr]">
           <div className="min-w-0 space-y-4 sm:space-y-5">
             <Section title="Content">
               <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
@@ -658,7 +615,7 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div ref={mainPreviewCardRef} className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/70 p-3 sm:rounded-[28px] sm:p-6">
+              <div className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/70 p-3 sm:rounded-[28px] sm:p-6">
                 <div className="flex w-full justify-center">
                 {isReady ? (
                   <div
@@ -779,41 +736,6 @@ function QrCodeEditorPage() {
           </div>
         </section>
       </div>
-
-      {isFloatingPreviewVisible ? (
-        <button
-          type="button"
-          onClick={() => setIsPreviewModalOpen(true)}
-          className="fixed inset-x-4 bottom-4 z-40 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-2.5 text-left shadow-[0_14px_36px_-22px_rgba(15,23,42,0.45)] backdrop-blur sm:inset-x-auto sm:right-4 sm:w-[250px] lg:hidden"
-        >
-          <img src={previewImageUrl} alt="Live QR preview thumbnail" className="h-14 w-14 shrink-0 rounded-xl border border-slate-200 bg-white object-cover" />
-          <span className="min-w-0">
-            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Live preview</span>
-            <span className="block truncate text-sm font-medium text-slate-800">View larger</span>
-          </span>
-        </button>
-      ) : null}
-
-      {isPreviewModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/40 lg:hidden">
-          <button type="button" aria-label="Close preview" onClick={() => setIsPreviewModalOpen(false)} className="absolute inset-0" />
-          <div className="relative z-10 w-full rounded-t-3xl bg-white p-4 pb-6 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-900">Live preview</p>
-              <button
-                type="button"
-                onClick={() => setIsPreviewModalOpen(false)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600"
-              >
-                Close
-              </button>
-            </div>
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2">
-              <img src={previewImageUrl} alt="Expanded live QR preview" className="mx-auto h-auto w-full max-w-[420px] rounded-xl bg-white" />
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <canvas ref={qrCanvasRef} className="hidden" />
 
