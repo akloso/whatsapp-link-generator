@@ -1,6 +1,6 @@
-import { type CSSProperties, useMemo, useState } from 'react';
-import { Check, Copy, MessageCircle } from 'lucide-react';
-import { countryOptions } from '../data/countryOptions';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, Copy, MessageCircle, Search } from 'lucide-react';
+import { countryOptions, type CountryOption } from '../data/countryOptions';
 import { trackEvent } from '../lib/trackEvent';
 
 type ButtonStyle = 'primary' | 'dark' | 'light' | 'outline' | 'minimal';
@@ -36,7 +36,9 @@ const iconGlyph = (iconStyle: IconStyle) => (iconStyle === 'whatsapp' ? '💬' :
 
 export default function WhatsAppButtonMaker() {
   const indiaOption = countryOptions.find((option) => option.country === 'India') ?? countryOptions[0];
-  const [countryCode, setCountryCode] = useState(indiaOption.code);
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption>(indiaOption);
+  const [isCountryOpen, setIsCountryOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
   const [label, setLabel] = useState('Chat on WhatsApp');
@@ -48,12 +50,33 @@ export default function WhatsAppButtonMaker() {
 
   const digitsOnlyPhone = phoneNumber.replace(/\D/g, '');
   const phoneError = getPhoneError(phoneNumber);
+  const countryRef = useRef<HTMLDivElement>(null);
+  const filteredCountries = useMemo(() => {
+    const query = countrySearch.trim().toLowerCase();
+    const sortedCountries = [...countryOptions].sort((a, b) => a.country.localeCompare(b.country));
+    const orderedCountries = indiaOption
+      ? [indiaOption, ...sortedCountries.filter((option) => option.country !== indiaOption.country)]
+      : sortedCountries;
+    if (!query) return orderedCountries;
+    return orderedCountries.filter((option) => option.country.toLowerCase().includes(query) || option.code.toLowerCase().includes(query));
+  }, [countrySearch, indiaOption]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!countryRef.current) return;
+      if (!countryRef.current.contains(event.target as Node)) {
+        setIsCountryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   const waLink = useMemo(() => {
-    const base = `https://wa.me/${countryCode.replace('+', '')}${digitsOnlyPhone}`;
+    const base = `https://wa.me/${selectedCountry.code.replace('+', '')}${digitsOnlyPhone}`;
     const trimmedMessage = message.trim();
     return trimmedMessage ? `${base}?text=${encodeURIComponent(trimmedMessage)}` : base;
-  }, [countryCode, digitsOnlyPhone, message]);
+  }, [digitsOnlyPhone, message, selectedCountry.code]);
 
   const placementCss = placement === 'inline'
     ? 'position: static;'
@@ -104,10 +127,60 @@ export default function WhatsAppButtonMaker() {
         <div className="grid gap-6 lg:grid-cols-2">
           <article className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Country code</label>
-              <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-full rounded-xl border border-gray-300 px-3 py-2">
-                {countryOptions.map((option) => <option key={`${option.country}-${option.code}`} value={option.code}>{option.country} ({option.code})</option>)}
-              </select>
+              <div className="space-y-2.5" ref={countryRef}>
+                <label className="block text-sm font-semibold tracking-wide text-gray-900">Country / Code</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded={isCountryOpen}
+                    onClick={() => setIsCountryOpen((current) => !current)}
+                    className="flex w-full items-center justify-between rounded-2xl border border-gray-300 bg-white px-4 py-3 text-left text-gray-900 shadow-sm transition-all hover:border-gray-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{selectedCountry.country}</div>
+                      <div className="text-sm text-gray-500">{selectedCountry.code}</div>
+                    </div>
+                    <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${isCountryOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isCountryOpen ? (
+                    <div className="absolute z-20 mt-3 w-full rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+                      <div className="relative mb-3">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={countrySearch}
+                          onChange={(event) => setCountrySearch(event.target.value)}
+                          placeholder="Search country or code"
+                          className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none transition-all focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20"
+                        />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100">
+                        {filteredCountries.map((option) => {
+                          const isSelected = option.code === selectedCountry.code && option.country === selectedCountry.country;
+                          return (
+                            <button
+                              key={`${option.country}-${option.code}`}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCountry(option);
+                                setCountrySearch('');
+                                setIsCountryOpen(false);
+                              }}
+                              className={`flex w-full items-center justify-between px-3 py-3 text-left text-sm transition-colors ${
+                                isSelected ? 'bg-green-50 text-green-700' : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span className="font-medium">{option.country}</span>
+                              <span className="text-gray-500">{option.code}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
               <label className="block text-sm font-medium text-gray-700">WhatsApp phone number</label>
               <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} className="w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="9876543210" />
               {phoneNumber && phoneError ? <p className="text-sm text-red-600">{phoneError}</p> : null}

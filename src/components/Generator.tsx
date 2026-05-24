@@ -400,6 +400,12 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
             >
               Generate WhatsApp Link
             </button>
+            <a
+              href="#bulk-generator"
+              className="flex w-full items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-6 py-3.5 text-sm font-semibold text-violet-700 transition-all hover:border-violet-300 hover:bg-violet-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-400/20 sm:text-base"
+            >
+              Try Bulk WhatsApp Links
+            </a>
 
             </div>
 
