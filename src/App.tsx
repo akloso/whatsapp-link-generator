@@ -30,45 +30,91 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   return { page: 'home' };
 };
 
-const pageMetadata: Record<PageKey, { title: string; description: string }> = {
+const SITE_URL = 'https://www.zapora.in';
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.jpg`;
+
+type SeoMetadata = {
+  title: string;
+  description: string;
+  canonicalPath: string;
+  ogType?: 'website' | 'article';
+};
+
+const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
   home: {
     title: 'Zapora — WhatsApp Links & QR Codes Made Simple',
     description:
       'Create clean WhatsApp chat links, QR codes, bulk links, and click-to-chat buttons in seconds. Free, fast, and easy to use.',
+    canonicalPath: '/',
+    ogType: 'website',
   },
   privacy: {
     title: 'Privacy Policy | Zapora',
     description:
-      'Read how Zapora handles your data when you generate links and QR codes.',
+      'Read Zapora’s privacy policy to understand what information may be collected, how it is used, and how to contact us.',
+    canonicalPath: '/privacy',
   },
   terms: {
     title: 'Terms of Use | Zapora',
     description:
-      'Review the Terms of Use for Zapora, including acceptable use, service availability, and limitations.',
+      'Read the terms of use for Zapora’s WhatsApp link generator, QR code editor, and related free tools.',
+    canonicalPath: '/terms',
   },
   contact: {
-    title: 'Contact | Zapora',
-    description: 'Contact Zapora for support, feedback, or business questions.',
-  },
-  blog: {
-    title: 'Zapora Blog | WhatsApp Guides',
-    description: 'Simple guides to help you create WhatsApp links, QR codes, and better chat flows.',
-  },
-  blogPost: {
-    title: 'Blog | Zapora',
-    description: 'Helpful WhatsApp link and QR code guides from Zapora.',
+    title: 'Contact Zapora',
+    description: 'Contact Zapora for questions, feedback, or support related to WhatsApp links, QR codes, and click-to-chat tools.',
+    canonicalPath: '/contact',
   },
   qrCodeEditor: {
-    title: 'QR Code Editor | Zapora',
-    description: 'Advanced QR design page to customize and preview QR codes for WhatsApp links and URLs.',
+    title: 'QR Code Editor — Customize WhatsApp QR Codes | Zapora',
+    description:
+      'Design and download custom WhatsApp QR codes with colors, banners, center icons, and export options for PNG, JPG, and SVG.',
+    canonicalPath: '/qr-code-editor',
+  },
+  blog: {
+    title: 'Zapora Blog — WhatsApp Links, QR Codes & Chat Tools',
+    description:
+      'Read practical guides on WhatsApp links, QR codes, click-to-chat buttons, and simple ways to help customers start conversations faster.',
+    canonicalPath: '/blog',
   },
   whatsappButtonMaker: {
-    title: 'WhatsApp Click-to-Chat Button Maker | Zapora',
-    description: 'Create and customize a WhatsApp website chat button and copy a ready-to-use HTML snippet.',
+    title: 'WhatsApp Button Maker — Create Click-to-Chat Buttons | Zapora',
+    description:
+      'Create clean WhatsApp click-to-chat buttons for your website with custom labels, colors, icons, and placement options.',
+    canonicalPath: '/whatsapp-button-maker',
   },
   bulkWhatsappGenerator: {
-    title: 'Bulk WhatsApp Link Generator | Zapora',
-    description: 'Generate WhatsApp links in bulk using manual input or CSV upload in Zapora.',
+    title: 'Bulk WhatsApp Link Generator — Create Multiple Links | Zapora',
+    description:
+      'Generate multiple WhatsApp chat links at once using manual input or CSV upload. Fast, simple, private, and free to use.',
+    canonicalPath: '/bulk-whatsapp-link-generator',
+  },
+};
+
+const blogSeoBySlug: Record<string, SeoMetadata> = {
+  'how-to-create-whatsapp-link': {
+    title: 'How to Create a WhatsApp Link — Step-by-Step Guide | Zapora',
+    description:
+      'Learn how to create a WhatsApp chat link with a phone number and pre-filled message, then share it across your website, social bio, ads, and campaigns.',
+    canonicalPath: '/blog/how-to-create-whatsapp-link',
+  },
+  'whatsapp-link-generator-guide': {
+    title: 'WhatsApp Link Generator Guide for Businesses | Zapora',
+    description:
+      'Understand how WhatsApp link generators work, when to use them, and how businesses can create cleaner customer conversation entry points.',
+    canonicalPath: '/blog/whatsapp-link-generator-guide',
+  },
+  'create-whatsapp-qr-code-for-business': {
+    title: 'Create a WhatsApp QR Code for Your Business | Zapora',
+    description:
+      'Learn how to create WhatsApp QR codes for shops, flyers, posters, packaging, events, and customer support touchpoints.',
+    canonicalPath: '/blog/create-whatsapp-qr-code-for-business',
+  },
+  'best-places-to-use-whatsapp-qr-code': {
+    title: 'Best Places to Use WhatsApp QR Codes | Zapora',
+    description:
+      'Explore practical places to use WhatsApp QR codes, including storefronts, posters, business cards, packaging, social media, and customer support.',
+    canonicalPath: '/blog/best-places-to-use-whatsapp-qr-code',
   },
 };
 
@@ -88,10 +134,17 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const defaultHomeMetadata = pageMetadata.home;
     const blogPost = currentPage === 'blogPost' && currentBlogSlug ? blogPostsBySlug.get(currentBlogSlug) : null;
-    const metadata = currentPage === 'blogPost' && blogPost
-      ? { title: `${blogPost.title} | Zapora Blog`, description: blogPost.excerpt }
+    const metadata = currentPage === 'blogPost'
+      ? (currentBlogSlug ? blogSeoBySlug[currentBlogSlug] : undefined) ?? {
+        title: blogPost ? `${blogPost.title} | Zapora` : defaultHomeMetadata.title,
+        description: blogPost?.excerpt ?? defaultHomeMetadata.description,
+        canonicalPath: blogPost ? `/blog/${blogPost.slug}` : '/',
+        ogType: 'article' as const,
+      }
       : pageMetadata[currentPage];
+
     document.title = metadata.title;
 
     const setMeta = (selector: string, content: string, attr: 'name' | 'property') => {
@@ -104,21 +157,18 @@ function App() {
       tag.setAttribute('content', content);
     };
 
+    const absoluteUrl = `${SITE_URL}${metadata.canonicalPath}`;
+
     setMeta('description', metadata.description, 'name');
     setMeta('og:title', metadata.title, 'property');
     setMeta('og:description', metadata.description, 'property');
-    setMeta('og:type', currentPage === 'home' ? 'website' : 'article', 'property');
+    setMeta('og:type', metadata.ogType ?? (currentPage === 'home' ? 'website' : 'article'), 'property');
+    setMeta('og:url', absoluteUrl, 'property');
+    setMeta('og:image', DEFAULT_OG_IMAGE, 'property');
+    setMeta('twitter:card', 'summary_large_image', 'name');
     setMeta('twitter:title', metadata.title, 'name');
     setMeta('twitter:description', metadata.description, 'name');
-
-    const canonicalPath = currentPage === 'home' ? '/'
-      : currentPage === 'qrCodeEditor' ? '/qr-code-editor'
-      : currentPage === 'blog' ? '/blog'
-      : currentPage === 'whatsappButtonMaker' ? '/whatsapp-button-maker'
-      : currentPage === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator'
-      : currentPage === 'blogPost' ? `/blog/${currentBlogSlug ?? ''}`
-      : `/${currentPage}`;
-    const absoluteUrl = `https://www.zapora.in${canonicalPath}`;
+    setMeta('twitter:image', DEFAULT_OG_IMAGE, 'name');
 
     let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonicalTag) {
@@ -127,8 +177,6 @@ function App() {
       document.head.appendChild(canonicalTag);
     }
     canonicalTag.setAttribute('href', absoluteUrl);
-
-    setMeta('og:url', absoluteUrl, 'property');
   }, [currentBlogSlug, currentPage]);
 
   const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
