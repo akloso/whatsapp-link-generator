@@ -529,6 +529,12 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
           </div>
         </div>
       </div>
+
+      <div className="relative mx-auto mt-6 max-w-6xl px-4 sm:px-6 lg:px-8">
+        <a href="/bulk-whatsapp-link-generator" className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100">
+          Need multiple links? Try Bulk WhatsApp Link Generator
+        </a>
+      </div>
     </section>
   );
 }

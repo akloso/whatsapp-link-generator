@@ -40,6 +40,8 @@ export default function WhatsAppButtonMaker() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
   const [label, setLabel] = useState('Chat on WhatsApp');
+  const [iconOnly, setIconOnly] = useState(false);
+  const [customColor, setCustomColor] = useState('#16a34a');
   const [buttonStyle, setButtonStyle] = useState<ButtonStyle>('primary');
   const [buttonShape, setButtonShape] = useState<ButtonShape>('rounded');
   const [iconStyle, setIconStyle] = useState<IconStyle>('whatsapp');
@@ -78,7 +80,10 @@ export default function WhatsAppButtonMaker() {
     ].join('; ');
   }, [buttonShape, buttonStyle]);
 
-  const htmlSnippet = `<a href="${waLink}" target="_blank" rel="noopener noreferrer" style="${placementCss} ${buttonCss}">${iconGlyph(iconStyle) ? `<span>${iconGlyph(iconStyle)}</span> ` : ''}<span>${label || 'Chat on WhatsApp'}</span></a>`;
+  const safeLabel = (label || 'Chat on WhatsApp').trim();
+  const textLabel = iconOnly ? '' : `<span>${safeLabel}</span>`;
+  const ariaLabel = safeLabel || 'Chat on WhatsApp';
+  const htmlSnippet = `<a href="${waLink}" target="_blank" rel="noopener noreferrer" aria-label="${ariaLabel}" style="${placementCss} ${buttonCss}${buttonStyle==='primary'?` background:${customColor}; border-color:${customColor};`:''}">${iconGlyph(iconStyle) ? `<span aria-hidden="true">${iconGlyph(iconStyle)}</span> ` : ''}${textLabel}</a>`;
 
   const copyHtml = async () => {
     trackEvent('generate_whatsapp_button', { style: buttonStyle, placement, has_message: Boolean(message.trim()) });
@@ -105,21 +110,23 @@ export default function WhatsAppButtonMaker() {
           <article className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="space-y-4">
               <label className="block text-sm font-medium text-gray-700">Country code</label>
-              <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-full rounded-xl border border-gray-300 px-3 py-2">
+              <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-300"><select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="w-full rounded-xl border-0 px-3 py-2">
                 {countryOptions.map((option) => <option key={`${option.country}-${option.code}`} value={option.code}>{option.country} ({option.code})</option>)}
-              </select>
+              </select></div>
               <label className="block text-sm font-medium text-gray-700">WhatsApp phone number</label>
               <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} className="w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="9876543210" />
               {phoneNumber && phoneError ? <p className="text-sm text-red-600">{phoneError}</p> : null}
               <label className="block text-sm font-medium text-gray-700">Pre-filled message (optional)</label>
               <textarea value={message} onChange={(e) => setMessage(e.target.value)} className="w-full rounded-xl border border-gray-300 px-3 py-2" rows={3} />
               <label className="block text-sm font-medium text-gray-700">Button label</label>
-              <input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full rounded-xl border border-gray-300 px-3 py-2" />
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Optional for icon-only" className="w-full rounded-xl border border-gray-300 px-3 py-2" />
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={iconOnly} onChange={(e)=>setIconOnly(e.target.checked)} /> Icon-only button</label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <SelectField label="Button style" value={buttonStyle} onChange={(v) => setButtonStyle(v as ButtonStyle)} options={['primary','dark','light','outline','minimal']} />
                 <SelectField label="Button shape" value={buttonShape} onChange={(v) => setButtonShape(v as ButtonShape)} options={['rounded','pill','square-soft']} />
                 <SelectField label="Icon style" value={iconStyle} onChange={(v) => setIconStyle(v as IconStyle)} options={['whatsapp','chat','none']} />
                 <SelectField label="Placement style" value={placement} onChange={(v) => setPlacement(v as PlacementStyle)} options={['inline','floating-right','floating-left']} />
+                <label className="block text-sm font-medium text-gray-700"><span className="mb-1.5 block">Custom primary color</span><input type="color" value={customColor} onChange={(e)=>setCustomColor(e.target.value)} className="h-10 w-full rounded-xl border border-gray-300" /></label>
               </div>
             </div>
           </article>
@@ -127,12 +134,14 @@ export default function WhatsAppButtonMaker() {
           <article className="space-y-6">
             <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900">Live preview</h2>
-              <div className="relative h-64 overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
+              <div className="relative h-64 overflow-hidden rounded-2xl border border-gray-300 bg-gray-50 p-4">
+                <div className="absolute inset-x-4 top-14 h-6 rounded bg-white/70" />
+                <div className="absolute inset-x-4 top-24 h-24 rounded bg-white/80" />
                 <div className="absolute inset-x-0 top-0 h-9 border-b border-gray-200 bg-white" />
                 <div className={`absolute ${placement === 'inline' ? 'left-4 top-16' : placement === 'floating-right' ? 'bottom-4 right-4' : 'bottom-4 left-4'}`}>
                   <a href={phoneError ? '#' : waLink} target="_blank" rel="noopener noreferrer" onClick={(e) => phoneError && e.preventDefault()} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold shadow-sm" style={previewStyle}>
                     {iconStyle === 'none' ? null : iconStyle === 'whatsapp' ? <span aria-hidden="true">💬</span> : <MessageCircle className="h-4 w-4" />}
-                    <span>{label || 'Chat on WhatsApp'}</span>
+                    {iconOnly ? null : <span>{label || 'Chat on WhatsApp'}</span>}
                   </a>
                 </div>
               </div>
