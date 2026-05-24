@@ -33,7 +33,7 @@ type SizeOption = {
   h: number;
 };
 
-type FormatOption = 'PNG' | 'JPG';
+type FormatOption = 'PNG' | 'JPG' | 'SVG';
 type CenterType = 'none' | 'emoji' | 'image';
 
 const PRESETS: Preset[] = [
@@ -51,7 +51,7 @@ const SIZES: SizeOption[] = [
   { name: 'Poster', ratio: '4:5', w: 1080, h: 1350 },
 ];
 
-const FORMATS: FormatOption[] = ['PNG', 'JPG'];
+const FORMATS: FormatOption[] = ['PNG', 'JPG', 'SVG'];
 
 const EMOJIS = ['💬', '📱', '🛍️', '❤️', '✨', '🎉', '📷', '🍔', '☕', '🎵', '🚀', '🌟'];
 type BarcodeDetectorLike = new (options: { formats: string[] }) => {
@@ -386,13 +386,33 @@ function QrCodeEditorPage() {
     const canvas = previewRef.current;
     if (!canvas) return;
 
-    const mimeType = format === 'PNG' ? 'image/png' : 'image/jpeg';
-    const url = canvas.toDataURL(mimeType, 0.95);
+    let url = '';
+    if (format === 'SVG') {
+      const svgMarkup = await buildSvgExport({
+        size,
+        finalContent,
+        fg,
+        banner,
+        title,
+        subtitle,
+        centerType,
+        centerEmoji,
+        centerImage,
+      });
+      const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+      url = URL.createObjectURL(blob);
+    } else {
+      const mimeType = format === 'PNG' ? 'image/png' : 'image/jpeg';
+      url = canvas.toDataURL(mimeType, 0.95);
+    }
 
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `zapora-qr-${size.name.toLowerCase().replace(/\s+/g, '-')}.${format.toLowerCase()}`;
     anchor.click();
+    if (format === 'SVG') {
+      URL.revokeObjectURL(url);
+    }
     trackEvent('download_qr', {
       source: 'qr_editor',
       export_format: format.toLowerCase(),
@@ -647,7 +667,7 @@ function QrCodeEditorPage() {
                   <ArrowUpRight className="h-4 w-4 text-slate-400" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {FORMATS.map((formatOption) => (
                     <button
                       key={formatOption}
@@ -947,6 +967,133 @@ function shade(hex: string, percent: number) {
   blue = Math.max(0, Math.min(255, blue));
 
   return `#${((red << 16) | (green << 8) | blue).toString(16).padStart(6, '0')}`;
+}
+
+async function buildSvgExport({
+  size,
+  finalContent,
+  fg,
+  banner,
+  title,
+  subtitle,
+  centerType,
+  centerEmoji,
+  centerImage,
+}: {
+  size: SizeOption;
+  finalContent: string;
+  fg: string;
+  banner: string;
+  title: string;
+  subtitle: string;
+  centerType: CenterType;
+  centerEmoji: string;
+  centerImage: string | null;
+}) {
+  const W = size.w;
+  const H = size.h;
+  const layout = getQrLayout(W, H);
+  const qrSvg = await QRCode.toString(finalContent, {
+    type: 'svg',
+    margin: 1,
+    errorCorrectionLevel: 'H',
+    color: { dark: fg, light: '#ffffff' },
+  });
+  const qrInner = extractSvgInnerMarkup(qrSvg);
+  const qrViewBox = getSvgViewBoxSize(qrSvg);
+  const qrScale = qrViewBox.width > 0 ? layout.qrSize / qrViewBox.width : 1;
+  const escapedTitle = escapeXml(truncate(title, 40));
+  const escapedSubtitle = escapeXml(truncate(subtitle, 60));
+  const gradientEnd = shade(banner, -15);
+  const footerY = layout.cardY + layout.cardH - Math.round(H * 0.025);
+  const logoPadding = Math.round(layout.logoSize * 0.18);
+  const logoRadius = Math.round(layout.logoSize * 0.18);
+
+  let centerMarkup = '';
+  if (centerType !== 'none') {
+    centerMarkup += `<rect x="${layout.logoX - logoPadding}" y="${layout.logoY - logoPadding}" width="${layout.logoSize + logoPadding * 2}" height="${layout.logoSize + logoPadding * 2}" rx="${Math.round(layout.logoSize * 0.25)}" fill="#ffffff" />`;
+    if (centerType === 'emoji') {
+      centerMarkup += `<text x="${layout.logoX + layout.logoSize / 2}" y="${layout.logoY + layout.logoSize / 2}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.round(layout.logoSize * 0.82)}" font-family="Apple Color Emoji, Segoe UI Emoji, Inter, sans-serif">${escapeXml(centerEmoji)}</text>`;
+    } else if (centerType === 'image' && centerImage) {
+      centerMarkup += `<defs><clipPath id="center-image-clip"><rect x="${layout.logoX}" y="${layout.logoY}" width="${layout.logoSize}" height="${layout.logoSize}" rx="${logoRadius}" /></clipPath></defs>`;
+      centerMarkup += `<image href="${centerImage}" x="${layout.logoX}" y="${layout.logoY}" width="${layout.logoSize}" height="${layout.logoSize}" preserveAspectRatio="xMidYMid meet" clip-path="url(#center-image-clip)" />`;
+    }
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none">
+  <defs>
+    <linearGradient id="banner-gradient" x1="${layout.cardX}" y1="${layout.cardY}" x2="${layout.cardX + layout.cardW}" y2="${layout.cardY + layout.bannerH}" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="${banner}" />
+      <stop offset="100%" stop-color="${gradientEnd}" />
+    </linearGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="#ffffff" />
+  <rect x="${layout.cardX}" y="${layout.cardY}" width="${layout.cardW}" height="${layout.cardH}" rx="${layout.cardR}" fill="#ffffff" />
+  <path d="${topRoundedRectPath(layout.cardX, layout.cardY, layout.cardW, layout.bannerH, layout.cardR)}" fill="url(#banner-gradient)" />
+  <text x="${layout.centerX}" y="${layout.titleY - (subtitle ? layout.titleSize * 0.55 : 0)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="${layout.titleSize}" font-family="Inter, system-ui, sans-serif" font-weight="600">${escapedTitle}</text>
+  ${subtitle ? `<text x="${layout.centerX}" y="${layout.titleY + layout.titleSize * 0.4}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" fill-opacity="0.9" font-size="${layout.subtitleSize}" font-family="Inter, system-ui, sans-serif" font-weight="400">${escapedSubtitle}</text>` : ''}
+  <rect x="${layout.qrX - layout.qrPadding}" y="${layout.qrY - layout.qrPadding}" width="${layout.qrSize + layout.qrPadding * 2}" height="${layout.qrSize + layout.qrPadding * 2}" rx="${Math.round(layout.qrSize * 0.06)}" fill="#ffffff" />
+  <g transform="translate(${layout.qrX} ${layout.qrY}) scale(${qrScale})">${qrInner}</g>
+  ${centerMarkup}
+  <text x="${layout.centerX}" y="${footerY}" text-anchor="middle" fill="rgba(15,31,23,0.45)" font-size="${layout.footerSize}" font-family="Inter, system-ui, sans-serif" font-weight="500">Powered by Zapora</text>
+</svg>`;
+}
+
+function getQrLayout(W: number, H: number) {
+  const outerPadX = Math.round(W * 0.07);
+  const cardX = outerPadX;
+  const cardY = Math.round(H * 0.06);
+  const cardW = W - outerPadX * 2;
+  const cardH = H - cardY * 2;
+  const cardR = Math.round(W * 0.05);
+  const bannerH = Math.round(cardH * 0.18);
+  const centerX = cardX + cardW / 2;
+  const titleSize = Math.round(W * 0.045);
+  const titleY = cardY + bannerH / 2;
+  const subtitleSize = Math.round(W * 0.026);
+  const bodyTop = cardY + bannerH;
+  const bodyHeight = cardH - bannerH;
+  const qrMaxByWidth = cardW - outerPadX * 1.5;
+  const qrMaxByHeight = bodyHeight - Math.round(H * 0.08);
+  const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
+  const qrX = cardX + (cardW - qrSize) / 2;
+  const qrY = bodyTop + (bodyHeight - qrSize) / 2 - Math.round(H * 0.01);
+  const qrPadding = Math.round(qrSize * 0.04);
+  const logoSize = Math.round(qrSize * 0.18);
+  const logoX = qrX + (qrSize - logoSize) / 2;
+  const logoY = qrY + (qrSize - logoSize) / 2;
+  const footerSize = Math.round(W * 0.02);
+  return { outerPadX, cardX, cardY, cardW, cardH, cardR, bannerH, centerX, titleSize, titleY, subtitleSize, bodyTop, bodyHeight, qrSize, qrX, qrY, qrPadding, logoSize, logoX, logoY, footerSize };
+}
+
+function extractSvgInnerMarkup(svg: string) {
+  return svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+}
+
+function getSvgViewBoxSize(svg: string) {
+  const viewBoxMatch = svg.match(/viewBox="([^"]+)"/i);
+  if (!viewBoxMatch) {
+    return { width: 0, height: 0 };
+  }
+  const parts = viewBoxMatch[1].trim().split(/[\s,]+/).map(Number);
+  if (parts.length !== 4 || parts.some(Number.isNaN)) {
+    return { width: 0, height: 0 };
+  }
+  return { width: parts[2], height: parts[3] };
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function topRoundedRectPath(x: number, y: number, w: number, h: number, r: number) {
+  return `M ${x + r} ${y} H ${x + w - r} A ${r} ${r} 0 0 1 ${x + w} ${y + r} V ${y + h} H ${x} V ${y + r} A ${r} ${r} 0 0 1 ${x + r} ${y} Z`;
 }
 
 export default QrCodeEditorPage;
