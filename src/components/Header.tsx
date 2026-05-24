@@ -1,7 +1,7 @@
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker';
 
 type HeaderProps = {
   currentPage: PageKey;
@@ -12,6 +12,7 @@ const navItems: Array<{ label: string; page: PageKey }> = [
   { label: 'Home', page: 'home' },
   { label: 'QR Code Editor', page: 'qrCodeEditor' },
   { label: 'Blog', page: 'blog' },
+  { label: 'Button Maker', page: 'whatsappButtonMaker' },
   { label: 'Privacy', page: 'privacy' },
   { label: 'Contact', page: 'contact' },
 ];
@@ -23,7 +24,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
     setIsMobileOpen(false);
   }, [currentPage]);
 
-  const getPath = (page: PageKey) => (page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : `/${page}`);
+  const getPath = (page: PageKey) => (page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : `/${page}`);
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
