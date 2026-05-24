@@ -32,9 +32,9 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
 
 const pageMetadata: Record<PageKey, { title: string; description: string }> = {
   home: {
-    title: 'Zapora - Free WhatsApp Link Generator',
+    title: 'Zapora — WhatsApp Links & QR Codes Made Simple',
     description:
-      'Create WhatsApp chat links instantly with phone number, country code, and optional message.',
+      'Create clean WhatsApp chat links, QR codes, bulk links, and click-to-chat buttons in seconds. Free, fast, and easy to use.',
   },
   privacy: {
     title: 'Privacy Policy | Zapora',
