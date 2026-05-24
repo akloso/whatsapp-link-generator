@@ -342,10 +342,18 @@ function QrCodeEditorPage() {
         ctx.fill();
 
         if (centerType === 'emoji') {
-          ctx.font = `${Math.round(logoSize * 0.85)}px "Apple Color Emoji","Segoe UI Emoji",Inter,sans-serif`;
+          const centerX = logoX + logoSize / 2;
+          const centerY = logoY + logoSize / 2;
+          const emojiSize = Math.round(logoSize * 0.82);
+          ctx.font = `${emojiSize}px "Apple Color Emoji","Segoe UI Emoji",Inter,sans-serif`;
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(centerEmoji, logoX + logoSize / 2, logoY + logoSize / 2 + logoSize * 0.05);
+          ctx.textBaseline = 'alphabetic';
+          const metrics = ctx.measureText(centerEmoji);
+          const hasMetrics = Number.isFinite(metrics.actualBoundingBoxAscent) && Number.isFinite(metrics.actualBoundingBoxDescent);
+          const offsetY = hasMetrics
+            ? (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
+            : emojiSize * 0.3;
+          ctx.fillText(centerEmoji, centerX, centerY + offsetY);
         } else if (centerType === 'image' && centerImage) {
           const image = await loadImage(centerImage);
           const ratio = Math.min(logoSize / image.width, logoSize / image.height);
@@ -514,22 +522,22 @@ function QrCodeEditorPage() {
             </Section>
 
             <Section title="Color">
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-2.5">
                 {PRESETS.map((presetOption) => (
                   <button
                     key={presetOption.name}
                     onClick={() => applyPreset(presetOption)}
-                    className={`min-w-0 rounded-lg border p-2 text-left transition ${
+                    className={`min-w-0 rounded-lg border p-1.5 text-left transition sm:p-2 ${
                       preset.name === presetOption.name
                         ? 'border-slate-900 bg-slate-50 shadow-sm'
                         : 'border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex h-6 overflow-hidden rounded-md ring-1 ring-slate-200">
+                    <div className="flex h-5 overflow-hidden rounded-md ring-1 ring-slate-200 sm:h-6">
                       <div className="flex-1" style={{ background: presetOption.banner }} />
                       <div className="flex-1" style={{ background: presetOption.fg }} />
                     </div>
-                    <p className="mt-1 text-[11px] font-medium text-slate-800 sm:text-xs">{presetOption.name}</p>
+                    <p className="mt-1 truncate text-[10px] font-medium text-slate-800 sm:text-xs">{presetOption.name}</p>
                   </button>
                 ))}
               </div>
@@ -857,12 +865,15 @@ function ColorField({
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5">
-        <input
-          type="color"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-7 w-9 cursor-pointer rounded-md border-0 bg-transparent p-0"
-        />
+        <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-md border border-slate-300" style={{ backgroundColor: value }}>
+          <input
+            type="color"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer appearance-none border-0 opacity-0"
+            aria-label={`${label} color picker`}
+          />
+        </div>
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -1013,7 +1024,7 @@ async function buildSvgExport({
   if (centerType !== 'none') {
     centerMarkup += `<rect x="${layout.logoX - logoPadding}" y="${layout.logoY - logoPadding}" width="${layout.logoSize + logoPadding * 2}" height="${layout.logoSize + logoPadding * 2}" rx="${Math.round(layout.logoSize * 0.25)}" fill="#ffffff" />`;
     if (centerType === 'emoji') {
-      centerMarkup += `<text x="${layout.logoX + layout.logoSize / 2}" y="${layout.logoY + layout.logoSize / 2}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.round(layout.logoSize * 0.82)}" font-family="Apple Color Emoji, Segoe UI Emoji, Inter, sans-serif">${escapeXml(centerEmoji)}</text>`;
+      centerMarkup += `<foreignObject x="${layout.logoX}" y="${layout.logoY}" width="${layout.logoSize}" height="${layout.logoSize}"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;line-height:1;font-size:${Math.round(layout.logoSize * 0.82)}px;font-family:Apple Color Emoji, Segoe UI Emoji, Inter, sans-serif;">${escapeXml(centerEmoji)}</div></foreignObject>`;
     } else if (centerType === 'image' && centerImage) {
       centerMarkup += `<defs><clipPath id="center-image-clip"><rect x="${layout.logoX}" y="${layout.logoY}" width="${layout.logoSize}" height="${layout.logoSize}" rx="${logoRadius}" /></clipPath></defs>`;
       centerMarkup += `<image href="${centerImage}" x="${layout.logoX}" y="${layout.logoY}" width="${layout.logoSize}" height="${layout.logoSize}" preserveAspectRatio="xMidYMid meet" clip-path="url(#center-image-clip)" />`;
