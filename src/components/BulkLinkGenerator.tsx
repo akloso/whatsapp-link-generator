@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { AlertCircle, Check, ChevronDown, Copy, Download, Loader2, Search, Upload } from 'lucide-react';
 import { MAX_PHONE_LENGTH, MIN_PHONE_LENGTH, countryOptions, type CountryOption } from '../data/countryOptions';
 import { trackEvent } from '../lib/trackEvent';
+import { ToolFaqSection, ToolHowItWorksSection } from './ToolPageSupportSections';
 
 type BulkLinkRow = { phoneNumber: string; countryCode: string; message: string; whatsappLink: string };
 type CsvInputRow = { countryCode: string; phoneNumber: string; prefilledMessage: string };
@@ -133,5 +134,50 @@ export default function BulkLinkGenerator() {
     </div><div className="space-y-4"><label className="block text-sm font-semibold text-gray-800">Common pre-filled message (manual mode)</label><textarea value={commonMessage} onChange={(e) => setCommonMessage(e.target.value)} rows={4} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900" /><button onClick={handleGenerateLinks} className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-5 py-3 text-sm font-semibold text-white">Generate Bulk Links</button>{errorMessage ? <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="mt-0.5 h-4 w-4" />{errorMessage}</div> : null}{csvFileName ? <p className="text-xs text-gray-500">Using uploaded file: <span className="font-medium">{csvFileName}</span></p> : null}</div></div>
 
     {generatedRows.length ? <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-gray-800">Generated: {generatedRows.length} · Duplicates skipped: {duplicateEntries} · Invalid/skipped: {invalidEntries}</p><button onClick={() => { const head = 'country_code,phone_number,whatsapp_link,prefilled_message'; const rows = generatedRows.map((r) => [esc(r.countryCode), esc(r.phoneNumber), esc(r.whatsappLink), esc(r.message)].join(',')); downloadTextFile([head, ...rows].join('\n'), 'zapora-bulk-whatsapp-links.csv'); }} className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"><Download className="h-3.5 w-3.5" />Download CSV</button></div><div className="max-h-80 overflow-y-auto rounded-xl border border-gray-200 bg-white">{generatedRows.map((row) => <div key={row.whatsappLink} className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2 text-xs"><span className="truncate text-gray-700">{row.whatsappLink}</span><button onClick={async () => { try { await navigator.clipboard.writeText(row.whatsappLink); setCopiedLink(row.whatsappLink); setTimeout(() => setCopiedLink(null), 1500); } catch { setCopiedLink(null); } }} className="inline-flex items-center gap-1 rounded-md border px-2 py-1">{copiedLink === row.whatsappLink ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}Copy</button></div>)}</div></div> : null}
+
+    <ToolHowItWorksSection
+      heading="How the bulk WhatsApp link generator works"
+      intro="Create multiple WhatsApp chat links from manual numbers or a CSV file, then download the final list in one clean CSV."
+      steps={[
+        {
+          title: 'Add your numbers',
+          description: 'Paste multiple phone numbers manually or upload a CSV file with country_code, phone_number, and prefilled_message columns.',
+        },
+        {
+          title: 'Generate clean links',
+          description: 'Zapora checks the rows, skips invalid entries where possible, and creates WhatsApp chat links with optional pre-filled messages.',
+        },
+        {
+          title: 'Download and share',
+          description: 'Preview the generated links, copy what you need, or download the final CSV for campaigns, outreach, or internal use.',
+        },
+      ]}
+    />
+
+    <ToolFaqSection
+      heading="Bulk WhatsApp Link Generator FAQs"
+      items={[
+        {
+          question: 'Can I generate multiple WhatsApp links at once?',
+          answer: 'Yes. You can paste multiple phone numbers manually or upload a CSV file, then generate WhatsApp links in bulk.',
+        },
+        {
+          question: 'What CSV format should I use?',
+          answer: 'Use these columns: country_code, phone_number, and prefilled_message. The sample CSV on the page includes the correct headers.',
+        },
+        {
+          question: 'Does Zapora store my bulk phone numbers?',
+          answer: 'No. Bulk link generation stays client-side. Bulk phone numbers and messages are not sent to analytics or Google Sheets.',
+        },
+        {
+          question: 'Can I add different messages for different numbers?',
+          answer: 'Yes. Add a prefilled_message value for each row in your CSV to create links with different messages.',
+        },
+        {
+          question: 'Can I download the generated links?',
+          answer: 'Yes. After generating the links, you can download the final output as a CSV file.',
+        },
+      ]}
+    />
   </div></div></section>;
 }

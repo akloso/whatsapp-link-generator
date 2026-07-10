@@ -2,6 +2,7 @@ import { type CSSProperties, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Copy, MessageCircle, Search } from 'lucide-react';
 import { countryOptions } from '../data/countryOptions';
 import { trackEvent } from '../lib/trackEvent';
+import { ToolFaqSection, ToolHowItWorksSection } from './ToolPageSupportSections';
 
 type ButtonStyle = 'primary' | 'dark' | 'light' | 'outline' | 'minimal';
 type ButtonShape = 'rounded' | 'pill' | 'square-soft';
@@ -125,7 +126,53 @@ export default function WhatsAppButtonMaker() {
     </div></article>
     <article className="min-w-0 space-y-6"><div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="mb-4 text-lg font-semibold text-gray-900">Live preview</h2><div className="relative h-72 overflow-hidden rounded-2xl border border-gray-300 bg-gray-50 p-4"><div className="absolute inset-x-0 top-0 h-9 border-b border-gray-200 bg-white" /><div className="absolute left-3 top-3 flex gap-1.5"> <span className="h-2.5 w-2.5 rounded-full bg-red-300" /> <span className="h-2.5 w-2.5 rounded-full bg-amber-300" /> <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div><div className="absolute inset-x-4 top-14 h-5 rounded bg-white/80" /><div className="absolute inset-x-4 top-24 h-24 rounded bg-white/80" /><div className={`absolute max-w-[calc(100%-2.5rem)] ${placement === 'inline' ? 'left-5 top-16' : placement === 'floating-right' ? 'right-5 bottom-5' : 'left-5 bottom-5'}`}><a href={phoneError ? '#' : waLink} target="_blank" rel="noopener noreferrer" onClick={(e) => phoneError && e.preventDefault()} className="inline-flex max-w-full items-center gap-2 px-4 py-3 text-sm font-semibold shadow-sm" style={previewStyle}>{iconStyle === 'none' ? null : iconStyle === 'whatsapp' ? <WhatsAppIcon /> : <MessageCircle className="h-4 w-4" />}{iconOnly ? null : <span className="truncate">{safeLabel}</span>}</a></div></div></div>
     <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><pre className="mt-2 max-h-56 overflow-auto rounded-2xl bg-gray-950 p-4 text-xs text-green-200"><code>{htmlSnippet}</code></pre><button type="button" onClick={copyHtml} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700" disabled={Boolean(phoneError)}>{copyState === 'success' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copyState === 'success' ? 'Copied' : 'Copy HTML'}</button>{copyState === 'error' ? <p className="mt-2 text-sm text-amber-700">Clipboard access failed. Please copy manually.</p> : null}</div>
-    </article></div></section></main>);
+    </article></div>
+
+    <ToolHowItWorksSection
+      heading="How the WhatsApp button maker works"
+      intro="Create a click-to-chat WhatsApp button for your website without writing custom code from scratch."
+      steps={[
+        {
+          title: 'Add your WhatsApp number',
+          description: 'Choose your country code, enter your phone number, and optionally add a pre-filled message.',
+        },
+        {
+          title: 'Customize the button',
+          description: 'Choose the button label, icon style, color, and placement based on where you want to show it on your website.',
+        },
+        {
+          title: 'Copy the HTML',
+          description: 'Copy the generated HTML and add it to your website where you want the WhatsApp button to appear.',
+        },
+      ]}
+    />
+
+    <ToolFaqSection
+      heading="WhatsApp Button Maker FAQs"
+      items={[
+        {
+          question: 'Can I create a WhatsApp button without coding?',
+          answer: 'Yes. Zapora creates copy-ready HTML for your WhatsApp button, so you can add it to your website with minimal setup.',
+        },
+        {
+          question: 'Can I create an icon-only WhatsApp button?',
+          answer: 'Yes. You can leave the label empty and use an icon-only button. The generated HTML still includes an accessible aria-label.',
+        },
+        {
+          question: 'Can I customize the button color?',
+          answer: 'Yes. You can choose a button color and preview how it will look before copying the HTML.',
+        },
+        {
+          question: 'Where should I place the WhatsApp button on my website?',
+          answer: 'You can use it inline inside a page section or as a floating button on the left or right side, depending on your website layout.',
+        },
+        {
+          question: 'Does the button open WhatsApp in a new tab?',
+          answer: 'Yes. The generated HTML opens WhatsApp in a new tab using target="_blank" and rel="noopener noreferrer".',
+        },
+      ]}
+    />
+  </section></main>);
 }
 
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
