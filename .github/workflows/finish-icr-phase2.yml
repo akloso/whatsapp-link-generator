@@ -1,0 +1,45 @@
+name: Finish ICR Phase 2
+
+on:
+  push:
+    branches:
+      - codex/perform-baseline-analysis-on-icr-dashboard-html
+    paths:
+      - .github/workflows/finish-icr-phase2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/perform-baseline-analysis-on-icr-dashboard-html
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install Chart.js
+        run: npm install --save chart.js@4.4.7
+      - name: Validate clean install
+        run: |
+          rm -rf node_modules
+          npm ci
+      - name: Validate project
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run build
+          git diff --check
+      - name: Commit package update and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/finish-icr-phase2.yml
+          git add package.json package-lock.json
+          git commit -m "Add Chart.js for ICR Executive Report"
+          git push origin HEAD:codex/perform-baseline-analysis-on-icr-dashboard-html
