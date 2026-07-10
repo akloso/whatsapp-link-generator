@@ -1,30 +1,43 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DEMO_ROWS } from './constants/demoRows';
 import { autoMap, validateMapping } from './logic/columnMapping';
+import { filterRows, makeDefaultFilters, makeFilterOptions, rangeForPreset } from './logic/filters';
+import { analyzeRows } from './logic/metrics';
 import { parseRows } from './logic/rowParser';
 import { headersFromRows } from './logic/worksheetDetection';
 import { getSourceType, loadWorksheetRows, readWorkbook, type WorkbookHandle } from './services/workbookReader';
 import { useIcrDashboardReducer } from './hooks/useIcrDashboardReducer';
 import { ColumnMappingModal } from './components/ColumnMappingModal';
+import { ExecutiveReport } from './components/ExecutiveReport';
 import { IcrEmptyState } from './components/IcrEmptyState';
 import { IcrToast } from './components/IcrToast';
 import { ParsedDataSummary } from './components/ParsedDataSummary';
 import { ProcessingOverlay } from './components/ProcessingOverlay';
+import { ReportFilters } from './components/ReportFilters';
 import { WorkbookUpload } from './components/WorkbookUpload';
 import { WorksheetSelector } from './components/WorksheetSelector';
-import type { FieldKey } from './types';
+import type { FieldKey, ReportFiltersState } from './types';
 
 const safeError = (error: unknown): string => error instanceof Error ? error.message : 'Something went wrong while preparing the workbook.';
 const busyStatuses = ['reading-file', 'inspecting-workbook', 'parsing-data'];
+const EMPTY_FILTERS: ReportFiltersState = { clientKey: 'all', rag: 'all', owner: 'all', rangePreset: 'all', from: '', to: '', latestOnly: false };
 
 export function IcrDashboard() {
   const [state, dispatch] = useIcrDashboardReducer();
   const [toast, setToast] = useState('');
+  const [filters, setFilters] = useState<ReportFiltersState>(EMPTY_FILTERS);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workbookRef = useRef<WorkbookHandle | null>(null);
 
   const isBusy = busyStatuses.includes(state.status);
   const mappingReviewNeeded = useMemo(() => Object.values(state.mapping).some((entry) => entry.status === 'review'), [state.mapping]);
+  const analyzedRows = useMemo(() => analyzeRows(state.parsedRows), [state.parsedRows]);
+  const filterOptions = useMemo(() => makeFilterOptions(analyzedRows), [analyzedRows]);
+  const filteredRows = useMemo(() => filterRows(analyzedRows, filters), [analyzedRows, filters]);
+
+  useEffect(() => {
+    setFilters(analyzedRows.length ? makeDefaultFilters(analyzedRows) : EMPTY_FILTERS);
+  }, [analyzedRows]);
 
   const notify = (message: string) => {
     setToast(message);
@@ -42,7 +55,7 @@ export function IcrDashboard() {
       dispatch({ type: 'PARSE_START' });
       const parsed = parseRows(state.rawRows, mapping);
       dispatch({ type: 'PARSE_SUCCESS', parsedRows: parsed.result, validationIssues: parsed.issues, warnings: validation.filter((message) => message.startsWith('Timestamp')) });
-      notify('Workbook parsed locally.');
+      notify('Workbook parsed locally. Executive report generated.');
     } catch {
       dispatch({ type: 'SET_ERROR', error: 'Rows could not be parsed. Review the mapping and try again.' });
     }
@@ -86,14 +99,24 @@ export function IcrDashboard() {
     const mapping = autoMap(headers);
     const parsed = parseRows(rawRows, mapping);
     dispatch({ type: 'LOAD_DEMO', rawRows, headers, mapping, parsedRows: parsed.result, validationIssues: parsed.issues, warnings: ['Fictional and synthetic demo data. No workbook library was loaded.'] });
-    notify('Loaded fictional demo data.');
+    notify('Loaded fictional demo data and generated the Executive Report.');
   };
 
   const clearData = () => {
     workbookRef.current = null;
+    setFilters(EMPTY_FILTERS);
     dispatch({ type: 'CLEAR_DATA' });
     if (fileInputRef.current) fileInputRef.current.value = '';
     notify('ICR workbook data cleared from memory.');
+  };
+
+  const handlePresetChange = (preset: ReportFiltersState['rangePreset']) => {
+    if (preset === 'custom') {
+      setFilters((current) => ({ ...current, rangePreset: preset }));
+      return;
+    }
+    const range = rangeForPreset(preset, analyzedRows);
+    setFilters((current) => ({ ...current, rangePreset: preset, ...range }));
   };
 
   return (
@@ -103,7 +126,7 @@ export function IcrDashboard() {
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-600">Internal noindex workspace</p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">ICR Trends Dashboard</h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            Upload an ICR Excel or CSV workbook to detect the relevant worksheet, review column mapping, and prepare the data for analysis.
+            Upload an ICR Excel or CSV workbook to detect the relevant worksheet, review column mapping, and generate an executive portfolio report.
           </p>
           <p className="mt-4 inline-flex rounded-full bg-violet-50 px-4 py-2 text-sm font-medium text-violet-900">
             Your workbook is processed locally in this browser and is not uploaded to Zapora servers.
@@ -139,13 +162,20 @@ export function IcrDashboard() {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <button className="icr-secondary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MAPPING' })}>Review mapping</button>
-                  <button className="icr-primary-button" type="button" onClick={() => parseCurrentRows()}>Parse data</button>
+                  <button className="icr-primary-button" type="button" onClick={() => parseCurrentRows()}>Generate report</button>
                 </div>
               </div>
             </section>
           ) : null}
 
           <ParsedDataSummary state={state} onReviewMapping={() => dispatch({ type: 'OPEN_MAPPING' })} onClear={clearData} />
+
+          {state.status === 'ready' ? (
+            <>
+              <ReportFilters filters={filters} options={filterOptions} onChange={setFilters} onPresetChange={handlePresetChange} />
+              <ExecutiveReport rows={filteredRows} sourceName={state.sourceName} />
+            </>
+          ) : null}
         </div>
       </section>
 
