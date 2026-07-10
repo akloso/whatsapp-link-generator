@@ -43,6 +43,8 @@ export const parseRows = (rows: RawRow[], mapping: ColumnMapping): { result: Par
     const clientName = safe(getByField(row, mapping, 'clientName'));
     const clientId = safe(getByField(row, mapping, 'clientId'));
     const rag = normalizeRag(getByField(row, mapping, 'rag'));
+    const trackingStatus = safe(getByField(row, mapping, 'trackingStatus'));
+    const flowStatus = safe(getByField(row, mapping, 'flowStatus'));
 
     if (!clientName) warn('clientName', 'Client name is missing.');
     if (rag === 'Unknown') warn('rag', 'RAG status is missing or not recognised.');
@@ -88,6 +90,13 @@ export const parseRows = (rows: RawRow[], mapping: ColumnMapping): { result: Par
       rag,
       owner: safe(getByField(row, mapping, 'owner')),
       manager: safe(getByField(row, mapping, 'manager')),
+      trackingStatus,
+      flowStatus,
+      opportunity: safe(getByField(row, mapping, 'opportunity')),
+      actionable: safe(getByField(row, mapping, 'actionable')),
+      tickets: parseNum(getByField(row, mapping, 'tickets')),
+      dtcPlaced: trackingStatus ? /placed/i.test(trackingStatus) && !/not placed|missing|need correction/i.test(trackingStatus) : null,
+      widgetPlaced: flowStatus ? !/widget (not placed|missing)|not placed.*widget/i.test(flowStatus) : null,
       leads: leadPair.a,
       subscribedLeads: leadPair.b,
       unassigned: unassignedPair.a,
