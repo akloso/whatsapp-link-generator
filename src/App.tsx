@@ -15,8 +15,9 @@ import BlogPostPage from './components/BlogPostPage';
 import WhatsAppButtonMaker from './components/WhatsAppButtonMaker';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 import { blogPostsBySlug } from './data/blogPosts';
+import IcrTrendsDashboardPage from './features/icr-trends-dashboard/IcrTrendsDashboardPage';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
 
 const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/privacy') return { page: 'privacy' };
@@ -26,6 +27,7 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/blog') return { page: 'blog' };
   if (pathname === '/whatsapp-button-maker') return { page: 'whatsappButtonMaker' };
   if (pathname === '/bulk-whatsapp-link-generator') return { page: 'bulkWhatsappGenerator' };
+  if (pathname === '/icr-trends-dashboard') return { page: 'icrTrendsDashboard' };
   if (pathname.startsWith('/blog/')) return { page: 'blogPost', slug: pathname.replace('/blog/', '') };
   return { page: 'home' };
 };
@@ -38,6 +40,8 @@ type SeoMetadata = {
   description: string;
   canonicalPath: string;
   ogType?: 'website' | 'article';
+  robots?: string;
+  suppressSocial?: boolean;
 };
 
 const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
@@ -88,6 +92,13 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
     description:
       'Generate multiple WhatsApp chat links at once using manual input or CSV upload. Fast, simple, private, and free to use.',
     canonicalPath: '/bulk-whatsapp-link-generator',
+  },
+  icrTrendsDashboard: {
+    title: 'ICR Trends Dashboard | Zapora',
+    description: 'Private browser-side ICR workbook analysis dashboard.',
+    canonicalPath: '/icr-trends-dashboard',
+    robots: 'noindex, nofollow, noarchive, nosnippet',
+    suppressSocial: true,
   },
 };
 
@@ -157,18 +168,36 @@ function App() {
       tag.setAttribute('content', content);
     };
 
+    const removeMeta = (selector: string, attr: 'name' | 'property') => {
+      document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${selector}"]`)?.remove();
+    };
+
     const absoluteUrl = `${SITE_URL}${metadata.canonicalPath}`;
 
     setMeta('description', metadata.description, 'name');
-    setMeta('og:title', metadata.title, 'property');
-    setMeta('og:description', metadata.description, 'property');
-    setMeta('og:type', metadata.ogType ?? (currentPage === 'home' ? 'website' : 'article'), 'property');
-    setMeta('og:url', absoluteUrl, 'property');
-    setMeta('og:image', DEFAULT_OG_IMAGE, 'property');
-    setMeta('twitter:card', 'summary_large_image', 'name');
-    setMeta('twitter:title', metadata.title, 'name');
-    setMeta('twitter:description', metadata.description, 'name');
-    setMeta('twitter:image', DEFAULT_OG_IMAGE, 'name');
+    setMeta('robots', metadata.robots ?? 'index, follow', 'name');
+
+    if (metadata.suppressSocial) {
+      removeMeta('og:title', 'property');
+      removeMeta('og:description', 'property');
+      removeMeta('og:type', 'property');
+      removeMeta('og:url', 'property');
+      removeMeta('og:image', 'property');
+      removeMeta('twitter:card', 'name');
+      removeMeta('twitter:title', 'name');
+      removeMeta('twitter:description', 'name');
+      removeMeta('twitter:image', 'name');
+    } else {
+      setMeta('og:title', metadata.title, 'property');
+      setMeta('og:description', metadata.description, 'property');
+      setMeta('og:type', metadata.ogType ?? (currentPage === 'home' ? 'website' : 'article'), 'property');
+      setMeta('og:url', absoluteUrl, 'property');
+      setMeta('og:image', DEFAULT_OG_IMAGE, 'property');
+      setMeta('twitter:card', 'summary_large_image', 'name');
+      setMeta('twitter:title', metadata.title, 'name');
+      setMeta('twitter:description', metadata.description, 'name');
+      setMeta('twitter:image', DEFAULT_OG_IMAGE, 'name');
+    }
 
     let canonicalTag = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonicalTag) {
@@ -180,7 +209,7 @@ function App() {
   }, [currentBlogSlug, currentPage]);
 
   const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
-    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
+    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
     window.history.pushState({}, '', targetPath);
     setCurrentPage(page === 'blog' && blogSlug ? 'blogPost' : page);
     setCurrentBlogSlug(blogSlug);
@@ -314,6 +343,8 @@ function App() {
     pageContent = <WhatsAppButtonMaker />;
   } else if (currentPage === 'bulkWhatsappGenerator') {
     pageContent = <BulkLinkGenerator />;
+  } else if (currentPage === 'icrTrendsDashboard') {
+    pageContent = <IcrTrendsDashboardPage />;
   } else if (currentPage === 'blog') {
     pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
   } else if (currentPage === 'blogPost') {
@@ -344,11 +375,13 @@ function App() {
     );
   }
 
+  const publicCurrentPage = currentPage === 'blogPost' ? 'blog' : currentPage === 'icrTrendsDashboard' ? 'home' : currentPage;
+
   return (
     <div className="min-h-screen bg-white">
-      <Header currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} />
+      <Header currentPage={publicCurrentPage} onNavigate={(page) => navigateTo(page)} />
       {pageContent}
-      <Footer currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />
+      <Footer currentPage={publicCurrentPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />
     </div>
   );
 }
