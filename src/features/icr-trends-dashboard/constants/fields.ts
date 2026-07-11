@@ -1,0 +1,46 @@
+import type { CanonicalFieldKey, FieldValueCategory } from '../types/icr';
+export interface CanonicalFieldDefinition { key: CanonicalFieldKey; label: string; type: FieldValueCategory; required: boolean; aliases: readonly string[] }
+export const FIELD_DEFS: readonly CanonicalFieldDefinition[] = [
+{key:'timestamp',label:'Review timestamp',type:'date',required:false,aliases:['timestamp','review date','date','icr date']},
+{key:'email',label:'Email address',type:'text',required:false,aliases:['email address','email']},
+{key:'clientName',label:'Client name',type:'text',required:true,aliases:['client name','organisation','organization','institution name','account name']},
+{key:'clientId',label:'Client ID',type:'text',required:false,aliases:['client id','account id','customer id']},
+{key:'lastMeeting',label:'Last physical meeting',type:'date',required:false,aliases:['last physical meeting done on','last meeting date','physical meeting']},
+{key:'lastTraining',label:'Last training/workshop',type:'date',required:false,aliases:['last training workshop done on','last training date','training workshop']},
+{key:'lastReport',label:'Last report presented',type:'date',required:false,aliases:['last report presented on icr observation','last report presented','report presented']},
+{key:'lastQbr',label:'Last QBR date',type:'date',required:false,aliases:['last qbr date','qbr date']},
+{key:'trackingStatus',label:'Tracking code placement',type:'status',required:false,aliases:['tracking code placement','dynamic tracking code','dtc status','tracking code']},
+{key:'flowStatus',label:'Applicant basic flow',type:'text',required:false,aliases:['applicant basic flow checked enquiry to enrolment','applicant basic flow checked','applicant flow']},
+{key:'leadPair',label:'Leads captured / subscribed',type:'pair',required:false,aliases:['total no of leads subscribed','total leads subscribed','leads captured subscribed','lead capacity']},
+{key:'unassignedPair',label:'Unassigned leads / applications',type:'pair',required:false,aliases:['no of leads applications unassigned','unassigned leads applications','unallocated leads applications','pending allocation']},
+{key:'referralLeads',label:'Referral leads',type:'number',required:false,aliases:['no of leads in referral','referral leads']},
+{key:'notMappedLeads',label:'Not mapped leads',type:'number',required:false,aliases:['number of not mapped leads na in case of zero','not mapped leads','unmapped leads']},
+{key:'paidPair',label:'Paid applications / capping',type:'pair',required:false,aliases:['no of paid application vs capping if any','paid application capping','paid applications']},
+{key:'overdue',label:'Overdue follow-ups',type:'number',required:false,aliases:['overdue follow ups till date','overdue followups','overdue follow ups']},
+{key:'untouched',label:'Untouched leads',type:'number',required:false,aliases:['no of untouched leads','untouched leads']},
+{key:'widgetPair',label:'Active / subscribed widgets',type:'pair',required:false,aliases:['no of widgets active subscribed','widgets active subscribed','active widgets']},
+{key:'userPair',label:'Active / subscribed users',type:'pair',required:false,aliases:['no of user active subscribed','users active subscribed','active users']},
+{key:'emailPair',label:'Email consumed / left',type:'pair',required:false,aliases:['no of emails credits consumed last 30 days','email credits consumed','email consumed']},
+{key:'smsPair',label:'SMS consumed / left',type:'pair',required:false,aliases:['no of sms credits consumed last 30 days','sms credits consumed','sms consumed']},
+{key:'whatsappPair',label:'WhatsApp consumed / left',type:'pair',required:false,aliases:['no of whatsapp credits consumed last 30 days vs credits left','whatsapp credits consumed','whatsapp consumed']},
+{key:'niaaPair',label:'NIAA consumed / left',type:'pair',required:false,aliases:['no of niaa sessions consumed vs left','niaa sessions consumed','niaa consumed']},
+{key:'rawPair',label:'Active / subscribed raw data',type:'pair',required:false,aliases:['no of active raw data vs subscribed','active raw data subscribed','raw data']},
+{key:'queryPair',label:'Open / unassigned queries',type:'pair',required:false,aliases:['no of open vs unassigned queries','open unassigned queries','queries']},
+{key:'applicationGrowth',label:'Application growth',type:'text',required:false,aliases:['application growth this year vs last year as of now','application growth']},
+{key:'rag',label:'RAG status',type:'rag',required:true,aliases:['rag analysis based on cs understanding','rag analysis','rag status','account health']},
+{key:'opportunity',label:'Potential business opportunity',type:'text',required:false,aliases:['any potential business opportunity action plan for it','potential business opportunity','opportunity']},
+{key:'actionable',label:'Key actionable',type:'text',required:false,aliases:['key actionable','actionable','next action']},
+{key:'owner',label:'CS SPOC',type:'text',required:false,aliases:['cs spoc','cs owner','customer success owner']},
+{key:'manager',label:'CS manager',type:'text',required:false,aliases:['cs manager','manager']},
+{key:'unassignedReason',label:'Reason for unassigned leads',type:'text',required:false,aliases:['reason for unassigned leads','unassigned reason']},
+{key:'notDelivered',label:'Modules subscribed but not delivered',type:'text',required:false,aliases:['modules subscribed vs not delivered','modules not delivered']},
+{key:'notUtilised',label:'Modules delivered but not utilised',type:'text',required:false,aliases:['modules delivered vs not utilised','modules not utilised','modules not used']},
+{key:'tickets',label:'Zendesk tickets',type:'number',required:false,aliases:['zendesk tickets raised in in last 30 days','zendesk tickets raised in last 30 days','zendesk tickets','tickets']},
+{key:'negativeFeedback',label:'Negative feedback and actions',type:'text',required:false,aliases:['what are the reasons for the negative feedback and what actions are taken nps ticket qbr','negative feedback']},
+{key:'metsBalance',label:'METS balance',type:'number',required:false,aliases:['mets balance','mets']},
+{key:'callStatus',label:'Call status',type:'text',required:false,aliases:['call status']},
+{key:'emailStatus',label:'Email status',type:'text',required:false,aliases:['email status']}
+];
+export const FIELD_BY_KEY = Object.fromEntries(FIELD_DEFS.map((field) => [field.key, field])) as Record<CanonicalFieldKey, CanonicalFieldDefinition>;
+export const REQUIRED_FIELD_KEYS = FIELD_DEFS.filter((field) => field.required).map((field) => field.key);
+export function getFieldDefinition(key: CanonicalFieldKey): CanonicalFieldDefinition { return FIELD_BY_KEY[key]; }

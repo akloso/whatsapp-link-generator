@@ -1,0 +1,2 @@
+import { describe,it,expect } from 'vitest';import { isMissing, normaliseHeader } from '../logic/normaliseHeader';
+describe('normaliseHeader',()=>{it('normalises case whitespace punctuation underscores hyphens slashes',()=>{expect(normaliseHeader(' Total_No. of Leads / Subscribed ')).toBe('total no of leads subscribed');});it('handles unknown and missing forms',()=>{expect(normaliseHeader(null)).toBe('');expect(isMissing('N/A')).toBe(true);expect(isMissing('not visible')).toBe(true);});});
