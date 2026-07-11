@@ -1,0 +1,2 @@
+import type { IcrWorkbookState } from '../hooks/useIcrWorkbook';
+export function ProcessingState({state}:{state:IcrWorkbookState}){ if(!['validating','reading','parsing'].includes(state.stage)) return null; const text=state.stage==='validating'?'Validating workbook metadata…':state.stage==='reading'?'Reading workbook locally in the browser…':`Parsing rows ${state.progress.processedRows}/${state.progress.totalRows}…`; return <div className="icr-dashboard__status" role="status" aria-live="polite"><span className="icr-dashboard__spinner" aria-hidden="true" />{text}</div> }
