@@ -1,0 +1,2 @@
+import { describe,it,expect } from 'vitest';import { normalRow } from './fixtures';import { latestByClient } from '../logic/snapshots';
+describe('snapshots',()=>{it('returns empty and latest per client with deterministic first tie',()=>{expect(latestByClient([])).toEqual([]);const older={...normalRow,timestamp:new Date(Date.UTC(2026,0,1))};const newer={...normalRow,timestamp:new Date(Date.UTC(2026,1,1)),_row:3};expect(latestByClient([older,newer])[0]._row).toBe(3);expect(latestByClient([{...older,_row:4},older])[0]._row).toBe(4);});});
