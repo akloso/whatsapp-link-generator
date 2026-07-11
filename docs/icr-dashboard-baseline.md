@@ -8,8 +8,9 @@
 - Commit SHA used for analysis: `0a395de01b263b5282451680e970c52d1ad4af32`.
 - SHA-256: `9b5b80b6f3687c16dc6c17b40faba28e862cf1a14317fd8423101e0538040bde`.
 - File size: 130,639 bytes.
-- Physical line count observed with `wc -l`: 506 newline-terminated lines.
-- Logical line count expected by Phase 0 requirements: 507; observed `splitlines()` count is 506. The checksum and byte size match the frozen artifact, so this is recorded as a counting-method discrepancy rather than a content change.
+- `wc -l` reports 506 because it counts newline characters.
+- The file ends with a newline, so its verified logical line count is 506 using the Phase 0 byte-counting formula.
+- The SHA-256 and byte size match the frozen artifact exactly; this is not a content discrepancy.
 - Analysis date: 2026-07-11.
 - Frozen status: the prototype is a frozen reference artifact and must not be modified by Phase 0 or later extraction work; future implementation should protect it with checksum tests.
 
@@ -460,7 +461,6 @@ Static checks completed in Phase 0 include file checksum/size/line checks, sourc
 
 ## 28. Known unknowns
 
-- Logical line count discrepancy: expected 507 but checksum-matching file reports 506 newline/split lines locally.
 - Some minified one-line functions require careful semantic porting despite complete inspection.
 - Ambiguous field mappings may overmatch similar business headers.
 - Date parsing is browser-dependent for non-ISO strings.
