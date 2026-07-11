@@ -9,6 +9,14 @@ const getByField = (row: RawRow, mapping: ColumnMapping, key: FieldKey): unknown
   return header ? row[header] : undefined;
 };
 
+const placementStatus = (value: string): boolean | null => {
+  const normalized = value.toLowerCase();
+  if (!normalized) return null;
+  if (/(not|missing|pending|correction|required|issue|absent|no\s)/.test(normalized)) return false;
+  if (/(placed|configured|present|active|validated|healthy|done|complete|implemented)/.test(normalized)) return true;
+  return null;
+};
+
 export const detectCustomNumericHeaders = (rows: RawRow[], mapping: ColumnMapping): string[] => {
   const mappedHeaders = new Set(Object.keys(mapping).filter((header) => mapping[header]?.key));
   const headers = [...new Set(rows.slice(0, 50).flatMap((row) => Object.keys(row)))];
@@ -43,6 +51,8 @@ export const parseRows = (rows: RawRow[], mapping: ColumnMapping): { result: Par
     const clientName = safe(getByField(row, mapping, 'clientName'));
     const clientId = safe(getByField(row, mapping, 'clientId'));
     const rag = normalizeRag(getByField(row, mapping, 'rag'));
+    const trackingStatus = safe(getByField(row, mapping, 'trackingStatus'));
+    const flowStatus = safe(getByField(row, mapping, 'flowStatus'));
 
     if (!clientName) warn('clientName', 'Client name is missing.');
     if (rag === 'Unknown') warn('rag', 'RAG status is missing or not recognised.');
@@ -88,6 +98,13 @@ export const parseRows = (rows: RawRow[], mapping: ColumnMapping): { result: Par
       rag,
       owner: safe(getByField(row, mapping, 'owner')),
       manager: safe(getByField(row, mapping, 'manager')),
+      trackingStatus,
+      flowStatus,
+      tickets: parseNum(getByField(row, mapping, 'tickets')),
+      opportunity: safe(getByField(row, mapping, 'opportunity')),
+      actionable: safe(getByField(row, mapping, 'actionable')),
+      dtcPlaced: placementStatus(trackingStatus),
+      widgetPlaced: placementStatus(flowStatus),
       leads: leadPair.a,
       subscribedLeads: leadPair.b,
       unassigned: unassignedPair.a,

@@ -59,6 +59,13 @@ export type ParsedRow = {
   rag: RagStatus;
   owner: string;
   manager: string;
+  trackingStatus: string;
+  flowStatus: string;
+  tickets: number | null;
+  opportunity: string;
+  actionable: string;
+  dtcPlaced: boolean | null;
+  widgetPlaced: boolean | null;
   leads: number | null;
   subscribedLeads: number | null;
   unassigned: number | null;
@@ -130,4 +137,77 @@ export type IcrDashboardState = {
   warnings: string[];
   error: string;
   isMappingOpen: boolean;
+};
+
+export type RiskThresholds = {
+  unassigned: number;
+  untouched: number;
+  overdue: number;
+  adoption: number;
+};
+
+export type AnalyzedRow = ParsedRow & {
+  health: number;
+  recommendation: string;
+  dtcPlaced: boolean | null;
+  widgetPlaced: boolean | null;
+  tickets: number | null;
+  opportunity: string;
+  actionable: string;
+  trackingStatus: string;
+  flowStatus: string;
+};
+
+export type PortfolioSummary = {
+  accountCount: number;
+  portfolioHealth: number | null;
+  criticalAccounts: number;
+  leadUtilisation: number | null;
+  unassigned: number;
+  untouched: number;
+  overdue: number;
+  widgetAdoption: number | null;
+  userAdoption: number | null;
+  rawAdoption: number | null;
+  emailConsumed: number;
+  smsConsumed: number;
+  whatsappConsumed: number;
+  niaaConsumed: number;
+};
+
+export type DateRangePreset = 'all' | '30' | '90' | '180' | 'ytd' | 'custom';
+
+export type ReportFiltersState = {
+  clientKey: string;
+  rag: RagStatus | 'all';
+  owner: string;
+  rangePreset: DateRangePreset;
+  from: string;
+  to: string;
+  latestOnly: boolean;
+};
+
+export type ReportFilterOptions = {
+  clients: Array<{ key: string; label: string }>;
+  rags: RagStatus[];
+  owners: string[];
+};
+
+export type ChartDatasetDefinition = {
+  label: string;
+  data: number[];
+  backgroundColor?: string | string[];
+  borderColor?: string | string[];
+  fill?: boolean;
+};
+
+export type ChartDefinition = {
+  id: string;
+  title: string;
+  type: 'bar' | 'line' | 'doughnut';
+  labels: string[];
+  datasets: ChartDatasetDefinition[];
+  summary: string;
+  horizontal?: boolean;
+  stacked?: boolean;
 };

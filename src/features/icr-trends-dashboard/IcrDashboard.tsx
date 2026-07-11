@@ -2,6 +2,9 @@ import { useMemo, useRef, useState } from 'react';
 import { DEMO_ROWS } from './constants/demoRows';
 import { autoMap, validateMapping } from './logic/columnMapping';
 import { parseRows } from './logic/rowParser';
+import { analyzeRows, buildPortfolioSummary } from './logic/metrics';
+import { applyReportFilters, DEFAULT_REPORT_FILTERS, getReportFilterOptions } from './logic/filters';
+import { buildChartData } from './logic/chartData';
 import { headersFromRows } from './logic/worksheetDetection';
 import { getSourceType, loadWorksheetRows, readWorkbook, type WorkbookHandle } from './services/workbookReader';
 import { useIcrDashboardReducer } from './hooks/useIcrDashboardReducer';
@@ -12,7 +15,9 @@ import { ParsedDataSummary } from './components/ParsedDataSummary';
 import { ProcessingOverlay } from './components/ProcessingOverlay';
 import { WorkbookUpload } from './components/WorkbookUpload';
 import { WorksheetSelector } from './components/WorksheetSelector';
-import type { FieldKey } from './types';
+import { ReportFilters } from './components/ReportFilters';
+import { ExecutiveReport } from './components/ExecutiveReport';
+import type { FieldKey, ReportFiltersState } from './types';
 
 const safeError = (error: unknown): string => error instanceof Error ? error.message : 'Something went wrong while preparing the workbook.';
 const busyStatuses = ['reading-file', 'inspecting-workbook', 'parsing-data'];
@@ -20,11 +25,17 @@ const busyStatuses = ['reading-file', 'inspecting-workbook', 'parsing-data'];
 export function IcrDashboard() {
   const [state, dispatch] = useIcrDashboardReducer();
   const [toast, setToast] = useState('');
+  const [reportFilters, setReportFilters] = useState<ReportFiltersState>(DEFAULT_REPORT_FILTERS);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workbookRef = useRef<WorkbookHandle | null>(null);
 
   const isBusy = busyStatuses.includes(state.status);
   const mappingReviewNeeded = useMemo(() => Object.values(state.mapping).some((entry) => entry.status === 'review'), [state.mapping]);
+  const analyzedRows = useMemo(() => analyzeRows(state.parsedRows), [state.parsedRows]);
+  const filterOptions = useMemo(() => getReportFilterOptions(analyzedRows), [analyzedRows]);
+  const filteredReport = useMemo(() => applyReportFilters(analyzedRows, reportFilters), [analyzedRows, reportFilters]);
+  const portfolioSummary = useMemo(() => buildPortfolioSummary(filteredReport.rows), [filteredReport.rows]);
+  const charts = useMemo(() => buildChartData(filteredReport.rows, filteredReport.preSnapshotRows), [filteredReport.rows, filteredReport.preSnapshotRows]);
 
   const notify = (message: string) => {
     setToast(message);
@@ -41,6 +52,7 @@ export function IcrDashboard() {
     try {
       dispatch({ type: 'PARSE_START' });
       const parsed = parseRows(state.rawRows, mapping);
+      setReportFilters(DEFAULT_REPORT_FILTERS);
       dispatch({ type: 'PARSE_SUCCESS', parsedRows: parsed.result, validationIssues: parsed.issues, warnings: validation.filter((message) => message.startsWith('Timestamp')) });
       notify('Workbook parsed locally.');
     } catch {
@@ -85,12 +97,14 @@ export function IcrDashboard() {
     const headers = headersFromRows(rawRows);
     const mapping = autoMap(headers);
     const parsed = parseRows(rawRows, mapping);
+    setReportFilters(DEFAULT_REPORT_FILTERS);
     dispatch({ type: 'LOAD_DEMO', rawRows, headers, mapping, parsedRows: parsed.result, validationIssues: parsed.issues, warnings: ['Fictional and synthetic demo data. No workbook library was loaded.'] });
     notify('Loaded fictional demo data.');
   };
 
   const clearData = () => {
     workbookRef.current = null;
+    setReportFilters(DEFAULT_REPORT_FILTERS);
     dispatch({ type: 'CLEAR_DATA' });
     if (fileInputRef.current) fileInputRef.current.value = '';
     notify('ICR workbook data cleared from memory.');
@@ -146,6 +160,13 @@ export function IcrDashboard() {
           ) : null}
 
           <ParsedDataSummary state={state} onReviewMapping={() => dispatch({ type: 'OPEN_MAPPING' })} onClear={clearData} />
+
+          {state.status === 'ready' && analyzedRows.length ? (
+            <>
+              <ReportFilters filters={reportFilters} options={filterOptions} resultCount={filteredReport.rows.length} rangeLabel={filteredReport.rangeLabel} error={filteredReport.error} onChange={setReportFilters} />
+              <ExecutiveReport sourceName={state.sourceName} sourceType={state.sourceType} rows={filteredReport.rows} summary={portfolioSummary} charts={charts} rangeLabel={filteredReport.rangeLabel} filterError={filteredReport.error} />
+            </>
+          ) : null}
         </div>
       </section>
 
