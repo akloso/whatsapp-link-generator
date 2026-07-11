@@ -1,0 +1,12 @@
+import { deriveFilterOptions as deriveBaseOptions, applyFilters } from './filters';
+import { latestByClient } from './snapshots';
+import type { NormalisedRow } from '../types/icr';
+import type { ReportFilterOptions, ReportFilterState } from '../types/report';
+
+export const DEFAULT_REPORT_FILTERS: ReportFilterState = { latestOnly: true };
+export function isActionableRecommendation(text: string): boolean { return !/^Maintain cadence/i.test(text.trim()); }
+export function activeFilterCount(filters: ReportFilterState): number { return [filters.clientKey,filters.rag,filters.owner,filters.status,filters.from,filters.to,filters.recommendation,filters.search?.trim()].filter(Boolean).length; }
+export function clearReportFilters(): ReportFilterState { return {...DEFAULT_REPORT_FILTERS}; }
+export function deriveReportFilterOptions(rows: readonly NormalisedRow[]): ReportFilterOptions { const base=deriveBaseOptions(rows); const statuses=[...new Set(rows.flatMap((r)=>[r.trackingStatus,r.flowStatus]).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); return {...base,statuses,recommendations:[{value:'actionable',label:'Needs action'},{value:'informational',label:'Monitor'}]}; }
+export function reconcileReportFilters(filters: ReportFilterState, options: ReportFilterOptions): ReportFilterState { return {...filters, clientKey: options.clients.some((o)=>o.value===filters.clientKey)?filters.clientKey:undefined, rag: options.rags.includes(filters.rag as never)?filters.rag:undefined, owner: options.owners.includes(filters.owner??'')?filters.owner:undefined, status: options.statuses.includes(filters.status??'')?filters.status:undefined}; }
+export function applyReportFilters(rows: readonly NormalisedRow[], filters: ReportFilterState): NormalisedRow[] { const base=applyFilters(rows,{...filters,latestOnly:false}); const q=filters.search?.trim().toLowerCase(); const filtered=base.filter((r)=>{ const matchesRec=!filters.recommendation || (filters.recommendation==='actionable')===isActionableRecommendation(r.recommendation); const matchesSearch=!q || [r.clientName,r.clientId,r.owner,r.manager,r.recommendation,r.opportunity,r.actionable].some((v)=>v.toLowerCase().includes(q)); return matchesRec && matchesSearch; }); return filters.latestOnly ? latestByClient(filtered).sort((a,b)=>a.clientName.localeCompare(b.clientName)||a._clientKey.localeCompare(b._clientKey)||a._row-b._row) : filtered; }
