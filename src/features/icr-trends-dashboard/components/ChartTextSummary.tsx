@@ -1,0 +1,2 @@
+import type { IcrAnyChartModel } from '../types/charts';
+export function ChartTextSummary({model}:{model:IcrAnyChartModel}){ return <ul className="icr-dashboard__chart-summary" aria-label={`${model.title} values`}>{model.points.map((point)=><li key={`${point.label}-${point.value}`}><span>{point.label}</span><strong>{point.value}</strong>{'count' in point?<small>{point.count} source row{point.count===1?'':'s'}</small>:null}</li>)}</ul>; }

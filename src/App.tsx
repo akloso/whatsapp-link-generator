@@ -15,8 +15,9 @@ import BlogPostPage from './components/BlogPostPage';
 import WhatsAppButtonMaker from './components/WhatsAppButtonMaker';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 import { blogPostsBySlug } from './data/blogPosts';
+import { IcrTrendsDashboardRoute } from './features/icr-trends-dashboard/IcrTrendsDashboardRoute';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
 
 const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/privacy') return { page: 'privacy' };
@@ -26,6 +27,7 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/blog') return { page: 'blog' };
   if (pathname === '/whatsapp-button-maker') return { page: 'whatsappButtonMaker' };
   if (pathname === '/bulk-whatsapp-link-generator') return { page: 'bulkWhatsappGenerator' };
+  if (pathname === '/icr-trends-dashboard') return { page: 'icrTrendsDashboard' };
   if (pathname.startsWith('/blog/')) return { page: 'blogPost', slug: pathname.replace('/blog/', '') };
   return { page: 'home' };
 };
@@ -38,6 +40,7 @@ type SeoMetadata = {
   description: string;
   canonicalPath: string;
   ogType?: 'website' | 'article';
+  robots?: 'index, follow' | 'noindex, nofollow' | 'noindex, nofollow, noarchive, nosnippet';
 };
 
 const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
@@ -88,6 +91,13 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
     description:
       'Generate multiple WhatsApp chat links at once using manual input or CSV upload. Fast, simple, private, and free to use.',
     canonicalPath: '/bulk-whatsapp-link-generator',
+  },
+  icrTrendsDashboard: {
+    title: 'ICR Trends Dashboard | Zapora',
+    description:
+      'Review ICR workbook structure, client intelligence, and data quality in a private browser-based workspace.',
+    canonicalPath: '/icr-trends-dashboard',
+    robots: 'noindex, nofollow, noarchive, nosnippet',
   },
 };
 
@@ -160,6 +170,7 @@ function App() {
     const absoluteUrl = `${SITE_URL}${metadata.canonicalPath}`;
 
     setMeta('description', metadata.description, 'name');
+    setMeta('robots', metadata.robots ?? 'index, follow', 'name');
     setMeta('og:title', metadata.title, 'property');
     setMeta('og:description', metadata.description, 'property');
     setMeta('og:type', metadata.ogType ?? (currentPage === 'home' ? 'website' : 'article'), 'property');
@@ -180,7 +191,7 @@ function App() {
   }, [currentBlogSlug, currentPage]);
 
   const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
-    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
+    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
     window.history.pushState({}, '', targetPath);
     setCurrentPage(page === 'blog' && blogSlug ? 'blogPost' : page);
     setCurrentBlogSlug(blogSlug);
@@ -314,6 +325,8 @@ function App() {
     pageContent = <WhatsAppButtonMaker />;
   } else if (currentPage === 'bulkWhatsappGenerator') {
     pageContent = <BulkLinkGenerator />;
+  } else if (currentPage === 'icrTrendsDashboard') {
+    pageContent = <IcrTrendsDashboardRoute />;
   } else if (currentPage === 'blog') {
     pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
   } else if (currentPage === 'blogPost') {
@@ -342,6 +355,10 @@ function App() {
         <FAQ />
       </>
     );
+  }
+
+  if (currentPage === 'icrTrendsDashboard') {
+    return pageContent;
   }
 
   return (
