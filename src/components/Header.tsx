@@ -80,7 +80,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3 sm:px-6 lg:px-8">
         <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex h-10 items-center" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-10" /></a>
 
@@ -103,7 +103,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
               All Tools <ChevronDown className={`h-4 w-4 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
             </button>
             {toolsOpen ? (
-              <div className="absolute left-0 top-full z-50 mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/40 to-white p-2 shadow-xl" role="menu">
+              <div className="absolute left-0 top-full z-50 mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-white p-2 shadow-xl" role="menu">
                 {tools.map((t) => (
                   <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); }} className="block rounded-xl border border-transparent p-3 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem"><p className="text-sm font-semibold text-gray-900">{t.label}</p><p className="text-xs text-gray-600">{t.desc}</p></a>
                 ))}
@@ -128,7 +128,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                   {otherToolsOpen ? (
                     <div
                       ref={otherToolsSubmenuRef}
-                      className="absolute top-0 z-[60] w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/40 to-white p-2 shadow-xl"
+                      className="absolute top-0 z-[60] w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-white p-2 shadow-xl"
                       style={{ left: otherToolsSubmenuLeft }}
                       role="menu"
                     >
