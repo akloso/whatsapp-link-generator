@@ -1,0 +1,6 @@
+import type { ChartConfiguration, ChartType } from 'chart.js';
+import type { IcrAnyChartModel } from '../types/charts';
+const palette=['#dc2626','#f59e0b','#2563eb','#059669','#7c3aed','#0891b2','#4f46e5','#9333ea'];
+export function prefersReducedMotion(): boolean { return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+export function chartColors(count:number): string[] { return Array.from({length:count},(_,i)=>palette[i%palette.length]); }
+export function buildChartConfig(model: IcrAnyChartModel, reducedMotion=prefersReducedMotion()): ChartConfiguration<ChartType, number[], string> { const isLine=model.type==='line'; return {type:model.type,data:{labels:model.labels,datasets:[{label:model.title,data:model.values,backgroundColor:isLine?'rgba(5,150,105,.18)':chartColors(model.values.length),borderColor:isLine?'#047857':'#ffffff',borderWidth:isLine?3:1,tension:isLine?0.32:0,fill:isLine}]},options:{responsive:true,maintainAspectRatio:false,animation:reducedMotion?false:{duration:320},plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:12,usePointStyle:true}},title:{display:false,text:model.title},tooltip:{enabled:true}},scales:isLine||model.type==='bar'?{y:{beginAtZero:true,ticks:{precision:0}},x:{ticks:{maxRotation:35,minRotation:0}}}:undefined}}; }
