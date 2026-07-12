@@ -15,7 +15,7 @@ import type { WorkbookModel } from '../logic/exportModels';
 
 const workbookModel: WorkbookModel = { sheets: [{ name: 'Dangerous/Sheet*Name?That Is Definitely Too Long', headers: ['Name', 'Score'], rows: [[' =SUM(A1:A2)', -4]] }, { name: 'Dangerous/Sheet*Name?That Is Definitely Too Long', headers: ['Name'], rows: [['@IMPORT']] }] };
 
-describe('Phase 5A hardening guards', () => {
+describe('ICR dashboard hardening guards', () => {
   it('filters non-finite chart values before Chart.js config creation', () => {
     const model: IcrChartModel = { kind: 'health', title: 'Finite only', description: 'defensive guard', type: 'bar', points: [], labels: ['Valid', 'Bad', 'Also valid'], values: [4, Number.NaN, 0], summary: 'summary', emptyReason: null };
     expect(finiteChartPoints(model.labels, model.values)).toEqual({ labels: ['Valid', 'Also valid'], values: [4, 0] });
@@ -30,7 +30,7 @@ describe('Phase 5A hardening guards', () => {
     const table = renderToStaticMarkup(<AccountPriorityTable rows={rows} sort={{ key: 'health', direction: 'desc' }} onSort={() => undefined} />);
     expect(table).toContain('aria-sort="descending"');
     expect(table).toContain('0 · Critical');
-    expect(table).toContain('<td>0</td>');
+    expect(table).toContain('Tickets: 0');
     const exports = renderToStaticMarkup(<ExportActions label="Hardening" disabled filenameBase="hardening" csv={() => ''} workbook={() => ({ sheets: [] })} />);
     expect(exports.match(/disabled=""/g)?.length).toBe(3);
     expect(exports).toContain('aria-live="polite"');
