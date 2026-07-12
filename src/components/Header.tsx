@@ -1,4 +1,4 @@
-import { ChevronDown, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator';
@@ -13,19 +13,23 @@ const tools = [
 const navItems = [{ label: 'Blog', page: 'blog' as PageKey }, { label: 'Privacy', page: 'privacy' as PageKey }, { label: 'Contact', page: 'contact' as PageKey }];
 const getPath = (p: PageKey) => p === 'home' ? '/' : p === 'qrCodeEditor' ? '/qr-code-editor' : p === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : p === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : `/${p}`;
 
+const icrDashboardPath = '/icr-trends-dashboard';
+
 export default function Header({ currentPage, onNavigate }: HeaderProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [otherToolsOpen, setOtherToolsOpen] = useState(false);
   const closeTimer = useRef<number | null>(null);
   const toolsRef = useRef<HTMLDivElement | null>(null);
 
   const clearCloseTimer = () => { if (closeTimer.current) { window.clearTimeout(closeTimer.current); closeTimer.current = null; } };
-  const scheduleClose = () => { clearCloseTimer(); closeTimer.current = window.setTimeout(() => setToolsOpen(false), 900); };
+  const closeToolsMenu = () => { setToolsOpen(false); setOtherToolsOpen(false); };
+  const scheduleClose = () => { clearCloseTimer(); closeTimer.current = window.setTimeout(closeToolsMenu, 900); };
 
-  useEffect(() => { setIsMobileOpen(false); setToolsOpen(false); clearCloseTimer(); }, [currentPage]);
+  useEffect(() => { setIsMobileOpen(false); closeToolsMenu(); clearCloseTimer(); }, [currentPage]);
   useEffect(() => {
     const onOutside = (event: MouseEvent) => {
-      if (toolsRef.current && event.target instanceof Node && !toolsRef.current.contains(event.target)) { clearCloseTimer(); setToolsOpen(false); }
+      if (toolsRef.current && event.target instanceof Node && !toolsRef.current.contains(event.target)) { clearCloseTimer(); closeToolsMenu(); }
     };
     document.addEventListener('mousedown', onOutside);
     return () => { document.removeEventListener('mousedown', onOutside); clearCloseTimer(); };
@@ -37,9 +41,56 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
         <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex h-10 items-center" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-10" /></a>
 
         <nav className="hidden items-center gap-2 sm:flex" aria-label="Primary">
-          <div ref={toolsRef} onMouseEnter={() => { clearCloseTimer(); setToolsOpen(true); }} onMouseLeave={scheduleClose} className="relative">
-            <button type="button" onClick={() => { clearCloseTimer(); setToolsOpen((v) => !v); }} className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800" aria-expanded={toolsOpen}>All Tools <ChevronDown className={`h-4 w-4 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} /></button>
-            {toolsOpen ? <div className="absolute left-0 top-full mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/40 to-white p-2 shadow-xl">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); }} className="block rounded-xl border border-transparent p-3 hover:border-emerald-100 hover:bg-white"><p className="text-sm font-semibold text-gray-900">{t.label}</p><p className="text-xs text-gray-600">{t.desc}</p></a>)}</div> : null}
+          <div
+            ref={toolsRef}
+            onMouseEnter={() => { clearCloseTimer(); setToolsOpen(true); }}
+            onMouseLeave={scheduleClose}
+            onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeToolsMenu(); }}
+            className="relative"
+          >
+            <button
+              type="button"
+              onClick={() => { clearCloseTimer(); setToolsOpen((v) => !v); }}
+              onFocus={() => { clearCloseTimer(); setToolsOpen(true); }}
+              className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
+              aria-expanded={toolsOpen}
+              aria-haspopup="menu"
+            >
+              All Tools <ChevronDown className={`h-4 w-4 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {toolsOpen ? (
+              <div className="absolute left-0 top-full z-50 mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/40 to-white p-2 shadow-xl" role="menu">
+                {tools.map((t) => (
+                  <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); }} className="block rounded-xl border border-transparent p-3 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem"><p className="text-sm font-semibold text-gray-900">{t.label}</p><p className="text-xs text-gray-600">{t.desc}</p></a>
+                ))}
+                <div
+                  className="relative"
+                  onMouseEnter={() => { clearCloseTimer(); setOtherToolsOpen(true); }}
+                  onMouseLeave={() => setOtherToolsOpen(false)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOtherToolsOpen((v) => !v)}
+                    onFocus={() => setOtherToolsOpen(true)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-transparent p-3 text-left hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none"
+                    aria-expanded={otherToolsOpen}
+                    aria-haspopup="menu"
+                    role="menuitem"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold text-gray-900">Other Tools</span>
+                      <span className="block text-xs text-gray-600">Additional Zapora dashboards</span>
+                    </span>
+                    <ChevronRight className={`h-4 w-4 flex-none text-gray-500 transition-transform ${otherToolsOpen ? 'translate-x-0.5 text-emerald-700' : ''}`} />
+                  </button>
+                  {otherToolsOpen ? (
+                    <div className="absolute left-full top-0 z-[60] ml-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/40 to-white p-2 shadow-xl before:absolute before:-left-3 before:top-0 before:h-full before:w-3" role="menu">
+                      <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-transparent p-3 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem"><p className="text-sm font-semibold text-gray-900">ICR Trends Dashboard</p><p className="text-xs text-gray-600">Open dashboard in a new tab</p></a>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
           {navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); }} className={`rounded-xl px-3 py-2 text-sm transition ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'}`}>{item.label}</a>)}
         </nav>
@@ -47,7 +98,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
         <button type="button" onClick={() => setIsMobileOpen((v) => !v)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 p-2 text-gray-700 transition hover:bg-gray-50 sm:hidden">{isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
       </div>
 
-      {isMobileOpen ? <nav className="border-t border-gray-100 bg-white px-4 py-3 sm:hidden"><div className="space-y-1">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{t.label}</a>)}{navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}</div></nav> : null}
+      {isMobileOpen ? <nav className="border-t border-gray-100 bg-white px-4 py-3 sm:hidden"><div className="space-y-1">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{t.label}</a>)}<button type="button" onClick={() => setOtherToolsOpen((v) => !v)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50" aria-expanded={otherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${otherToolsOpen ? 'rotate-180' : ''}`} /></button>{otherToolsOpen ? <div className="ml-3 border-l border-emerald-100 pl-2"><a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50">ICR Trends Dashboard</a></div> : null}{navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}</div></nav> : null}
     </header>
   );
 }
