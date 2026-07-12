@@ -34,16 +34,16 @@ export const DASHBOARD_VIEW_CONTENT: Record<DashboardView, DashboardViewContent>
   },
   client: {
     title: 'Client Intelligence',
-    subtitle: 'Review the planned client-level workspace before workbook parsing is connected.',
+    subtitle: 'Explore client history, latest health, and account-level trends from the parsed workbook.',
     emptyTitle: 'No workbook loaded',
-    emptyDescription: 'Client intelligence will populate after a workbook is processed in a future phase.',
+    emptyDescription: 'Upload and parse a workbook to review client-level intelligence.',
     futureItems: ['Client history', 'Metric trends', 'Findings and field register'],
   },
   quality: {
     title: 'Data Quality',
-    subtitle: 'Reserve space for workbook structure checks and parsing diagnostics.',
+    subtitle: 'Review mapping coverage, field completeness, and parsing diagnostics from the parsed workbook.',
     emptyTitle: 'No workbook loaded',
-    emptyDescription: 'Data quality diagnostics will appear after Phase 2 introduces local workbook processing.',
+    emptyDescription: 'Upload and parse a workbook to inspect data-quality diagnostics.',
     futureItems: ['Mapping confidence', 'Parsing warnings', 'Missing or ambiguous values'],
   },
 };
