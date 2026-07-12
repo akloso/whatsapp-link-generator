@@ -40,7 +40,7 @@ type SeoMetadata = {
   description: string;
   canonicalPath: string;
   ogType?: 'website' | 'article';
-  robots?: 'index, follow' | 'noindex, nofollow';
+  robots?: 'index, follow' | 'noindex, nofollow' | 'noindex, nofollow, noarchive, nosnippet';
 };
 
 const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
@@ -97,7 +97,7 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
     description:
       'Review ICR workbook structure, client intelligence, and data quality in a private browser-based workspace.',
     canonicalPath: '/icr-trends-dashboard',
-    robots: 'noindex, nofollow',
+    robots: 'noindex, nofollow, noarchive, nosnippet',
   },
 };
 
