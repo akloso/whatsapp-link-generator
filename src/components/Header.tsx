@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator';
 type HeaderProps = { currentPage: PageKey; onNavigate: (page: PageKey) => void };
@@ -14,19 +14,63 @@ const navItems = [{ label: 'Blog', page: 'blog' as PageKey }, { label: 'Privacy'
 const getPath = (p: PageKey) => p === 'home' ? '/' : p === 'qrCodeEditor' ? '/qr-code-editor' : p === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : p === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : `/${p}`;
 
 const icrDashboardPath = '/icr-trends-dashboard';
+const submenuWidth = 256;
+const submenuGap = 8;
+const viewportSafeMargin = 16;
 
 export default function Header({ currentPage, onNavigate }: HeaderProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [otherToolsOpen, setOtherToolsOpen] = useState(false);
+  const [otherToolsSubmenuLeft, setOtherToolsSubmenuLeft] = useState(submenuGap);
+  const [otherToolsDirection, setOtherToolsDirection] = useState<'right' | 'left'>('right');
   const closeTimer = useRef<number | null>(null);
   const toolsRef = useRef<HTMLDivElement | null>(null);
+  const otherToolsItemRef = useRef<HTMLDivElement | null>(null);
+  const otherToolsSubmenuRef = useRef<HTMLDivElement | null>(null);
 
   const clearCloseTimer = () => { if (closeTimer.current) { window.clearTimeout(closeTimer.current); closeTimer.current = null; } };
   const closeToolsMenu = () => { setToolsOpen(false); setOtherToolsOpen(false); };
   const scheduleClose = () => { clearCloseTimer(); closeTimer.current = window.setTimeout(closeToolsMenu, 900); };
 
+  const updateOtherToolsPosition = useCallback(() => {
+    const parent = otherToolsItemRef.current;
+    if (!parent) return;
+
+    const parentRect = parent.getBoundingClientRect();
+    const measuredSubmenuWidth = otherToolsSubmenuRef.current?.getBoundingClientRect().width ?? submenuWidth;
+    const rightOffset = parentRect.width + submenuGap;
+    const rightEdge = parentRect.left + rightOffset + measuredSubmenuWidth;
+
+    if (rightEdge <= window.innerWidth - viewportSafeMargin) {
+      setOtherToolsDirection('right');
+      setOtherToolsSubmenuLeft(rightOffset);
+      return;
+    }
+
+    const leftOffset = -measuredSubmenuWidth - submenuGap;
+    const leftEdge = parentRect.left + leftOffset;
+    const clampedLeftOffset = leftEdge < viewportSafeMargin
+      ? viewportSafeMargin - parentRect.left
+      : leftOffset;
+
+    setOtherToolsDirection('left');
+    setOtherToolsSubmenuLeft(clampedLeftOffset);
+  }, []);
+
+  const openOtherTools = () => {
+    updateOtherToolsPosition();
+    setOtherToolsOpen(true);
+  };
+
   useEffect(() => { setIsMobileOpen(false); closeToolsMenu(); clearCloseTimer(); }, [currentPage]);
+  useEffect(() => {
+    if (!otherToolsOpen) return undefined;
+
+    updateOtherToolsPosition();
+    window.addEventListener('resize', updateOtherToolsPosition);
+    return () => window.removeEventListener('resize', updateOtherToolsPosition);
+  }, [otherToolsOpen, updateOtherToolsPosition]);
   useEffect(() => {
     const onOutside = (event: MouseEvent) => {
       if (toolsRef.current && event.target instanceof Node && !toolsRef.current.contains(event.target)) { clearCloseTimer(); closeToolsMenu(); }
@@ -64,28 +108,35 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                   <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); }} className="block rounded-xl border border-transparent p-3 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem"><p className="text-sm font-semibold text-gray-900">{t.label}</p><p className="text-xs text-gray-600">{t.desc}</p></a>
                 ))}
                 <div
+                  ref={otherToolsItemRef}
                   className="relative"
-                  onMouseEnter={() => { clearCloseTimer(); setOtherToolsOpen(true); }}
+                  onMouseEnter={() => { clearCloseTimer(); openOtherTools(); }}
                   onMouseLeave={() => setOtherToolsOpen(false)}
                 >
                   <button
                     type="button"
-                    onClick={() => setOtherToolsOpen((v) => !v)}
-                    onFocus={() => setOtherToolsOpen(true)}
+                    onClick={() => { if (!otherToolsOpen) updateOtherToolsPosition(); setOtherToolsOpen((v) => !v); }}
+                    onFocus={openOtherTools}
                     className="flex w-full items-center justify-between gap-3 rounded-xl border border-transparent p-3 text-left hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none"
                     aria-expanded={otherToolsOpen}
                     aria-haspopup="menu"
                     role="menuitem"
                   >
-                    <span>
-                      <span className="block text-sm font-semibold text-gray-900">Other Tools</span>
-                      <span className="block text-xs text-gray-600">Additional Zapora dashboards</span>
-                    </span>
+                    <span className="text-sm font-semibold text-gray-900">Other Tools</span>
                     <ChevronRight className={`h-4 w-4 flex-none text-gray-500 transition-transform ${otherToolsOpen ? 'translate-x-0.5 text-emerald-700' : ''}`} />
                   </button>
                   {otherToolsOpen ? (
-                    <div className="absolute left-full top-0 z-[60] ml-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/40 to-white p-2 shadow-xl before:absolute before:-left-3 before:top-0 before:h-full before:w-3" role="menu">
-                      <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-transparent p-3 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem"><p className="text-sm font-semibold text-gray-900">ICR Trends Dashboard</p><p className="text-xs text-gray-600">Open dashboard in a new tab</p></a>
+                    <div
+                      ref={otherToolsSubmenuRef}
+                      className="absolute top-0 z-[60] w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/40 to-white p-2 shadow-xl"
+                      style={{ left: otherToolsSubmenuLeft }}
+                      role="menu"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`absolute top-0 h-full w-3 ${otherToolsDirection === 'right' ? '-left-3' : '-right-3'}`}
+                      />
+                      <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-transparent p-3 text-sm font-semibold text-gray-900 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem">ICR Trends Dashboard</a>
                     </div>
                   ) : null}
                 </div>
