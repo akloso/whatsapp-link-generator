@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
 type HeaderProps = { currentPage: PageKey; onNavigate: (page: PageKey) => void };
 
 const tools = [

@@ -357,12 +357,8 @@ function App() {
     );
   }
 
-  if (currentPage === 'icrTrendsDashboard') {
-    return pageContent;
-  }
-
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white [--zapora-header-height:4rem]">
       <Header currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} />
       {pageContent}
       <Footer currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />
