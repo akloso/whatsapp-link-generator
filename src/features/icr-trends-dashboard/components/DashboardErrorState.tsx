@@ -1,1 +1,0 @@
-export function DashboardErrorState({message,onReset}:{message:string;onReset:()=>void}){ return <div className="icr-dashboard__error" role="alert"><h2 id="icr-dashboard-workspace-title">Workbook needs attention</h2><p>{message}</p><button type="button" className="icr-dashboard__secondary-button" onClick={onReset}>Clear and choose another workbook</button></div> }

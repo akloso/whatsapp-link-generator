@@ -1,4 +1,0 @@
-import { exportCell, safeWorksheetName } from './exportSanitizers';
-import type { WorkbookModel } from './exportModels';
-type XlsxModule = typeof import('xlsx');
-export async function workbookModelToBlob(model: WorkbookModel, loader:()=>Promise<XlsxModule>=()=>import('xlsx')): Promise<Blob> { const XLSX=await loader(); const wb=XLSX.utils.book_new(); const used=new Set<string>(); model.sheets.forEach((sheet)=>{ const rows=[sheet.headers,...sheet.rows].map((row)=>row.map(exportCell)); const ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=sheet.headers.map((h)=>({wch:Math.min(42,Math.max(12,h.length+4))})); XLSX.utils.book_append_sheet(wb,ws,safeWorksheetName(sheet.name,used)); }); const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'}); return new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); }

@@ -1,5 +1,0 @@
-import type { PairValue, ParseResult } from '../types/icr';
-import { isMissing, safeString } from './normaliseHeader';
-import { tokenNumbers } from './parseNumber';
-export function parsePair(value: unknown): ParseResult<PairValue> { const nums=tokenNumbers(value); const pair={ a: nums[0] ?? null, b: nums[1] ?? null, count: nums.length, ambiguous: nums.length>2 || (/^[\d,]+$/.test(safeString(value)) && nums.length===1 && safeString(value).replace(/,/g,'').length>8) }; if (nums.length) return { ok:true, value:pair, diagnostics: pair.ambiguous ? [{code:'ambiguous-pair',message:'First two detected values used with caution',rawValue:value}] : []}; return { ok:false, value:null, diagnostics: isMissing(value) ? [{code:'missing',message:'Value is missing',rawValue:value}] : [{code:'invalid-pair',message:'No numeric value found',rawValue:value}]}; }
-export function pairRatio(pair: PairValue | null): number | null { return pair && Number.isFinite(pair.a) && Number.isFinite(pair.b) && pair.b !== null && pair.b !== 0 ? (pair.a as number) / pair.b : null; }

@@ -1,2 +1,0 @@
-import { describe,it,expect } from 'vitest';import { FIELD_DEFS, getFieldDefinition, REQUIRED_FIELD_KEYS } from '../constants/fields';
-describe('fields',()=>{it('exports prototype labels and required fields',()=>{expect(getFieldDefinition('clientName').label).toBe('Client name');expect(getFieldDefinition('rag').aliases).toContain('rag analysis based on cs understanding');expect(REQUIRED_FIELD_KEYS).toEqual(['clientName','rag']);expect(FIELD_DEFS.length).toBeGreaterThan(35);});});

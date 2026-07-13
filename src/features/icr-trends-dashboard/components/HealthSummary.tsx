@@ -1,2 +1,0 @@
-import type { HealthDistribution } from '../types/report';
-export function HealthSummary({distribution}:{distribution:HealthDistribution}){ const total=Object.values(distribution).reduce((s,v)=>s+v,0); return <section className="icr-dashboard__panel-lite" aria-labelledby="health-summary-title"><h2 id="health-summary-title">Health score summary</h2><p>Total accounts: {total}</p><ul className="icr-dashboard__summary-list">{Object.entries(distribution).map(([label,count])=><li key={label}><span>{label}</span><strong>{count}</strong></li>)}</ul></section>; }
