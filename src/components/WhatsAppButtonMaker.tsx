@@ -3,12 +3,13 @@ import { Check, ChevronDown, Copy, MessageCircle, Search } from 'lucide-react';
 import { countryOptions } from '../data/countryOptions';
 import { trackEvent } from '../lib/trackEvent';
 import { ToolFaqSection, ToolHowItWorksSection } from './ToolPageSupportSections';
+import { Button, Surface, TextInput, Textarea } from './ui';
 
 type ButtonStyle = 'primary' | 'dark' | 'light' | 'outline' | 'minimal';
 type ButtonShape = 'rounded' | 'pill' | 'square-soft';
 type IconStyle = 'whatsapp' | 'chat' | 'none';
 type PlacementStyle = 'inline' | 'floating-right' | 'floating-left';
-type CodeFormat = 'html' | 'html-css' | 'react';
+type CodeFormat = 'inline-html' | 'html-css' | 'react';
 
 type ButtonConfig = {
   countryCode: string;
@@ -68,7 +69,7 @@ const getWaLink = ({ countryCode, phoneNumber, message }: Pick<ButtonConfig, 'co
 const getIconMarkup = (iconStyle: IconStyle) => (iconStyle === 'none' ? '' : '<span class="zapora-whatsapp-button__icon" aria-hidden="true">💬</span>');
 const getSafeLabel = (label: string) => label.trim() || ariaLabel;
 
-function generateHtmlCode(config: ButtonConfig) {
+function generateInlineHtmlCode(config: ButtonConfig) {
   const visual = getVisualStyle(config);
   const placementCss = config.placement === 'inline' ? 'position: static;' : `position: fixed; bottom: 20px; ${config.placement === 'floating-right' ? 'right' : 'left'}: 20px; z-index: 9999;`;
   const padding = config.iconOnly ? '12px' : '12px 16px';
@@ -122,7 +123,7 @@ export default function WhatsAppButtonMaker() {
   const [buttonShape, setButtonShape] = useState<ButtonShape>('rounded');
   const [iconStyle, setIconStyle] = useState<IconStyle>('whatsapp');
   const [placement, setPlacement] = useState<PlacementStyle>('inline');
-  const [codeFormat, setCodeFormat] = useState<CodeFormat>('html');
+  const [codeFormat, setCodeFormat] = useState<CodeFormat>('inline-html');
   const [copyState, setCopyState] = useState<'idle' | 'success' | 'error'>('idle');
   const [isCountryOpen, setIsCountryOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
@@ -142,7 +143,7 @@ export default function WhatsAppButtonMaker() {
   }, [countrySearch, indiaOption]);
 
   const waLink = useMemo(() => getWaLink(config), [config]);
-  const generatedCode = useMemo(() => ({ html: generateHtmlCode(config), 'html-css': generateHtmlCssCode(config), react: generateReactCode(config) }), [config]);
+  const generatedCode = useMemo(() => ({ 'inline-html': generateInlineHtmlCode(config), 'html-css': generateHtmlCssCode(config), react: generateReactCode(config) }), [config]);
   const activeCode = generatedCode[codeFormat];
   const previewStyle: CSSProperties = { ...getVisualStyle(config), borderWidth: 1, borderStyle: 'solid' };
 
@@ -173,16 +174,16 @@ export default function WhatsAppButtonMaker() {
   };
 
   return (
-    <main className="overflow-x-hidden bg-gradient-to-b from-white via-green-50/35 to-white py-8 sm:py-12">
-      <section className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+    <main className="overflow-x-hidden bg-white py-6 sm:py-8 lg:py-10">
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <header className="mb-5 max-w-3xl sm:mb-7">
           <p className="mb-2 inline-flex rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">Free WhatsApp website widget</p>
           <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-4xl">WhatsApp Click-to-Chat Button Maker</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-600 sm:text-base">Design a compact WhatsApp button, preview it safely, then copy HTML, HTML + CSS, or React code for your website.</p>
+          <p className="mt-2 text-sm leading-6 text-gray-600 sm:text-base">Design a compact WhatsApp button, preview it safely, then copy Inline HTML, HTML + CSS, or React code for your website.</p>
         </header>
 
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] lg:items-start">
-          <article className="min-w-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+          <Surface className="min-w-0 p-4 sm:p-5">
             <div className="space-y-5">
               <ConfigSection title="WhatsApp details">
                 <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
@@ -194,7 +195,7 @@ export default function WhatsAppButtonMaker() {
                         <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isCountryOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {isCountryOpen ? (
-                        <div className="absolute left-0 right-0 z-20 mt-2 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl sm:max-w-none">
+                        <div className="absolute left-0 right-0 z-20 mt-2 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl sm:max-w-none" onKeyDown={(event) => { if (event.key === 'Escape') setIsCountryOpen(false); }}>
                           <div className="relative mb-2"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input ref={countrySearchRef} value={countrySearch} onChange={(e) => setCountrySearch(e.target.value)} placeholder="Search India, +91, 66..." aria-label="Search country" className="h-10 w-full rounded-xl border border-gray-200 pl-9 pr-3 text-sm text-gray-900 outline-none transition focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20" /></div>
                           <div id="button-maker-country-options" role="listbox" aria-label="Country options" className="max-h-56 overflow-y-auto rounded-xl border border-gray-100">
                             {filteredCountries.length ? filteredCountries.map((option) => {
@@ -209,17 +210,17 @@ export default function WhatsAppButtonMaker() {
                   <Field label="WhatsApp phone number" htmlFor="button-maker-phone">
                     <div className={`flex h-11 min-w-0 items-center rounded-xl border bg-white px-3 shadow-sm transition focus-within:ring-2 ${phoneError && phoneNumber ? 'border-rose-300 focus-within:border-rose-400 focus-within:ring-rose-100' : 'border-gray-300 hover:border-gray-400 focus-within:border-emerald-500 focus-within:ring-emerald-500/20'}`}>
                       <span className="shrink-0 pr-2 text-sm font-semibold text-gray-500">{countryCode}</span>
-                      <input id="button-maker-phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} inputMode="numeric" autoComplete="tel-national" placeholder="9876543210" className="h-full min-w-0 flex-1 border-none bg-transparent text-sm text-gray-900 outline-none" />
+                      <input id="button-maker-phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} inputMode="numeric" autoComplete="tel-national" placeholder="9876543210" aria-invalid={Boolean(phoneError && phoneNumber)} aria-describedby="button-maker-phone-error" className="h-full min-w-0 flex-1 border-none bg-transparent text-sm text-gray-900 outline-none" />
                     </div>
-                    {phoneNumber && phoneError ? <p className="mt-1.5 text-xs font-medium text-rose-600">{phoneError}</p> : null}
+                    {phoneNumber && phoneError ? <p id="button-maker-phone-error" className="mt-1.5 text-xs font-medium text-rose-600">{phoneError}</p> : null}
                   </Field>
                 </div>
-                <Field label="Pre-filled message (optional)" htmlFor="button-maker-message"><textarea id="button-maker-message" value={message} onChange={(e) => setMessage(e.target.value)} rows={3} placeholder="Hi, I’d like to know more." className="min-h-20 w-full resize-y rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition hover:border-gray-400 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20" /></Field>
+                <Field label="Pre-filled message (optional)" htmlFor="button-maker-message"><Textarea id="button-maker-message" value={message} onChange={(e) => setMessage(e.target.value)} rows={3} placeholder="Hi, I’d like to know more." className="min-h-[88px]" /></Field>
               </ConfigSection>
 
               <ConfigSection title="Button content">
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                  <Field label="Button label" htmlFor="button-maker-label"><input id="button-maker-label" value={label} onChange={(e) => setLabel(e.target.value)} disabled={iconOnly} className="h-11 w-full rounded-xl border border-gray-300 px-3 text-sm text-gray-900 shadow-sm outline-none transition hover:border-gray-400 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20 disabled:bg-gray-50 disabled:text-gray-400" /></Field>
+                  <Field label="Button label" htmlFor="button-maker-label"><TextInput id="button-maker-label" value={label} onChange={(e) => setLabel(e.target.value)} disabled={iconOnly} /></Field>
                   <label className="inline-flex h-11 items-center gap-2 rounded-xl border border-gray-200 px-3 text-sm font-semibold text-gray-700 transition hover:border-emerald-200 hover:bg-emerald-50/50"><input type="checkbox" checked={iconOnly} onChange={(e) => setIconOnly(e.target.checked)} className="h-4 w-4 rounded border-gray-300 accent-emerald-600" /> Icon only</label>
                 </div>
                 <SegmentedOptions label="Icon style" value={iconStyle} options={Object.entries(iconLabels)} onChange={(value) => setIconStyle(value as IconStyle)} />
@@ -235,10 +236,10 @@ export default function WhatsAppButtonMaker() {
 
               <ConfigSection title="Placement"><SegmentedOptions label="Placement style" value={placement} options={Object.entries(placementLabels)} onChange={(value) => setPlacement(value as PlacementStyle)} /></ConfigSection>
             </div>
-          </article>
+          </Surface>
 
           <aside className="min-w-0 space-y-5 lg:sticky lg:top-5">
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Live preview">
+            <Surface className="p-4 sm:p-5" aria-label="Live preview">
               <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-base font-bold text-gray-950">Live Preview</h2><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{placementLabels[placement]}</span></div>
               <div className="relative h-56 overflow-hidden rounded-2xl border border-gray-200 bg-[linear-gradient(135deg,#f8fafc_0%,#f8fafc_50%,#ecfdf5_100%)] p-4" aria-hidden="true">
                 <div className="absolute inset-x-0 top-0 h-8 border-b border-gray-200 bg-white" /><div className="absolute left-3 top-3 flex gap-1.5"><span className="h-2 w-2 rounded-full bg-red-300" /><span className="h-2 w-2 rounded-full bg-amber-300" /><span className="h-2 w-2 rounded-full bg-emerald-300" /></div>
@@ -248,19 +249,19 @@ export default function WhatsAppButtonMaker() {
                 </div>
               </div>
               {phoneError ? <p className="mt-2 text-xs font-medium text-rose-600">Add a valid number to enable copying generated code.</p> : null}
-            </section>
+            </Surface>
 
-            <section className="min-w-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Generated code">
-              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-base font-bold text-gray-950">Generated code</h2><div role="tablist" aria-label="Code format" className="grid grid-cols-3 rounded-xl bg-gray-100 p-1 text-xs font-semibold text-gray-600">{(['html', 'html-css', 'react'] as CodeFormat[]).map((format) => <button key={format} type="button" role="tab" aria-selected={codeFormat === format} onClick={() => setCodeFormat(format)} className={`rounded-lg px-2.5 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 ${codeFormat === format ? 'bg-white text-emerald-700 shadow-sm' : 'hover:text-gray-900'}`}>{format === 'html-css' ? 'HTML + CSS' : format === 'react' ? 'React' : 'HTML'}</button>)}</div></div>
+            <Surface className="min-w-0 p-4 sm:p-5" aria-label="Generated code">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-base font-bold text-gray-950">Generated code</h2><p className="mt-1 text-sm text-gray-600">{codeFormat === 'inline-html' ? 'Inline HTML: easiest to paste anywhere' : codeFormat === 'html-css' ? 'HTML + CSS: cleaner and reusable' : 'React: for React-based projects'}</p></div><div role="tablist" aria-label="Code format" className="grid grid-cols-3 rounded-xl bg-gray-100 p-1 text-xs font-semibold text-gray-600">{(['inline-html', 'html-css', 'react'] as CodeFormat[]).map((format) => <button key={format} type="button" role="tab" aria-selected={codeFormat === format} onClick={() => setCodeFormat(format)} className={`rounded-lg px-2.5 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 ${codeFormat === format ? 'bg-white text-emerald-700 shadow-sm' : 'hover:text-gray-900'}`}>{format === 'html-css' ? 'HTML + CSS' : format === 'react' ? 'React' : 'Inline HTML'}</button>)}</div></div>
               <pre className="max-h-64 max-w-full overflow-auto rounded-2xl bg-gray-950 p-3 text-xs leading-5 text-green-100"><code>{activeCode}</code></pre>
-              <button type="button" onClick={copyCode} disabled={Boolean(phoneError)} aria-label={`Copy ${codeFormat === 'html-css' ? 'HTML and CSS' : codeFormat} code`} className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600">{copyState === 'success' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copyState === 'success' ? 'Copied' : `Copy ${codeFormat === 'html-css' ? 'HTML + CSS' : codeFormat === 'react' ? 'React' : 'HTML'}`}</button>
+              <Button type="button" onClick={copyCode} disabled={Boolean(phoneError)} aria-label={`Copy ${codeFormat === 'html-css' ? 'HTML and CSS' : codeFormat === 'react' ? 'React' : 'Inline HTML'} code`} variant={copyState === 'success' ? 'success' : 'primary'} className="mt-3" icon={copyState === 'success' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>{copyState === 'success' ? 'Copied' : `Copy ${codeFormat === 'html-css' ? 'HTML + CSS' : codeFormat === 'react' ? 'React' : 'Inline HTML'}`}</Button>
               {copyState === 'error' ? <p className="mt-2 text-sm text-amber-700">Clipboard access failed. Please copy manually.</p> : null}
-            </section>
+            </Surface>
           </aside>
         </div>
 
-        <ToolHowItWorksSection heading="How the WhatsApp button maker works" intro="Create a click-to-chat WhatsApp button for your website without writing custom code from scratch." steps={[{ title: 'Add your WhatsApp number', description: 'Choose the country code, enter the phone number, and optionally add a pre-filled message.' }, { title: 'Customize the button', description: 'Choose the label, icon style, color, and placement.' }, { title: 'Copy the code', description: 'Choose HTML, HTML + CSS, or React, then copy the generated code and add it to your website.' }]} />
-        <ToolFaqSection heading="WhatsApp Button Maker FAQs" items={[{ question: 'Can I create a WhatsApp button without coding?', answer: 'Yes. Zapora creates copy-ready code with minimal setup required.' }, { question: 'Which code formats can I generate?', answer: 'You can generate HTML, separate HTML and CSS, or a React component.' }, { question: 'Can I create an icon-only WhatsApp button?', answer: 'Yes. The label can be empty. Generated code should still include an accessible aria-label.' }, { question: 'Can I customize the button color?', answer: 'Yes. Users can choose a color and preview it before copying the code.' }, { question: 'Where should I place the WhatsApp button?', answer: 'It can be inline or floating on the left or right, depending on the website layout.' }, { question: 'Does the button open WhatsApp in a new tab?', answer: 'Yes. Generated links should use target="_blank" and rel="noopener noreferrer".' }]} />
+        <ToolHowItWorksSection heading="How the WhatsApp button maker works" intro="Create a click-to-chat WhatsApp button for your website without writing custom code from scratch." steps={[{ title: 'Add your WhatsApp number', description: 'Choose the country code, enter the phone number, and optionally add a pre-filled message.' }, { title: 'Customize the button', description: 'Choose the label, icon style, color, and placement.' }, { title: 'Copy the code', description: 'Choose Inline HTML, HTML + CSS, or React, then copy the generated code and add it to your website.' }]} />
+        <ToolFaqSection heading="WhatsApp Button Maker FAQs" items={[{ question: 'Can I create a WhatsApp button without coding?', answer: 'Yes. Zapora creates copy-ready code with minimal setup required.' }, { question: 'Which code formats can I generate?', answer: 'You can generate Inline HTML, separate HTML and CSS, or a React component.' }, { question: 'Can I create an icon-only WhatsApp button?', answer: 'Yes. The label can be empty. Generated code should still include an accessible aria-label.' }, { question: 'Can I customize the button color?', answer: 'Yes. Users can choose a color and preview it before copying the code.' }, { question: 'Where should I place the WhatsApp button?', answer: 'It can be inline or floating on the left or right, depending on the website layout.' }, { question: 'Does the button open WhatsApp in a new tab?', answer: 'Yes. Generated links should use target="_blank" and rel="noopener noreferrer".' }]} />
       </section>
     </main>
   );

@@ -1,10 +1,10 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Download, Search, Sparkles, AlertCircle, ExternalLink } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, Check, ChevronDown, Copy, Download, ExternalLink, Link2, QrCode, Search, Sparkles } from 'lucide-react';
 import QRCode from 'qrcode';
 import { trackEvent } from '../lib/trackEvent';
 import { logToGoogleSheets } from '../lib/sheetsLogger';
 import { countryOptions, type CountryOption } from '../data/countryOptions';
-
+import { Button, FieldLabel, Surface, Textarea } from './ui';
 
 const MIN_PHONE_LENGTH = 6;
 const MAX_PHONE_LENGTH = 15;
@@ -48,7 +48,6 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
   const [isCountryOpen, setIsCountryOpen] = useState(false);
   const [countryError, setCountryError] = useState('');
   const [phoneError, setPhoneError] = useState('');
-  const [showCelebration, setShowCelebration] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [qrForegroundColor, setQrForegroundColor] = useState('#000000');
 
@@ -154,7 +153,6 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
     setGeneratedLink(link);
     setCopied(false);
     setDownloadStatus('idle');
-    setShowCelebration(true);
     trackEvent('generate_link', {
       source: 'homepage_generator',
       has_message: Boolean(trimmedMessage),
@@ -175,7 +173,6 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
       user_action_consent: true,
       created_at: new Date().toISOString(),
     });
-    window.setTimeout(() => setShowCelebration(false), 1100);
   };
 
   const copyToClipboard = async () => {
@@ -250,72 +247,60 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
   };
 
   return (
-    <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-12 sm:py-14">
-      <div className="absolute inset-0 opacity-60">
-        <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-green-100 blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-50 blur-3xl"></div>
-      </div>
-
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-7 text-center sm:mb-8">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-100 bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm">
-            <Sparkles className="h-4 w-4" />
-            Fast, clean, and ready to share
+    <section id="generator" className="bg-white py-6 sm:py-8 lg:py-10">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-4 max-w-3xl sm:mb-6">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-800">
+            <Sparkles className="h-3.5 w-3.5" /> Free WhatsApp link generator
           </div>
-          <h2 className="mb-3 text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl">Create Your Free Link</h2>
-          <p className="mx-auto max-w-2xl text-base leading-relaxed text-gray-600 sm:text-lg">
-            Choose a country, add your WhatsApp number, and optionally include a message to generate a clean wa.me link.
+          <h2 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">Create your chat link</h2>
+          <p className="mt-2 text-sm leading-6 text-gray-600 sm:text-base">
+            Pick a country code, enter your WhatsApp number, and add an optional message. Your link and QR code appear here after you generate.
           </p>
         </div>
 
-        <div className="rounded-[32px] border border-gray-200 bg-white/95 p-4 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.98fr_1.02fr] xl:gap-7">
-            <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2.5" ref={dropdownRef}>
-                <label htmlFor="country-dropdown" className="block text-sm font-semibold tracking-wide text-gray-900">
-                  Country / Code <span className="font-medium text-gray-400">(Required)</span>
-                </label>
+        <Surface className="overflow-visible p-4 sm:p-5 lg:p-6">
+          <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(320px,1fr)] lg:gap-6">
+            <div className="min-w-0 space-y-4">
+              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)]">
+                <div className="min-w-0 space-y-1.5" ref={dropdownRef}>
+                  <FieldLabel htmlFor="country-dropdown">Country / Code</FieldLabel>
+                  <div className="relative min-w-0">
+                    <button
+                      id="country-dropdown"
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={isCountryOpen}
+                      aria-controls="country-listbox"
+                      onClick={() => setIsCountryOpen((current) => !current)}
+                      className={`flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-xl border bg-white px-3.5 py-2 text-left text-gray-900 transition duration-150 hover:border-gray-400 focus-visible:outline-none focus-visible:ring-4 ${
+                        countryError ? 'border-rose-300 focus-visible:ring-rose-200' : 'border-gray-300 focus-visible:border-green-500 focus-visible:ring-green-500/15'
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">{selectedCountry ? selectedCountry.country : 'Select a country'}</span>
+                        <span className="block text-xs text-gray-500">{selectedCountry ? selectedCountry.code : 'Pick country code'}</span>
+                      </span>
+                      <ChevronDown className={`h-4 w-4 flex-none text-gray-500 transition-transform ${isCountryOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                <div className="relative">
-                  <button
-                    id="country-dropdown"
-                    type="button"
-                    aria-haspopup="listbox"
-                    aria-expanded={isCountryOpen}
-                    aria-controls="country-listbox"
-                    onClick={() => setIsCountryOpen((current) => !current)}
-                    className={`flex w-full items-center justify-between rounded-2xl border bg-white px-4 py-3.5 text-left text-gray-900 shadow-sm transition-all hover:border-gray-400 focus-visible:outline-none focus-visible:ring-4 ${
-                      countryError ? 'border-rose-300 focus-visible:ring-rose-200' : 'border-gray-300 focus-visible:border-green-500 focus-visible:ring-green-500/20'
-                    }`}
-                  >
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">{selectedCountry ? selectedCountry.country : 'Select a country'}</div>
-                      <div className="text-sm text-gray-500">{selectedCountry ? selectedCountry.code : 'Pick country code'}</div>
-                    </div>
-                    <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${isCountryOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {isCountryOpen && (
-                    <div className="absolute z-20 mt-3 w-full rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
-                      <div className="relative mb-3">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                        <input
-                          ref={searchInputRef}
-                          type="text"
-                          value={countrySearch}
-                          onChange={(e) => setCountrySearch(e.target.value)}
-                          placeholder="Search country or code"
-                          aria-label="Search country"
-                          className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none transition-all focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20"
-                        />
-                      </div>
-
-                      <div id="country-listbox" role="listbox" aria-label="Country options" className="max-h-64 overflow-y-auto rounded-xl border border-gray-100">
-                        {filteredCountries.length > 0 ? (
-                          filteredCountries.map((option) => {
+                    {isCountryOpen ? (
+                      <div className="absolute left-0 right-0 z-20 mt-2 max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
+                        <div className="relative mb-2">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input
+                            ref={searchInputRef}
+                            type="text"
+                            value={countrySearch}
+                            onChange={(e) => setCountrySearch(e.target.value)}
+                            placeholder="Search country or code"
+                            aria-label="Search country"
+                            className="min-h-10 w-full rounded-xl border border-gray-200 py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition focus-visible:border-green-500 focus-visible:ring-4 focus-visible:ring-green-500/15"
+                          />
+                        </div>
+                        <div id="country-listbox" role="listbox" aria-label="Country options" className="max-h-60 overflow-y-auto rounded-xl border border-gray-100">
+                          {filteredCountries.length > 0 ? filteredCountries.map((option) => {
                             const isSelected = option.code === selectedCountry?.code && option.country === selectedCountry.country;
-
                             return (
                               <button
                                 key={`${option.country}-${option.code}`}
@@ -323,219 +308,116 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                                 role="option"
                                 aria-selected={isSelected}
                                 onClick={() => selectCountry(option)}
-                                className={`flex w-full items-center justify-between px-3 py-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/20 ${
-                                  isSelected ? 'bg-green-50 text-green-700' : 'text-gray-700 hover:bg-gray-50'
-                                }`}
+                                className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/20 ${isSelected ? 'bg-green-50 text-green-800' : 'text-gray-700 hover:bg-gray-50'}`}
                               >
-                                <span className="font-medium">{option.country}</span>
-                                <span className="text-gray-500">{option.code}</span>
+                                <span className="min-w-0 truncate font-medium">{option.country}</span>
+                                <span className="flex-none text-gray-500">{option.code}</span>
                               </button>
                             );
-                          })
-                        ) : (
-                          <div className="px-3 py-4 text-sm text-gray-500">No country found for that search.</div>
-                        )}
+                          }) : <div className="px-3 py-4 text-sm text-gray-500">No country found for that search.</div>}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-                {countryError ? <p className="flex items-start gap-2 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4" />{countryError}</p> : null}
-              </div>
-
-              <div className="space-y-2.5">
-                <label htmlFor="phone-number" className="block text-sm font-semibold tracking-wide text-gray-900">
-                  Phone Number <span className="font-medium text-gray-400">(Required)</span>
-                </label>
-                <div
-                  className={`flex items-center rounded-2xl border bg-white px-4 shadow-sm transition-all focus-within:ring-2 ${
-                    phoneError ? 'border-rose-300 focus-within:border-rose-400 focus-within:ring-rose-100' : 'border-gray-300 hover:border-gray-400 focus-within:border-green-500 focus-within:ring-green-500/20'
-                  }`}
-                >
-                  <span className="pr-3 text-sm font-semibold text-gray-500">{selectedCountry?.code ?? '+'}</span>
-                  <input
-                    id="phone-number"
-                    ref={phoneInputRef}
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    pattern="[0-9]*"
-                    aria-invalid={Boolean(phoneError)}
-                    aria-describedby="phone-helper"
-                    value={phoneNumber}
-                    onBlur={() => {
-                      setPhoneTouched(true);
-                      setPhoneError(getPhoneError(phoneNumber));
-                    }}
-                    onChange={(e) => handlePhoneNumberChange(e.target.value)}
-                    placeholder="9876543210"
-                    className="w-full border-none bg-transparent py-3.5 text-gray-900 outline-none"
-                  />
-                </div>
-                <p id="phone-helper" className={`text-sm ${phoneError ? 'flex items-start gap-2 text-rose-700' : 'text-gray-500'}`}>
-                  {phoneError ? <AlertCircle className="mt-0.5 h-4 w-4" aria-hidden="true" /> : null}
-                  {phoneError || 'Use digits only. Include area code when needed.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              <label htmlFor="prefilled-message" className="block text-sm font-semibold tracking-wide text-gray-900">
-                Pre-filled Message <span className="font-medium text-gray-400">(Optional)</span>
-              </label>
-              <textarea
-                id="prefilled-message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Hi! I would like to know more about your service."
-                rows={4}
-                className="w-full resize-none rounded-2xl border border-gray-300 px-4 py-3.5 text-gray-900 outline-none transition-all hover:border-gray-400 focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20"
-              />
-            </div>
-
-            <button
-              onClick={generateLink}
-              disabled={!isFormValid}
-              aria-disabled={!isFormValid}
-              className="w-full rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:text-lg"
-            >
-              Generate WhatsApp Link
-            </button>
-            <a
-              href="/bulk-whatsapp-link-generator"
-              className="inline-flex w-full items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100 sm:text-base"
-            >
-              Try Bulk WhatsApp Links
-            </a>
-
-            </div>
-
-            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-inner sm:p-5 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[520px]`}>
-              {!generatedLink ? (
-                <div className="hidden h-full flex-col items-center justify-center text-center md:flex">
-                  <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
-                    <Sparkles className="h-6 w-6 text-green-600" />
+                    ) : null}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Your result appears here</h3>
-                  <p className="mt-2 max-w-xs text-sm text-gray-600">Generate a link to preview your QR, copy the URL, and download a share-ready code.</p>
+                  {countryError ? <p className="flex items-start gap-2 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4" />{countryError}</p> : null}
                 </div>
-              ) : (
-                <div className="relative space-y-3">
-                {showCelebration && (
-                  <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center" aria-hidden="true">
-                    <div className="success-confetti">
-                      {[...Array(10)].map((_, index) => (
-                        <span key={index} style={{ '--delay': `${index * 45}ms` } as CSSProperties} />
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
-                  <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
-                    Your Generated Link
-                  </label>
-                  <div className="flex flex-col gap-2">
+                <div className="min-w-0 space-y-1.5">
+                  <FieldLabel htmlFor="phone-number">Phone Number</FieldLabel>
+                  <div className={`flex min-h-11 items-center rounded-xl border bg-white px-3.5 transition duration-150 focus-within:ring-4 ${phoneError ? 'border-rose-300 focus-within:border-rose-400 focus-within:ring-rose-100' : 'border-gray-300 hover:border-gray-400 focus-within:border-green-500 focus-within:ring-green-500/15'}`}>
+                    <span className="border-r border-gray-200 pr-2 text-sm font-semibold text-gray-500">{selectedCountry?.code ?? '+'}</span>
                     <input
-                      id="generated-link"
-                      type="text"
-                      value={generatedLink}
-                      readOnly
-                      className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-gray-700 outline-none"
+                      id="phone-number"
+                      ref={phoneInputRef}
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      pattern="[0-9]*"
+                      aria-invalid={Boolean(phoneError)}
+                      aria-describedby="phone-helper"
+                      value={phoneNumber}
+                      onBlur={() => { setPhoneTouched(true); setPhoneError(getPhoneError(phoneNumber)); }}
+                      onChange={(e) => handlePhoneNumberChange(e.target.value)}
+                      placeholder="9876543210"
+                      className="min-w-0 flex-1 border-none bg-transparent px-2 py-2.5 text-sm text-gray-900 outline-none placeholder:text-gray-400"
                     />
                   </div>
+                  <p id="phone-helper" className={`text-sm leading-5 ${phoneError ? 'flex items-start gap-2 text-rose-700' : 'text-gray-500'}`}>
+                    {phoneError ? <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" /> : null}
+                    {phoneError || 'Digits only. Include area code if needed.'}
+                  </p>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <button
-                    onClick={copyToClipboard}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
-                    aria-label="Copy generated WhatsApp link"
-                  >
-                    <Copy className="h-5 w-5" />
-                    {copied ? 'Link Copied' : 'Copy Link'}
-                  </button>
+              <div className="space-y-1.5">
+                <FieldLabel htmlFor="prefilled-message" optional>Pre-filled Message</FieldLabel>
+                <Textarea id="prefilled-message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Hi! I would like to know more about your service." rows={3} />
+                <p className="text-sm text-gray-500">This message is encoded into the link only after you generate.</p>
+              </div>
 
-                  <button
-                    onClick={downloadQrCode}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
-                    aria-label="Download QR code"
-                  >
-                    {downloadStatus === 'success' ? <Check className="h-5 w-5 text-green-600" /> : <Download className="h-5 w-5" />}
-                    {downloadStatus === 'success' ? 'QR Downloaded' : 'Download QR'}
-                  </button>
-                  <button
-                    onClick={openWhatsApp}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white py-3.5 font-semibold text-gray-900 transition-all hover:border-green-400 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20"
-                    aria-label="Open generated WhatsApp link"
-                  >
-                    <ExternalLink className="h-5 w-5 shrink-0" />
-                    Open WhatsApp
-                  </button>
+              <Button onClick={generateLink} disabled={!isFormValid} aria-disabled={!isFormValid} variant="primary" className="w-full text-base" icon={<Link2 className="h-4 w-4" />}>
+                Generate WhatsApp Link
+              </Button>
+            </div>
+
+            <div className="min-w-0 rounded-2xl border border-gray-200 bg-gray-50 p-3 sm:p-4">
+              {!generatedLink ? (
+                <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center">
+                  <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-700"><QrCode className="h-5 w-5" /></div>
+                  <h3 className="text-base font-semibold text-gray-950">Result preview</h3>
+                  <p className="mt-2 max-w-xs text-sm leading-6 text-gray-600">Your generated URL, copy/open actions, and QR download controls will appear here.</p>
                 </div>
-
-                <button
-                  onClick={() => onCustomizeQrCode?.(generatedLink)}
-                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 py-3.5 font-semibold text-emerald-800 transition-all hover:border-emerald-300 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20"
-                  aria-label="Customize QR code on dedicated editor page"
-                >
-                  <Sparkles className="h-5 w-5" />
-                  Customize QR Code
-                </button>
-
-                <p role="status" aria-live="polite" className="min-h-5 text-center text-sm text-gray-600">
-                  {downloadStatus === 'success' && 'QR code downloaded successfully.'}
-                  {downloadStatus === 'error' && 'We could not download the QR code. Please try again.'}
-                </p>
-
-                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 text-center shadow-md sm:p-5">
-                  <p className="mb-4 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <img src={qrImageUrl} alt="QR code for generated WhatsApp link" className="h-56 w-56 sm:h-60 sm:w-60" />
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-green-200 bg-white p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <label htmlFor="generated-link" className="text-sm font-semibold text-gray-900">Generated link</label>
+                      <span aria-live="polite" className={`text-xs font-semibold ${copied ? 'text-green-700' : 'text-gray-500'}`}>{copied ? 'Copied' : 'Ready'}</span>
+                    </div>
+                    <input id="generated-link" type="text" value={generatedLink} readOnly className="w-full min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs leading-5 text-gray-700 outline-none" />
                   </div>
-                </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">QR Color Style</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <Button onClick={copyToClipboard} variant={copied ? 'success' : 'secondary'} aria-label="Copy generated WhatsApp link" icon={copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} className="w-full">{copied ? 'Copied' : 'Copy'}</Button>
+                    <Button onClick={openWhatsApp} variant="primary" aria-label="Open generated WhatsApp link" icon={<ExternalLink className="h-4 w-4" />} className="w-full">Open</Button>
+                    <Button onClick={downloadQrCode} variant="secondary" aria-label="Download QR code" icon={downloadStatus === 'success' ? <Check className="h-4 w-4 text-green-600" /> : <Download className="h-4 w-4" />} className="w-full">{downloadStatus === 'success' ? 'Saved' : 'QR PNG'}</Button>
+                  </div>
+
+                  <p role="status" aria-live="polite" className={`min-h-5 text-center text-sm ${downloadStatus === 'error' ? 'text-rose-700' : 'text-gray-600'}`}>
+                    {downloadStatus === 'success' && 'QR code downloaded successfully.'}
+                    {downloadStatus === 'error' && 'We could not download the QR code. Please try again.'}
+                  </p>
+
+                  <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[auto_minmax(0,1fr)]">
+                    <div className="flex justify-center rounded-xl border border-gray-200 bg-white p-3">
+                      <img src={qrImageUrl} alt="QR code for generated WhatsApp link" className="h-44 w-44 sm:h-52 sm:w-52" />
+                    </div>
+                    <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3">
+                      <p className="text-sm font-semibold text-gray-900">QR color</p>
+                      <p className="mt-1 text-sm text-gray-500">Use the editor for advanced QR styling.</p>
+                      <div className="mt-3 grid grid-cols-6 gap-2">
+                        {qrColorPresets.map((preset) => (
+                          <button key={preset.id} type="button" onClick={() => setQrForegroundColor(preset.value)} aria-label={`Use ${preset.id} for QR code`} className={`relative h-8 w-8 rounded-full border transition duration-150 ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400'}`} style={preset.type === 'blend' ? { backgroundImage: preset.swatch } : { backgroundColor: preset.value }}>
+                            {qrForegroundColor === preset.value ? <span className="absolute inset-0 grid place-items-center text-xs text-white">✓</span> : null}
+                          </button>
+                        ))}
+                      </div>
+                      <label className="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        <span className="font-medium">Custom</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate font-mono text-xs uppercase text-gray-500">{qrForegroundColor}</span>
+                          <input type="color" value={qrForegroundColor} onChange={(event) => setQrForegroundColor(event.target.value)} className="h-8 w-10 cursor-pointer rounded-md border border-gray-300 bg-white p-1" aria-label="Pick custom QR foreground color" />
+                        </span>
+                      </label>
+                      <Button onClick={() => onCustomizeQrCode?.(generatedLink)} variant="success" className="mt-3 w-full" icon={<Sparkles className="h-4 w-4" />} aria-label="Customize QR code on dedicated editor page">Customize QR</Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
-                    {qrColorPresets.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => setQrForegroundColor(preset.value)}
-                        aria-label={`Use ${preset.id} for QR code`}
-                        className={`relative h-9 w-9 rounded-full border transition-all ${qrForegroundColor === preset.value ? 'border-gray-900 ring-2 ring-gray-900/20' : 'border-gray-200 hover:border-gray-400 hover:scale-[1.03]'} ${preset.type === 'blend' ? 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_0_0_1px_rgba(0,0,0,0.12)]' : ''}`}
-                        style={preset.type === 'blend' ? { backgroundImage: preset.swatch } : { backgroundColor: preset.value }}
-                      >
-                        {qrForegroundColor === preset.value ? <span className="absolute inset-0 grid place-items-center text-white">✓</span> : null}
-                      </button>
-                    ))}
-                  </div>
-                  <label className="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
-                    <span className="font-medium">Custom color</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs uppercase text-gray-500">{qrForegroundColor}</span>
-                      <input
-                        type="color"
-                        value={qrForegroundColor}
-                        onChange={(event) => setQrForegroundColor(event.target.value)}
-                        className="h-9 w-12 cursor-pointer rounded-md border border-gray-300 bg-white p-1"
-                        aria-label="Pick custom QR foreground color"
-                      />
-                    </div>
-                  </label>
-                </div>
-
                 </div>
               )}
             </div>
           </div>
-        </div>
+        </Surface>
       </div>
-
     </section>
   );
 }
