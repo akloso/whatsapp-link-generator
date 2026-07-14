@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --zapora-green: 22 163 74;
+    --zapora-ink: 17 24 39;
+    --zapora-muted: 75 85 99;
+    --zapora-surface: 255 255 255;
+    --zapora-border: 229 231 235;
+  }
+}
+
+@layer base {
   html,
   body,
   #root {
@@ -16,74 +26,98 @@
   }
 }
 
-.success-confetti {
-  position: relative;
-  width: 220px;
-  height: 52px;
+@layer base {
+  :root {
+    --zapora-mint: 236 253 245;
+    --zapora-teal: 204 251 241;
+    --zapora-sky: 224 242 254;
+    --zapora-lavender: 237 233 254;
+    --zapora-cream: 255 251 235;
+    --zapora-peach: 255 237 213;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgb(var(--zapora-mint) / 0.9), transparent 34rem),
+      linear-gradient(180deg, #f8fffb 0%, #ffffff 42%, #f8fafc 100%);
+    color: rgb(var(--zapora-ink));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
-.success-confetti span {
-  --x: 0;
+@layer utilities {
+  .zapora-page-bg {
+    background:
+      radial-gradient(circle at 12% 0%, rgb(var(--zapora-mint) / 0.85), transparent 24rem),
+      radial-gradient(circle at 90% 8%, rgb(var(--zapora-sky) / 0.55), transparent 22rem),
+      linear-gradient(180deg, #fbfffd 0%, #ffffff 48%, #f8fafc 100%);
+  }
+
+  .zapora-warm-bg {
+    background:
+      radial-gradient(circle at 12% 0%, rgb(var(--zapora-cream) / 0.9), transparent 24rem),
+      linear-gradient(180deg, #fffdf7 0%, #ffffff 54%, #f8fafc 100%);
+  }
+
+  .zapora-interactive {
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  }
+
+  .zapora-interactive:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.zapora-confetti {
+  pointer-events: none;
   position: absolute;
-  left: 50%;
-  top: 20px;
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  opacity: 0;
-  background: #10b981;
-  animation: confetti-pop 720ms ease-out var(--delay, 0ms) forwards;
+  inset-inline: 0;
+  top: -0.5rem;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
 }
 
-.success-confetti span:nth-child(2n) {
-  background: #22c55e;
+.zapora-confetti span {
+  --i: 0;
+  position: absolute;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: hsl(calc(142 + (var(--i) * 18)) 72% 48%);
+  transform: translateY(0) rotate(0deg);
+  animation: zapora-confetti-pop 1150ms ease-out forwards;
+  animation-delay: calc(var(--i) * 22ms);
 }
 
-.success-confetti span:nth-child(3n) {
-  background: #34d399;
-}
+.zapora-confetti span:nth-child(3n) { border-radius: 0.12rem; background: #38bdf8; }
+.zapora-confetti span:nth-child(4n) { background: #a78bfa; }
+.zapora-confetti span:nth-child(5n) { background: #fb923c; }
 
-.success-confetti span:nth-child(1) {
-  --x: -82px;
-}
-.success-confetti span:nth-child(2) {
-  --x: -60px;
-}
-.success-confetti span:nth-child(3) {
-  --x: -42px;
-}
-.success-confetti span:nth-child(4) {
-  --x: -24px;
-}
-.success-confetti span:nth-child(5) {
-  --x: -8px;
-}
-.success-confetti span:nth-child(6) {
-  --x: 10px;
-}
-.success-confetti span:nth-child(7) {
-  --x: 28px;
-}
-.success-confetti span:nth-child(8) {
-  --x: 45px;
-}
-.success-confetti span:nth-child(9) {
-  --x: 63px;
-}
-.success-confetti span:nth-child(10) {
-  --x: 82px;
-}
-
-@keyframes confetti-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, 0) scale(0.6);
-  }
-  30% {
-    opacity: 0.9;
-  }
+@keyframes zapora-confetti-pop {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.7) rotate(0deg); }
+  15% { opacity: 1; }
   100% {
     opacity: 0;
-    transform: translate(calc(-50% + var(--x)), -34px) scale(1);
+    transform: translate(calc((var(--i) - 7) * 13px), calc(34px + (var(--i) % 4) * 8px)) scale(1) rotate(160deg);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zapora-confetti { display: none; }
+}
+
+@keyframes zapora-result-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

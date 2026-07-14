@@ -312,7 +312,7 @@ function App() {
         extra={
           <a
             href="mailto:hizapora@gmail.com"
-            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
           >
             Email Support
           </a>
@@ -376,28 +376,25 @@ type InfoPageProps = {
 
 function InfoPage({ icon: Icon, title, subtitle, sections, extra }: InfoPageProps) {
   return (
-    <main className="relative overflow-hidden bg-gradient-to-b from-white via-green-50/50 to-white py-16 sm:py-20">
-      <div className="absolute inset-0 opacity-40">
-        <div className="absolute right-10 top-12 h-72 w-72 rounded-full bg-green-100 blur-3xl"></div>
-      </div>
-      <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <article className="rounded-[32px] border border-gray-200 bg-white p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)] sm:p-8 lg:p-10">
-          <header className="mb-8 border-b border-gray-200 pb-6">
-            <div className="mb-4 inline-flex rounded-2xl bg-green-100 p-3 text-green-700">
-              <Icon className="h-6 w-6" />
+    <main className="bg-slate-50 py-8 sm:py-10">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+        <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_16px_48px_-32px_rgba(15,23,42,0.35)] sm:p-6">
+          <header className="mb-6 border-b border-gray-200 pb-5">
+            <div className="mb-3 inline-flex rounded-xl bg-green-50 p-2.5 text-green-700">
+              <Icon className="h-5 w-5" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl">{title}</h1>
-            <p className="mt-3 text-base text-gray-600">{subtitle}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">{title}</h1>
+            <p className="mt-2 text-sm leading-6 text-gray-600 sm:text-base">{subtitle}</p>
           </header>
-          <div className="space-y-6">
+          <div className="space-y-5">
             {sections.map((section) => (
               <section key={section.heading} className="space-y-2">
-                <h2 className="text-xl font-semibold text-gray-900">{section.heading}</h2>
-                <p className="leading-relaxed text-gray-600">{section.content}</p>
+                <h2 className="text-lg font-semibold text-gray-900">{section.heading}</h2>
+                <p className="text-sm leading-6 text-gray-600 sm:text-base">{section.content}</p>
               </section>
             ))}
           </div>
-          {extra ? <div className="mt-8 border-t border-gray-200 pt-6">{extra}</div> : null}
+          {extra ? <div className="mt-6 border-t border-gray-200 pt-5">{extra}</div> : null}
         </article>
       </div>
     </main>

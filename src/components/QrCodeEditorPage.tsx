@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
 import { trackEvent } from '../lib/trackEvent';
+import { Button, Surface, TextInput, Textarea } from './ui';
 
 type Preset = {
   name: string;
@@ -74,6 +75,9 @@ function QrCodeEditorPage() {
   const [status, setStatus] = useState('');
   const [importStatus, setImportStatus] = useState('');
   const [isImportingQr, setIsImportingQr] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [centerImageFileName, setCenterImageFileName] = useState('');
+  const [exportStatus, setExportStatus] = useState('');
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -116,6 +120,7 @@ function QrCodeEditorPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setCenterImageFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
       setCenterImage(reader.result as string);
@@ -149,10 +154,12 @@ function QrCodeEditorPage() {
   };
 
   const handleImportQr = async (file: File) => {
+    setImportFileName(file.name);
     setImportStatus('Reading QR image...');
 
     const acceptedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!acceptedTypes.includes(file.type)) {
+      setImportFileName(file.name);
       setImportStatus('Please upload a PNG, JPG, or WEBP QR image.');
       return;
     }
@@ -347,13 +354,8 @@ function QrCodeEditorPage() {
           const emojiSize = Math.round(logoSize * 0.82);
           ctx.font = `${emojiSize}px "Apple Color Emoji","Segoe UI Emoji",Inter,sans-serif`;
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'alphabetic';
-          const metrics = ctx.measureText(centerEmoji);
-          const hasMetrics = Number.isFinite(metrics.actualBoundingBoxAscent) && Number.isFinite(metrics.actualBoundingBoxDescent);
-          const offsetY = hasMetrics
-            ? (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
-            : emojiSize * 0.3;
-          ctx.fillText(centerEmoji, centerX, centerY + offsetY);
+          ctx.textBaseline = 'middle';
+          ctx.fillText(centerEmoji, centerX, centerY + emojiSize * 0.04);
         } else if (centerType === 'image' && centerImage) {
           const image = await loadImage(centerImage);
           const ratio = Math.min(logoSize / image.width, logoSize / image.height);
@@ -389,6 +391,7 @@ function QrCodeEditorPage() {
 
   const handleDownload = async () => {
     if (!isReady) return;
+    setExportStatus('Preparing export…');
 
     await renderPreview();
     const canvas = previewRef.current;
@@ -425,6 +428,8 @@ function QrCodeEditorPage() {
       source: 'qr_editor',
       export_format: format.toLowerCase(),
     });
+    setExportStatus(`${format} export ready.`);
+    window.setTimeout(() => setExportStatus(''), 2200);
   };
 
   const scrollToEditor = () => {
@@ -432,40 +437,41 @@ function QrCodeEditorPage() {
   };
 
   return (
-    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-white py-5 sm:py-12">
-      <div className="mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8">
-        <section className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] sm:mb-8 sm:rounded-[28px] sm:px-7 sm:py-6">
+    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-[radial-gradient(circle_at_12%_0%,rgba(224,242,254,0.9),transparent_24rem),linear-gradient(180deg,#f8fcff_0%,#ffffff_50%,#f8fafc_100%)] py-6 sm:py-8 lg:py-10">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+        <section className="mb-5 rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-[0_16px_48px_-32px_rgba(15,23,42,0.35)] sm:mb-6 sm:px-5 sm:py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              <p className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-green-800">
                 Zapora Studio
               </p>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-950 sm:text-3xl">
                 QR Code Editor
               </h1>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-gray-600">
                 Design and export a clean, premium, scannable QR in one place.
               </p>
             </div>
 
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">
+            <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700">
               <Palette className="h-3.5 w-3.5 text-violet-600" />
               Premium editor
             </div>
           </div>
         </section>
 
-        <section ref={editorSectionRef} className="grid gap-4 sm:gap-6 lg:grid-cols-[420px_1fr]">
-          <div className="min-w-0 space-y-4 sm:space-y-5">
+        <section ref={editorSectionRef} className="grid gap-5 lg:grid-cols-[minmax(0,0.88fr)_minmax(320px,1fr)] lg:gap-6">
+          <div className="min-w-0 space-y-4">
             <Section title="Content">
-              <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100">
-                <span className="text-sm font-semibold text-slate-900">Upload existing QR</span>
-                <span className="mt-1 block text-xs text-slate-600">
+              <label className="block rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-left transition hover:bg-gray-100">
+                <span className="text-sm font-semibold text-gray-900">Upload existing QR</span>
+                <span className="mt-1 block text-xs text-gray-600">
                   Upload a QR image to rebuild it as an editable Zapora QR.
                 </span>
-                <span className="mt-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                <span className="mt-2 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">
                   <ImageIcon className="h-3.5 w-3.5" /> {isImportingQr ? 'Importing…' : 'Choose QR image'}
                 </span>
+                {importFileName ? <span className="mt-2 block truncate text-xs font-medium text-gray-700">Selected: {importFileName}</span> : null}
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/jpg,image/webp"
@@ -476,47 +482,47 @@ function QrCodeEditorPage() {
                     }
                     event.currentTarget.value = '';
                   }}
-                  className="hidden"
+                  className="sr-only"
                 />
               </label>
               {importStatus ? (
-                <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">{importStatus}</p>
+                <p className="mt-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">{importStatus}</p>
               ) : null}
 
               <Field label="Link or text">
-                <input
+                <TextInput
                   value={rawContent}
                   onChange={(event) => handleRawContentChange(event.target.value)}
                   placeholder="https://wa.me/91XXXXXXXXXX"
-                  className="zapora-input"
+                  className=""
                 />
               </Field>
 
               <Field label="WhatsApp message">
-                <textarea
+                <Textarea
                   value={message}
                   onChange={(event) => handleMessageChange(event.target.value)}
                   rows={3}
                   placeholder="Optional pre-filled WhatsApp message"
-                  className="zapora-input min-h-[84px] resize-none sm:min-h-[96px]"
+                  className="min-h-[88px]"
                 />
               </Field>
 
               <Field label="Title">
-                <input
+                <TextInput
                   value={title}
                   maxLength={40}
                   onChange={(event) => setTitle(event.target.value)}
-                  className="zapora-input"
+                  className=""
                 />
               </Field>
 
               <Field label="Subtitle">
-                <input
+                <TextInput
                   value={subtitle}
                   maxLength={60}
                   onChange={(event) => setSubtitle(event.target.value)}
-                  className="zapora-input"
+                  className=""
                 />
               </Field>
             </Section>
@@ -527,17 +533,18 @@ function QrCodeEditorPage() {
                   <button
                     key={presetOption.name}
                     onClick={() => applyPreset(presetOption)}
+                    aria-pressed={preset.name === presetOption.name}
                     className={`min-w-0 rounded-lg border p-1.5 text-left transition sm:p-2 ${
                       preset.name === presetOption.name
-                        ? 'border-slate-900 bg-slate-50 shadow-sm'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'border-gray-950 bg-gray-50 font-semibold shadow-sm ring-2 ring-gray-950/10'
+                        : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    <div className="flex h-5 overflow-hidden rounded-md ring-1 ring-slate-200 sm:h-6">
+                    <div className="flex h-5 overflow-hidden rounded-md ring-1 ring-gray-200 sm:h-6">
                       <div className="flex-1" style={{ background: presetOption.banner }} />
                       <div className="flex-1" style={{ background: presetOption.fg }} />
                     </div>
-                    <p className="mt-1 truncate text-[10px] font-medium text-slate-800 sm:text-xs">{presetOption.name}</p>
+                    <p className="mt-1 truncate text-[10px] font-medium text-gray-800 sm:text-xs">{presetOption.name}</p>
                   </button>
                 ))}
               </div>
@@ -554,10 +561,11 @@ function QrCodeEditorPage() {
                   <button
                     key={type}
                     onClick={() => setCenterType(type)}
+                    aria-pressed={centerType === type}
                     className={`min-w-0 rounded-xl border px-2.5 py-2 text-[11px] font-medium capitalize transition sm:px-3 sm:text-xs ${
                       centerType === type
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                        ? 'border-gray-950 bg-gray-950 text-white'
+                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     {type === 'none' ? (
@@ -581,8 +589,9 @@ function QrCodeEditorPage() {
                     <button
                       key={emoji}
                       onClick={() => setCenterEmoji(emoji)}
-                      className={`flex aspect-square items-center justify-center rounded-lg text-xl transition ${
-                        centerEmoji === emoji ? 'bg-emerald-50 ring-1 ring-emerald-500' : 'hover:bg-slate-50'
+                      aria-pressed={centerEmoji === emoji}
+                      className={`flex aspect-square items-center justify-center rounded-lg text-xl leading-none transition ${
+                        centerEmoji === emoji ? 'bg-emerald-50 ring-1 ring-emerald-500' : 'hover:bg-gray-50'
                       }`}
                     >
                       {emoji}
@@ -593,19 +602,21 @@ function QrCodeEditorPage() {
 
               {centerType === 'image' ? (
                 <div className="mt-3 space-y-2">
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600 transition hover:bg-slate-100">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-600 transition hover:bg-gray-100">
                     <ImageIcon className="h-4 w-4" />
                     {centerImage ? 'Replace image' : 'Upload image (PNG, JPG, WEBP)'}
-                    <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
+                    <input type="file" accept="image/*" onChange={onUpload} className="sr-only" />
                   </label>
+                  {centerImageFileName ? <p className="truncate text-xs font-medium text-gray-700">Selected: {centerImageFileName}</p> : null}
 
                   {centerImage ? (
                     <button
                       onClick={() => {
                         setCenterImage(null);
+                        setCenterImageFileName('');
                         setCenterType('none');
                       }}
-                      className="inline-flex items-center gap-1.5 text-xs text-slate-500 transition hover:text-red-600"
+                      className="inline-flex items-center gap-1.5 text-xs text-gray-500 transition hover:text-red-600"
                     >
                       <Trash2 className="h-3.5 w-3.5" /> Remove image
                     </button>
@@ -616,11 +627,11 @@ function QrCodeEditorPage() {
           </div>
 
           <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
+            <div className="rounded-2xl border border-gray-200 bg-sky-50/60 p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live preview</p>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Live preview</p>
+                  <p className="mt-1 text-sm text-gray-600">
                     {size.name} · {size.ratio}
                   </p>
                 </div>
@@ -630,24 +641,25 @@ function QrCodeEditorPage() {
                     <button
                       key={sizeOption.name}
                       onClick={() => setSize(sizeOption)}
+                      aria-pressed={size.name === sizeOption.name}
                       className={`min-w-0 rounded-xl border px-2 py-2 text-left transition sm:px-3 ${
                         size.name === sizeOption.name
-                          ? 'border-slate-900 bg-white text-slate-950 shadow-sm'
-                          : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
+                          ? 'border-gray-950 bg-white text-gray-950 shadow-sm'
+                          : 'border-gray-200 bg-white/70 text-gray-600 hover:bg-white'
                       }`}
                     >
                       <p className="text-[11px] font-semibold leading-tight">{sizeOption.name}</p>
-                      <p className="text-[10px] text-slate-500">{sizeOption.ratio}</p>
+                      <p className="text-[10px] text-gray-500">{sizeOption.ratio}</p>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/70 p-3 sm:rounded-[28px] sm:p-6">
+              <div className="max-w-full overflow-hidden rounded-2xl border border-sky-100 bg-white/80 p-3 sm:rounded-[28px] sm:p-6">
                 <div className="flex w-full justify-center">
                 {isReady ? (
                   <div
-                    className="w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200 sm:rounded-[24px]"
+                    className="w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-gray-200 sm:rounded-[24px]"
                     style={{
                       aspectRatio: `${size.w}/${size.h}`,
                       width: size.ratio === '9:16' ? 'min(100%, 220px)' : size.ratio === '4:5' ? 'min(100%, 280px)' : 'min(100%, 300px)',
@@ -657,22 +669,22 @@ function QrCodeEditorPage() {
                     <canvas ref={previewRef} className="h-full w-full" />
                   </div>
                 ) : (
-                  <div className="flex min-h-[300px] w-full items-center justify-center rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500 sm:min-h-[420px] sm:rounded-[24px] sm:px-6">
+                  <div className="flex min-h-[300px] w-full items-center justify-center rounded-[20px] border border-dashed border-gray-300 bg-gray-50 px-4 text-center text-sm text-gray-500 sm:min-h-[420px] sm:rounded-[24px] sm:px-6">
                     Add a link or text to generate your QR preview.
                   </div>
                 )}
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:mt-5 sm:rounded-[24px] sm:p-5">
+              <div className="mt-3 rounded-2xl border border-sky-100 bg-white p-3.5 shadow-sm sm:rounded-[24px] sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Download</p>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Download</p>
+                    <p className="mt-1 text-sm text-gray-600">
                       Export your QR in a clean, presentation-ready format.
                     </p>
                   </div>
-                  <ArrowUpRight className="h-4 w-4 text-slate-400" />
+                  <ArrowUpRight className="h-4 w-4 text-gray-400" />
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
@@ -680,10 +692,11 @@ function QrCodeEditorPage() {
                     <button
                       key={formatOption}
                       onClick={() => setFormat(formatOption)}
+                      aria-pressed={format === formatOption}
                       className={`min-w-0 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
                         format === formatOption
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                          ? 'border-gray-950 bg-gray-950 text-white'
+                          : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       {formatOption}
@@ -691,20 +704,23 @@ function QrCodeEditorPage() {
                   ))}
                 </div>
 
-                <button
+                <Button
                   onClick={handleDownload}
                   disabled={!isReady}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#16a34a_0%,#059669_100%)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(5,150,105,0.8)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-4 sm:py-3.5"
+                  variant="primary"
+                  className="mt-3 w-full sm:mt-4"
+                  icon={<Download className="h-4 w-4" />}
                 >
-                  <Download className="h-4 w-4" /> Download QR ({format})
-                </button>
+                  Download QR ({format})
+                </Button>
 
-                <p className="mt-3 text-center text-xs text-slate-500">
+                <p className="mt-3 text-center text-xs text-gray-500">
                   High error correction enabled · Safe scan area protected
                 </p>
+                {exportStatus ? <p role="status" aria-live="polite" className="mt-2 text-center text-xs font-medium text-green-700">{exportStatus}</p> : null}
               </div>
 
-              {status ? <p className="mt-4 text-sm text-slate-500">{status}</p> : null}
+              {status ? <p className="mt-4 text-sm text-gray-500">{status}</p> : null}
             </div>
           </div>
         </section>
@@ -715,15 +731,15 @@ function QrCodeEditorPage() {
               <p className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
                 QR Code Editor
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[1.9rem]">
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-gray-950 sm:text-[1.9rem]">
                 Design QR codes worth scanning.
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+              <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:text-[15px]">
                 A premium QR design studio built into Zapora. Add a title, subtitle, brand colors, and a center
                 logo — all while keeping the QR safely scannable.
               </p>
 
-              <div className="mt-4 grid gap-2 text-sm text-slate-700">
+              <div className="mt-4 grid gap-2 text-sm text-gray-700">
                 <FeatureBullet text="Color presets and custom picker" />
                 <FeatureBullet text="Title & subtitle on a soft top banner" />
                 <FeatureBullet text="Center emoji, icon, or uploaded logo" />
@@ -731,12 +747,9 @@ function QrCodeEditorPage() {
                 <FeatureBullet text="Always optimized for safe scanning" />
               </div>
 
-              <button
-                onClick={scrollToEditor}
-                className="mt-5 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_30px_-20px_rgba(5,150,105,0.8)] transition hover:bg-emerald-700"
-              >
+              <Button onClick={scrollToEditor} variant="primary" className="mt-5">
                 Customize QR Code
-              </button>
+              </Button>
             </div>
 
             <div className="hidden min-h-[220px] items-center justify-center lg:flex">
@@ -745,10 +758,10 @@ function QrCodeEditorPage() {
           </div>
 
           <div>
-            <h3 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
+            <h3 className="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl">
               Built for every kind of conversation
             </h3>
-            <p className="mt-1.5 text-sm text-slate-600 sm:text-[15px]">
+            <p className="mt-1.5 text-sm text-gray-600 sm:text-[15px]">
               From storefronts to social bios — Zapora fits anywhere a chat starts.
             </p>
 
@@ -767,24 +780,6 @@ function QrCodeEditorPage() {
 
       <canvas ref={qrCanvasRef} className="hidden" />
 
-      <style>{`
-        .zapora-input {
-          width: 100%;
-          border-radius: 0.9rem;
-          border: 1px solid rgb(203 213 225);
-          background: #ffffff;
-          padding: 0.85rem 1rem;
-          font-size: 0.875rem;
-          color: rgb(15 23 42);
-          outline: none;
-          transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-
-        .zapora-input:focus {
-          border-color: rgb(16 185 129);
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
-        }
-      `}</style>
     </main>
   );
 }
@@ -800,17 +795,17 @@ function FeatureBullet({ text }: { text: string }) {
 
 function PromoMockup() {
   return (
-    <div className="relative w-full max-w-[290px] rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_22px_45px_-38px_rgba(15,23,42,0.55)]">
+    <div className="relative w-full max-w-[290px] rounded-[26px] border border-gray-200 bg-white p-4 shadow-[0_22px_45px_-38px_rgba(15,23,42,0.55)]">
       <div className="mb-3 rounded-xl bg-emerald-500 px-3 py-2 text-center text-xs font-semibold text-white">
         Scan to chat
       </div>
-      <div className="rounded-2xl border border-slate-200 p-4">
-        <div className="aspect-square rounded-xl bg-slate-100 p-3">
+      <div className="rounded-2xl border border-gray-200 p-4">
+        <div className="aspect-square rounded-xl bg-gray-100 p-3">
           <div className="grid h-full grid-cols-7 gap-1.5">
             {Array.from({ length: 49 }).map((_, idx) => (
               <span
                 key={idx}
-                className={`rounded-[3px] ${idx % 3 === 0 || idx % 5 === 0 ? 'bg-slate-900' : 'bg-white ring-1 ring-slate-200'}`}
+                className={`rounded-[3px] ${idx % 3 === 0 || idx % 5 === 0 ? 'bg-gray-950' : 'bg-white ring-1 ring-gray-200'}`}
               />
             ))}
           </div>
@@ -825,28 +820,28 @@ function PromoMockup() {
 
 function UseCaseCard({ icon: Icon, title }: { icon: React.ComponentType<{ className?: string }>; title: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_14px_25px_-22px_rgba(15,23,42,0.35)] sm:rounded-2xl sm:px-3.5">
+    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-[0_14px_25px_-22px_rgba(15,23,42,0.35)] sm:rounded-2xl sm:px-3.5">
       <div className="rounded-full bg-emerald-50 p-2 ring-1 ring-emerald-100">
         <Icon className="h-4 w-4 text-emerald-700" />
       </div>
-      <p className="text-sm font-medium text-slate-800">{title}</p>
+      <p className="text-sm font-medium text-gray-800">{title}</p>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.3)] sm:rounded-[24px] sm:p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</h3>
+    <Surface className="min-w-0 p-4 sm:p-5">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{title}</h3>
       <div className="mt-3 space-y-3 sm:mt-4">{children}</div>
-    </div>
+    </Surface>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-gray-700">{label}</span>
       {children}
     </label>
   );
@@ -863,9 +858,9 @@ function ColorField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-700">{label}</span>
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5">
-        <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-md border border-slate-300" style={{ backgroundColor: value }}>
+      <span className="mb-1.5 block text-xs font-medium text-gray-700">{label}</span>
+      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1.5">
+        <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-md border border-gray-300" style={{ backgroundColor: value }}>
           <input
             type="color"
             value={value}
@@ -877,7 +872,7 @@ function ColorField({
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="flex-1 bg-transparent text-xs text-slate-700 outline-none"
+          className="min-w-0 flex-1 bg-transparent font-mono text-xs uppercase text-gray-700 outline-none"
         />
       </div>
     </label>
