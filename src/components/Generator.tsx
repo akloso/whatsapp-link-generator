@@ -250,14 +250,14 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
   };
 
   return (
-    <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-12 sm:py-14">
+    <section id="generator" className="relative overflow-hidden bg-gradient-to-b from-gray-50 via-white to-white py-9 sm:py-11">
       <div className="absolute inset-0 opacity-60">
         <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-green-100 blur-3xl"></div>
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-50 blur-3xl"></div>
       </div>
 
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-7 text-center sm:mb-8">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-5 text-center sm:mb-6">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-100 bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm">
             <Sparkles className="h-4 w-4" />
             Fast, clean, and ready to share
@@ -268,8 +268,8 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
           </p>
         </div>
 
-        <div className="rounded-[32px] border border-gray-200 bg-white/95 p-4 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6 xl:grid-cols-[0.98fr_1.02fr] xl:gap-7">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-emerald-950/[0.04] sm:p-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-5 xl:grid-cols-[0.95fr_1.05fr]">
             <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2.5" ref={dropdownRef}>
@@ -285,7 +285,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                     aria-expanded={isCountryOpen}
                     aria-controls="country-listbox"
                     onClick={() => setIsCountryOpen((current) => !current)}
-                    className={`flex w-full items-center justify-between rounded-2xl border bg-white px-4 py-3.5 text-left text-gray-900 shadow-sm transition-all hover:border-gray-400 focus-visible:outline-none focus-visible:ring-4 ${
+                    className={`flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2.5 text-left text-gray-900 shadow-sm transition-all hover:border-gray-400 focus-visible:outline-none focus-visible:ring-4 ${
                       countryError ? 'border-rose-300 focus-visible:ring-rose-200' : 'border-gray-300 focus-visible:border-green-500 focus-visible:ring-green-500/20'
                     }`}
                   >
@@ -388,7 +388,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Hi! I would like to know more about your service."
                 rows={4}
-                className="w-full resize-none rounded-2xl border border-gray-300 px-4 py-3.5 text-gray-900 outline-none transition-all hover:border-gray-400 focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20"
+                className="w-full resize-none rounded-xl border border-gray-300 px-3 py-2.5 text-gray-900 outline-none transition-all hover:border-gray-400 focus-visible:border-green-500 focus-visible:ring-2 focus-visible:ring-green-500/20"
               />
             </div>
 
@@ -396,20 +396,20 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
               onClick={generateLink}
               disabled={!isFormValid}
               aria-disabled={!isFormValid}
-              className="w-full rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4 text-base font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:text-lg"
+              className="w-full rounded-xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:text-lg"
             >
               Generate WhatsApp Link
             </button>
             <a
               href="/bulk-whatsapp-link-generator"
-              className="inline-flex w-full items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100 sm:text-base"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 sm:text-base"
             >
               Try Bulk WhatsApp Links
             </a>
 
             </div>
 
-            <div className={`relative rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-inner sm:p-5 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[520px]`}>
+            <div className={`relative rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-950/[0.04] sm:p-5 ${generatedLink ? "block" : "hidden md:block"} md:min-h-[420px]`}>
               {!generatedLink ? (
                 <div className="hidden h-full flex-col items-center justify-center text-center md:flex">
                   <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
@@ -430,7 +430,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                   </div>
                 )}
 
-                <div className="rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
+                <div className="rounded-2xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
                   <label htmlFor="generated-link" className="mb-3 block text-sm font-semibold tracking-wide text-gray-900">
                     Your Generated Link
                   </label>
@@ -487,7 +487,7 @@ export default function Generator({ onCustomizeQrCode }: GeneratorProps) {
                   {downloadStatus === 'error' && 'We could not download the QR code. Please try again.'}
                 </p>
 
-                <div className="flex flex-col items-center rounded-3xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 text-center shadow-md sm:p-5">
+                <div className="flex flex-col items-center rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 text-center shadow-md sm:p-5">
                   <p className="mb-4 text-sm font-medium text-gray-600">Scan this QR code with your phone camera or WhatsApp.</p>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                     <img src={qrImageUrl} alt="QR code for generated WhatsApp link" className="h-56 w-56 sm:h-60 sm:w-60" />

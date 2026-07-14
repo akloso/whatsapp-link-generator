@@ -13,13 +13,13 @@ type FaqItem = {
 
 export function ToolHowItWorksSection({ heading, intro, steps }: { heading: string; intro: string; steps: Step[] }) {
   return (
-    <section className="mt-8 rounded-2xl border border-emerald-100 bg-white p-4 sm:mt-10 sm:p-6">
+    <section className="mt-7 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-950/[0.03] sm:mt-9 sm:p-5">
       <h2 className="text-xl font-bold tracking-tight text-gray-950 sm:text-2xl">{heading}</h2>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">{intro}</p>
 
-      <div className="mt-4 grid gap-3 sm:mt-5 md:grid-cols-3">
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
         {steps.map((step, idx) => (
-          <article key={step.title} className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3.5 sm:p-4">
+          <article key={step.title} className="rounded-xl bg-emerald-50/50 p-3.5 ring-1 ring-emerald-100">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Step {idx + 1}</p>
             <h3 className="mt-1 text-sm font-semibold text-gray-900 sm:text-base">{step.title}</h3>
             <p className="mt-1.5 text-xs leading-relaxed text-gray-600 sm:text-sm">{step.description}</p>
@@ -34,7 +34,7 @@ export function ToolFaqSection({ heading, items }: { heading: string; items: Faq
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 sm:mt-8 sm:p-6">
+    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-emerald-950/[0.03] sm:mt-7 sm:p-5">
       <h2 className="text-xl font-bold tracking-tight text-gray-950 sm:text-2xl">{heading}</h2>
 
       <div className="mt-4 space-y-2.5 sm:mt-5">
@@ -44,7 +44,7 @@ export function ToolFaqSection({ heading, items }: { heading: string; items: Faq
           const isOpen = openIndex === index;
 
           return (
-            <article key={faq.question} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <article key={faq.question} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               <button
                 id={buttonId}
                 type="button"

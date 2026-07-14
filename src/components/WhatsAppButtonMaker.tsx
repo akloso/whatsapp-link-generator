@@ -1,8 +1,9 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, MessageCircle, Search } from 'lucide-react';
+import { Check, ChevronDown, Copy, MessageCircle, Search, Wand2 } from 'lucide-react';
 import { countryOptions } from '../data/countryOptions';
 import { trackEvent } from '../lib/trackEvent';
 import { ToolFaqSection, ToolHowItWorksSection } from './ToolPageSupportSections';
+import { pageShell, ToolPageIntro } from './uiSystem';
 
 type ButtonStyle = 'primary' | 'dark' | 'light' | 'outline' | 'minimal';
 type ButtonShape = 'rounded' | 'pill' | 'square-soft';
@@ -173,16 +174,12 @@ export default function WhatsAppButtonMaker() {
   };
 
   return (
-    <main className="overflow-x-hidden bg-gradient-to-b from-white via-green-50/35 to-white py-8 sm:py-12">
-      <section className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-        <header className="mb-5 max-w-3xl sm:mb-7">
-          <p className="mb-2 inline-flex rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">Free WhatsApp website widget</p>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-4xl">WhatsApp Click-to-Chat Button Maker</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-600 sm:text-base">Design a compact WhatsApp button, preview it safely, then copy HTML, HTML + CSS, or React code for your website.</p>
-        </header>
+    <main className="overflow-x-hidden bg-gradient-to-b from-white via-green-50/30 to-white py-8 sm:py-12">
+      <section className={pageShell}>
+        <ToolPageIntro icon={Wand2} eyebrow="Free WhatsApp website widget" title="WhatsApp Click-to-Chat Button Maker" description="Design a compact WhatsApp button, preview it safely, then copy Inline HTML, HTML + CSS, or React code for your website." />
 
-        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] lg:items-start">
-          <article className="min-w-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
+          <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-emerald-950/[0.03] sm:p-5">
             <div className="space-y-5">
               <ConfigSection title="WhatsApp details">
                 <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
@@ -238,7 +235,7 @@ export default function WhatsAppButtonMaker() {
           </article>
 
           <aside className="min-w-0 space-y-5 lg:sticky lg:top-5">
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Live preview">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-emerald-950/[0.03] sm:p-5" aria-label="Live preview">
               <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-base font-bold text-gray-950">Live Preview</h2><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{placementLabels[placement]}</span></div>
               <div className="relative h-56 overflow-hidden rounded-2xl border border-gray-200 bg-[linear-gradient(135deg,#f8fafc_0%,#f8fafc_50%,#ecfdf5_100%)] p-4" aria-hidden="true">
                 <div className="absolute inset-x-0 top-0 h-8 border-b border-gray-200 bg-white" /><div className="absolute left-3 top-3 flex gap-1.5"><span className="h-2 w-2 rounded-full bg-red-300" /><span className="h-2 w-2 rounded-full bg-amber-300" /><span className="h-2 w-2 rounded-full bg-emerald-300" /></div>
@@ -250,8 +247,8 @@ export default function WhatsAppButtonMaker() {
               {phoneError ? <p className="mt-2 text-xs font-medium text-rose-600">Add a valid number to enable copying generated code.</p> : null}
             </section>
 
-            <section className="min-w-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Generated code">
-              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-base font-bold text-gray-950">Generated code</h2><div role="tablist" aria-label="Code format" className="grid grid-cols-3 rounded-xl bg-gray-100 p-1 text-xs font-semibold text-gray-600">{(['html', 'html-css', 'react'] as CodeFormat[]).map((format) => <button key={format} type="button" role="tab" aria-selected={codeFormat === format} onClick={() => setCodeFormat(format)} className={`rounded-lg px-2.5 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 ${codeFormat === format ? 'bg-white text-emerald-700 shadow-sm' : 'hover:text-gray-900'}`}>{format === 'html-css' ? 'HTML + CSS' : format === 'react' ? 'React' : 'HTML'}</button>)}</div></div>
+            <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-emerald-950/[0.03] sm:p-5" aria-label="Generated code">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-base font-bold text-gray-950">Generated code</h2><div role="tablist" aria-label="Code format" className="grid grid-cols-3 rounded-xl bg-gray-100 p-1 text-xs font-semibold text-gray-600">{(['html', 'html-css', 'react'] as CodeFormat[]).map((format) => <button key={format} type="button" role="tab" aria-selected={codeFormat === format} onClick={() => setCodeFormat(format)} className={`rounded-lg px-2.5 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 ${codeFormat === format ? 'bg-white text-emerald-700 shadow-sm' : 'hover:text-gray-900'}`}>{format === 'html-css' ? 'HTML + CSS' : format === 'react' ? 'React' : 'Inline HTML'}</button>)}</div></div>
               <pre className="max-h-64 max-w-full overflow-auto rounded-2xl bg-gray-950 p-3 text-xs leading-5 text-green-100"><code>{activeCode}</code></pre>
               <button type="button" onClick={copyCode} disabled={Boolean(phoneError)} aria-label={`Copy ${codeFormat === 'html-css' ? 'HTML and CSS' : codeFormat} code`} className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600">{copyState === 'success' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copyState === 'success' ? 'Copied' : `Copy ${codeFormat === 'html-css' ? 'HTML + CSS' : codeFormat === 'react' ? 'React' : 'HTML'}`}</button>
               {copyState === 'error' ? <p className="mt-2 text-sm text-amber-700">Clipboard access failed. Please copy manually.</p> : null}

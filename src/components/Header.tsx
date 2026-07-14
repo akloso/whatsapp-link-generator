@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
+import { pageShell } from './uiSystem';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
@@ -80,9 +81,9 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3 sm:px-6 lg:px-8">
-        <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex h-10 items-center" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-10" /></a>
+    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
+      <div className={`${pageShell} flex items-center justify-between gap-3 py-2.5 sm:py-3`}>
+        <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex h-10 items-center shrink-0" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-9" /></a>
 
         <nav className="hidden items-center gap-2 sm:flex" aria-label="Primary">
           <div
@@ -96,7 +97,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
               type="button"
               onClick={() => { clearCloseTimer(); setToolsOpen((v) => !v); }}
               onFocus={() => { clearCloseTimer(); setToolsOpen(true); }}
-              className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
+              className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-[0.93rem] font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
               aria-expanded={toolsOpen}
               aria-haspopup="menu"
             >
@@ -143,13 +144,13 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
               </div>
             ) : null}
           </div>
-          {navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); }} className={`rounded-xl px-3 py-2 text-sm transition ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'}`}>{item.label}</a>)}
+          {navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); }} className={`rounded-xl px-3 py-2 text-sm transition ${currentPage === item.page ? 'bg-emerald-50 font-bold text-emerald-800 ring-1 ring-emerald-100' : 'font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800'}`}>{item.label}</a>)}
         </nav>
 
         <button type="button" onClick={() => setIsMobileOpen((v) => !v)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 p-2 text-gray-700 transition hover:bg-gray-50 sm:hidden">{isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
       </div>
 
-      {isMobileOpen ? <nav className="border-t border-gray-100 bg-white px-4 py-3 sm:hidden"><div className="space-y-1">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{t.label}</a>)}<button type="button" onClick={() => setOtherToolsOpen((v) => !v)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50" aria-expanded={otherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${otherToolsOpen ? 'rotate-180' : ''}`} /></button>{otherToolsOpen ? <div className="ml-3 border-l border-emerald-100 pl-2"><a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50">ICR Trends Dashboard</a></div> : null}{navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}</div></nav> : null}
+      {isMobileOpen ? <nav className="border-t border-slate-100 bg-white px-4 py-3 sm:hidden"><div className="space-y-1">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-emerald-50 font-bold text-emerald-800 ring-1 ring-emerald-100' : 'text-gray-700 hover:bg-gray-50'}`}>{t.label}</a>)}<button type="button" onClick={() => setOtherToolsOpen((v) => !v)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50" aria-expanded={otherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${otherToolsOpen ? 'rotate-180' : ''}`} /></button>{otherToolsOpen ? <div className="ml-3 border-l border-emerald-100 pl-2"><a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50">ICR Trends Dashboard</a></div> : null}{navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-bold text-emerald-800 ring-1 ring-emerald-100' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}</div></nav> : null}
     </header>
   );
 }
