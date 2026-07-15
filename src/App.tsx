@@ -13,11 +13,12 @@ import SeoContent from './components/SeoContent';
 import BlogListPage from './components/BlogListPage';
 import BlogPostPage from './components/BlogPostPage';
 import WhatsAppButtonMaker from './components/WhatsAppButtonMaker';
+import HtmlWidgetPreview from './components/HtmlWidgetPreview';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 import { blogPostsBySlug } from './data/blogPosts';
 import { IcrTrendsDashboardRoute } from './features/icr-trends-dashboard/IcrTrendsDashboardRoute';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard' | 'htmlWidgetPreview';
 
 const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/privacy') return { page: 'privacy' };
@@ -28,6 +29,7 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/whatsapp-button-maker') return { page: 'whatsappButtonMaker' };
   if (pathname === '/bulk-whatsapp-link-generator') return { page: 'bulkWhatsappGenerator' };
   if (pathname === '/icr-trends-dashboard') return { page: 'icrTrendsDashboard' };
+  if (pathname === '/html-widget-preview') return { page: 'htmlWidgetPreview' };
   if (pathname.startsWith('/blog/')) return { page: 'blogPost', slug: pathname.replace('/blog/', '') };
   return { page: 'home' };
 };
@@ -98,6 +100,13 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
       'Review ICR workbook structure, client intelligence, and data quality in a private browser-based workspace.',
     canonicalPath: '/icr-trends-dashboard',
     robots: 'noindex, nofollow, noarchive, nosnippet',
+  },
+  htmlWidgetPreview: {
+    title: 'HTML & Widget Preview — Test Embed Code Safely | Zapora',
+    description:
+      'Paste HTML, iframe, form, or JavaScript widget code and test it safely in a sandboxed browser preview before adding it to your website.',
+    canonicalPath: '/html-widget-preview',
+    ogType: 'website',
   },
 };
 
@@ -191,7 +200,7 @@ function App() {
   }, [currentBlogSlug, currentPage]);
 
   const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
-    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
+    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : page === 'htmlWidgetPreview' ? '/html-widget-preview' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
     window.history.pushState({}, '', targetPath);
     setCurrentPage(page === 'blog' && blogSlug ? 'blogPost' : page);
     setCurrentBlogSlug(blogSlug);
@@ -327,6 +336,8 @@ function App() {
     pageContent = <BulkLinkGenerator />;
   } else if (currentPage === 'icrTrendsDashboard') {
     pageContent = <IcrTrendsDashboardRoute />;
+  } else if (currentPage === 'htmlWidgetPreview') {
+    pageContent = <HtmlWidgetPreview />;
   } else if (currentPage === 'blog') {
     pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
   } else if (currentPage === 'blogPost') {

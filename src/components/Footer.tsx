@@ -1,4 +1,4 @@
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard' | 'htmlWidgetPreview';
 
 interface FooterProps {
   currentPage: PageKey;
