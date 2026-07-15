@@ -13,11 +13,12 @@ import SeoContent from './components/SeoContent';
 import BlogListPage from './components/BlogListPage';
 import BlogPostPage from './components/BlogPostPage';
 import WhatsAppButtonMaker from './components/WhatsAppButtonMaker';
+import HtmlWidgetPreview from './components/HtmlWidgetPreview';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 import { blogPostsBySlug } from './data/blogPosts';
 import { IcrTrendsDashboardRoute } from './features/icr-trends-dashboard/IcrTrendsDashboardRoute';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard' | 'htmlWidgetPreview';
 
 const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/privacy') return { page: 'privacy' };
@@ -28,6 +29,7 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/whatsapp-button-maker') return { page: 'whatsappButtonMaker' };
   if (pathname === '/bulk-whatsapp-link-generator') return { page: 'bulkWhatsappGenerator' };
   if (pathname === '/icr-trends-dashboard') return { page: 'icrTrendsDashboard' };
+  if (pathname === '/html-widget-preview') return { page: 'htmlWidgetPreview' };
   if (pathname.startsWith('/blog/')) return { page: 'blogPost', slug: pathname.replace('/blog/', '') };
   return { page: 'home' };
 };
@@ -98,6 +100,13 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
       'Review ICR workbook structure, client intelligence, and data quality in a private browser-based workspace.',
     canonicalPath: '/icr-trends-dashboard',
     robots: 'noindex, nofollow, noarchive, nosnippet',
+  },
+  htmlWidgetPreview: {
+    title: 'HTML & Widget Preview — Test Embed Code Safely | Zapora',
+    description:
+      'Paste HTML, iframe, form, or JavaScript widget code and test it safely in a sandboxed browser preview before adding it to your website.',
+    canonicalPath: '/html-widget-preview',
+    ogType: 'website',
   },
 };
 
@@ -191,7 +200,7 @@ function App() {
   }, [currentBlogSlug, currentPage]);
 
   const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
-    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
+    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : page === 'htmlWidgetPreview' ? '/html-widget-preview' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
     window.history.pushState({}, '', targetPath);
     setCurrentPage(page === 'blog' && blogSlug ? 'blogPost' : page);
     setCurrentBlogSlug(blogSlug);
@@ -312,7 +321,7 @@ function App() {
         extra={
           <a
             href="mailto:hizapora@gmail.com"
-            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:from-green-700 hover:to-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/30"
           >
             Email Support
           </a>
@@ -327,6 +336,8 @@ function App() {
     pageContent = <BulkLinkGenerator />;
   } else if (currentPage === 'icrTrendsDashboard') {
     pageContent = <IcrTrendsDashboardRoute />;
+  } else if (currentPage === 'htmlWidgetPreview') {
+    pageContent = <HtmlWidgetPreview />;
   } else if (currentPage === 'blog') {
     pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
   } else if (currentPage === 'blogPost') {
@@ -376,28 +387,25 @@ type InfoPageProps = {
 
 function InfoPage({ icon: Icon, title, subtitle, sections, extra }: InfoPageProps) {
   return (
-    <main className="relative overflow-hidden bg-gradient-to-b from-white via-green-50/50 to-white py-16 sm:py-20">
-      <div className="absolute inset-0 opacity-40">
-        <div className="absolute right-10 top-12 h-72 w-72 rounded-full bg-green-100 blur-3xl"></div>
-      </div>
-      <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <article className="rounded-[32px] border border-gray-200 bg-white p-6 shadow-[0_20px_70px_-30px_rgba(0,0,0,0.25)] sm:p-8 lg:p-10">
-          <header className="mb-8 border-b border-gray-200 pb-6">
-            <div className="mb-4 inline-flex rounded-2xl bg-green-100 p-3 text-green-700">
-              <Icon className="h-6 w-6" />
+    <main className="bg-white py-8 sm:py-10">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+        <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_16px_48px_-32px_rgba(15,23,42,0.35)] sm:p-6">
+          <header className="mb-6 border-b border-gray-200 pb-5">
+            <div className="mb-3 inline-flex rounded-xl bg-green-50 p-2.5 text-green-700">
+              <Icon className="h-5 w-5" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl">{title}</h1>
-            <p className="mt-3 text-base text-gray-600">{subtitle}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">{title}</h1>
+            <p className="mt-2 text-sm leading-6 text-gray-600 sm:text-base">{subtitle}</p>
           </header>
-          <div className="space-y-6">
+          <div className="space-y-5">
             {sections.map((section) => (
               <section key={section.heading} className="space-y-2">
-                <h2 className="text-xl font-semibold text-gray-900">{section.heading}</h2>
-                <p className="leading-relaxed text-gray-600">{section.content}</p>
+                <h2 className="text-lg font-semibold text-gray-900">{section.heading}</h2>
+                <p className="text-sm leading-6 text-gray-600 sm:text-base">{section.content}</p>
               </section>
             ))}
           </div>
-          {extra ? <div className="mt-8 border-t border-gray-200 pt-6">{extra}</div> : null}
+          {extra ? <div className="mt-6 border-t border-gray-200 pt-5">{extra}</div> : null}
         </article>
       </div>
     </main>

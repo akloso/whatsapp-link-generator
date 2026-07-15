@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --zapora-green: 22 163 74;
+    --zapora-ink: 17 24 39;
+    --zapora-muted: 75 85 99;
+    --zapora-surface: 255 255 255;
+    --zapora-border: 229 231 235;
+  }
+}
+
+@layer base {
   html,
   body,
   #root {
@@ -13,77 +23,5 @@
   :where(a, button, input, textarea, select):focus-visible {
     outline: 2px solid rgb(34 197 94 / 0.55);
     outline-offset: 2px;
-  }
-}
-
-.success-confetti {
-  position: relative;
-  width: 220px;
-  height: 52px;
-}
-
-.success-confetti span {
-  --x: 0;
-  position: absolute;
-  left: 50%;
-  top: 20px;
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  opacity: 0;
-  background: #10b981;
-  animation: confetti-pop 720ms ease-out var(--delay, 0ms) forwards;
-}
-
-.success-confetti span:nth-child(2n) {
-  background: #22c55e;
-}
-
-.success-confetti span:nth-child(3n) {
-  background: #34d399;
-}
-
-.success-confetti span:nth-child(1) {
-  --x: -82px;
-}
-.success-confetti span:nth-child(2) {
-  --x: -60px;
-}
-.success-confetti span:nth-child(3) {
-  --x: -42px;
-}
-.success-confetti span:nth-child(4) {
-  --x: -24px;
-}
-.success-confetti span:nth-child(5) {
-  --x: -8px;
-}
-.success-confetti span:nth-child(6) {
-  --x: 10px;
-}
-.success-confetti span:nth-child(7) {
-  --x: 28px;
-}
-.success-confetti span:nth-child(8) {
-  --x: 45px;
-}
-.success-confetti span:nth-child(9) {
-  --x: 63px;
-}
-.success-confetti span:nth-child(10) {
-  --x: 82px;
-}
-
-@keyframes confetti-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, 0) scale(0.6);
-  }
-  30% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(calc(-50% + var(--x)), -34px) scale(1);
   }
 }

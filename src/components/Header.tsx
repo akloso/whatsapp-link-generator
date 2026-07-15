@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard' | 'htmlWidgetPreview';
 type HeaderProps = { currentPage: PageKey; onNavigate: (page: PageKey) => void };
 
 const tools = [
@@ -11,7 +11,7 @@ const tools = [
   { label: 'WhatsApp Button Maker', desc: 'Create website click-to-chat buttons', page: 'whatsappButtonMaker' as PageKey },
 ];
 const navItems = [{ label: 'Blog', page: 'blog' as PageKey }, { label: 'Privacy', page: 'privacy' as PageKey }, { label: 'Contact', page: 'contact' as PageKey }];
-const getPath = (p: PageKey) => p === 'home' ? '/' : p === 'qrCodeEditor' ? '/qr-code-editor' : p === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : p === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : `/${p}`;
+const getPath = (p: PageKey) => p === 'home' ? '/' : p === 'qrCodeEditor' ? '/qr-code-editor' : p === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : p === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : p === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : p === 'htmlWidgetPreview' ? '/html-widget-preview' : `/${p}`;
 
 const icrDashboardPath = '/icr-trends-dashboard';
 const submenuWidth = 256;
@@ -80,9 +80,9 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3 sm:px-6 lg:px-8">
-        <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex h-10 items-center" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-10" /></a>
+    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white" onKeyDown={(event) => { if (event.key === 'Escape') { setIsMobileOpen(false); closeToolsMenu(); } }}>
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="inline-flex h-10 items-center" aria-label="Zapora home"><img src="/logo.svg" alt="Zapora" className="h-8 w-auto sm:h-9" /></a>
 
         <nav className="hidden items-center gap-2 sm:flex" aria-label="Primary">
           <div
@@ -137,6 +137,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                         className={`absolute top-0 h-full w-3 ${otherToolsDirection === 'right' ? '-left-3' : '-right-3'}`}
                       />
                       <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-transparent p-3 text-sm font-semibold text-gray-900 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem">ICR Trends Dashboard</a>
+                      <a href={getPath('htmlWidgetPreview')} onClick={(e) => { e.preventDefault(); onNavigate('htmlWidgetPreview'); }} className={`block rounded-xl border border-transparent p-3 text-sm font-semibold hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none ${currentPage === 'htmlWidgetPreview' ? 'bg-emerald-50 text-emerald-800' : 'text-gray-900'}`} role="menuitem">HTML &amp; Widget Preview</a>
                     </div>
                   ) : null}
                 </div>
@@ -146,10 +147,10 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
           {navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); }} className={`rounded-xl px-3 py-2 text-sm transition ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'font-medium text-gray-700 hover:bg-gray-50 hover:text-emerald-800'}`}>{item.label}</a>)}
         </nav>
 
-        <button type="button" onClick={() => setIsMobileOpen((v) => !v)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 p-2 text-gray-700 transition hover:bg-gray-50 sm:hidden">{isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+        <button type="button" onClick={() => setIsMobileOpen((v) => !v)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 p-2 text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-500/20 sm:hidden" aria-label="Toggle navigation menu" aria-expanded={isMobileOpen}>{isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
       </div>
 
-      {isMobileOpen ? <nav className="border-t border-gray-100 bg-white px-4 py-3 sm:hidden"><div className="space-y-1">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{t.label}</a>)}<button type="button" onClick={() => setOtherToolsOpen((v) => !v)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50" aria-expanded={otherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${otherToolsOpen ? 'rotate-180' : ''}`} /></button>{otherToolsOpen ? <div className="ml-3 border-l border-emerald-100 pl-2"><a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50">ICR Trends Dashboard</a></div> : null}{navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}</div></nav> : null}
+      {isMobileOpen ? <nav className="border-t border-gray-100 bg-white px-4 py-3 shadow-sm sm:hidden" aria-label="Mobile"><div className="space-y-1">{tools.map((t) => <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{t.label}</a>)}<button type="button" onClick={() => setOtherToolsOpen((v) => !v)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50" aria-expanded={otherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${otherToolsOpen ? 'rotate-180' : ''}`} /></button>{otherToolsOpen ? <div className="ml-3 border-l border-emerald-100 pl-2"><a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50">ICR Trends Dashboard</a><a href={getPath('htmlWidgetPreview')} onClick={(e) => { e.preventDefault(); onNavigate('htmlWidgetPreview'); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === 'htmlWidgetPreview' ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>HTML &amp; Widget Preview</a></div> : null}{navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); setIsMobileOpen(false); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}</div></nav> : null}
     </header>
   );
 }
