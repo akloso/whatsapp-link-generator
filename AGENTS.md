@@ -45,11 +45,11 @@ Do not replace the existing architecture or routing model unless the user explic
 
 Inspect these before changing shared product structure:
 
-- `src/App.tsx` — page routing and application composition
-- `src/components/Header.tsx` — canonical Zapora header and navigation
-- `src/components/Footer.tsx` — canonical Zapora footer
-- `src/index.css` — global tokens and baseline behavior
-- `public/logo.svg` — canonical logo
+- `src/App.tsx` - page routing and application composition
+- `src/components/Header.tsx` - canonical Zapora header and navigation
+- `src/components/Footer.tsx` - canonical Zapora footer
+- `src/index.css` - global tokens and baseline behavior
+- `public/logo.svg` - canonical logo
 
 Important product components include:
 
@@ -122,6 +122,16 @@ Avoid:
 Use the system/Tailwind sans stack unless the project explicitly adopts a new font system.
 
 Respect `prefers-reduced-motion`.
+
+## Writing and Copy Rules
+
+Do not use em dashes anywhere in source copy, UI labels, comments, markdown, README content, PR descriptions, commit messages, or generated text.
+
+Never use this character: `—`
+
+Use a normal hyphen instead: `-`
+
+Before finishing content or UI work, search changed files and remove every em dash. This applies to visible and non-visible text.
 
 ## Codex Working Standard
 
