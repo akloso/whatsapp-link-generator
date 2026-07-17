@@ -638,9 +638,10 @@ function QrCodeEditorPage() {
             </Section>
           </div>
 
-          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="lg:sticky lg:top-[calc(var(--zapora-header-height)+1rem)] lg:z-10">
+              <div className="rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Live preview</p>
                   <p className="mt-1 text-sm font-medium text-gray-700">
@@ -665,9 +666,9 @@ function QrCodeEditorPage() {
                     </button>
                   ))}
                 </div>
-              </div>
+                </div>
 
-              <div className="max-w-full overflow-hidden rounded-2xl border border-white/80 bg-white/70 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
+                <div className="max-w-full overflow-hidden rounded-2xl border border-white/80 bg-white/70 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
                 <div className="flex w-full justify-center">
                 {isReady ? (
                   <div
@@ -687,9 +688,13 @@ function QrCodeEditorPage() {
                   </div>
                 )}
                 </div>
-              </div>
+                </div>
 
-              <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
+              {status ? <p className="mt-4 text-sm text-gray-500">{status}</p> : null}
+            </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">Export setup</p>
@@ -728,13 +733,11 @@ function QrCodeEditorPage() {
                 </Button>
 
                 <p className="mt-3 text-center text-xs text-gray-500">
-                  <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-amber-600" /> High error correction · Safe scan area protected</span>
+                  <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-amber-600" /> High error correction - Safe scan area protected</span>
                 </p>
                 {exportStatus ? <p role="status" aria-live="polite" className="mt-2 text-center text-xs font-medium text-green-700">{exportStatus}</p> : null}
               </div>
 
-              {status ? <p className="mt-4 text-sm text-gray-500">{status}</p> : null}
-            </div>
           </div>
         </section>
 
