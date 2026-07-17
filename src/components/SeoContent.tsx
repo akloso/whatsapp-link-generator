@@ -1,59 +1,9 @@
-export default function SeoContent() {
-  return (
-    <section className="bg-gradient-to-b from-white to-emerald-50/40 py-12 sm:py-14">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-7 text-center sm:mb-8">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">
-            Everything you need to create WhatsApp links and QR codes
-          </h2>
-          <p className="mx-auto mt-3 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
-            Zapora helps you turn a phone number into a ready-to-share WhatsApp chat link, with optional messages and QR
-            codes for posters, websites, social bios, and campaigns.
-          </p>
-        </div>
+import { ArrowUpRight, Globe2, Package, PanelTop, ScanLine, UsersRound } from 'lucide-react';
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900">What is a WhatsApp link generator?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              A WhatsApp link generator creates a direct chat link for your number, so people can message you without
-              saving your contact first. Add your country code, phone number, and optional message, and Zapora creates
-              a ready-to-share link instantly.
-            </p>
-          </article>
-
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900">How to create a WhatsApp link?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              Enter your phone number, choose the correct country code, add an optional pre-filled message, and click
-              Generate. You can then copy the link, open it in WhatsApp, or download a QR code for sharing.
-            </p>
-          </article>
-
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900">Why use a WhatsApp QR code?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              A WhatsApp QR code makes it easier for people to start a chat from offline or visual places like flyers,
-              posters, packaging, store counters, business cards, and event banners. Users simply scan the code and
-              open your WhatsApp chat.
-            </p>
-          </article>
-
-          <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900">Can I customize my QR code?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              Yes. Use Zapora’s QR Code Editor to add brand colors, a title, subtitle, center emoji or logo, and
-              export sizes like Square Post, Story, and Poster while keeping the QR code scannable.
-            </p>
-            <a
-              href="/qr-code-editor"
-              className="mt-3 inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
-            >
-              Customize your QR code
-            </a>
-          </article>
-        </div>
-      </div>
-    </section>
-  );
-}
+const uses = [
+  { icon: PanelTop, title: 'Website & landing pages', text: 'Give visitors a direct route to your WhatsApp chat.', color: 'bg-emerald-100 text-emerald-700' },
+  { icon: UsersRound, title: 'Social bios', text: 'Keep your profile link useful and easy to act on.', color: 'bg-cyan-100 text-cyan-700' },
+  { icon: ScanLine, title: 'Posters & flyers', text: 'Turn offline attention into an instant conversation.', color: 'bg-amber-100 text-amber-700' },
+  { icon: Package, title: 'Packaging & storefronts', text: 'Offer help, reorders, and support at the point of need.', color: 'bg-violet-100 text-violet-700' },
+];
+export default function SeoContent() { return <section className="bg-[#f8fcfa] py-14 sm:py-20"><div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-[.8fr_1.2fr] lg:items-start lg:px-8"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-700">Built for real touchpoints</p><h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Put a WhatsApp conversation where people need it.</h2><p className="mt-4 text-sm leading-7 text-slate-600 sm:text-base">A WhatsApp link generator creates a direct chat link without asking people to save a number first. Zapora adds an optional first message and a QR code so the same destination works online and off.</p><a href="/qr-code-editor" className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-emerald-700 transition hover:text-emerald-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20">Need more QR styling? Open the editor <ArrowUpRight className="h-4 w-4" /></a></div><div className="grid gap-3 sm:grid-cols-2">{uses.map((use) => <article key={use.title} className="rounded-2xl border border-white bg-white p-5 shadow-[0_14px_28px_-28px_rgba(15,23,42,.4)]"><div className={`grid h-10 w-10 place-items-center rounded-xl ${use.color}`}><use.icon className="h-5 w-5" /></div><h3 className="mt-4 text-sm font-bold text-slate-900">{use.title}</h3><p className="mt-1.5 text-sm leading-6 text-slate-600">{use.text}</p></article>)}</div><p className="lg:col-span-2 flex items-center gap-2 text-xs text-slate-500"><Globe2 className="h-4 w-4 text-emerald-600" />Share one clean wa.me link across your campaigns, customer support, and everyday materials.</p></div></section>; }

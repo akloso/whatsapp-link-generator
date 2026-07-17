@@ -25,3 +25,24 @@
     outline-offset: 2px;
   }
 }
+
+@layer utilities {
+  .hero-float { animation: zapora-float 7s ease-in-out infinite; }
+  .zapora-result-enter { animation: zapora-enter 360ms cubic-bezier(.22, 1, .36, 1) both; }
+  .zapora-accordion-grid { grid-template-rows: 0fr; transition: grid-template-rows 240ms ease; }
+  .zapora-accordion-grid[data-open='true'] { grid-template-rows: 1fr; }
+}
+
+@keyframes zapora-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes zapora-enter {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}
