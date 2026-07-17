@@ -34,6 +34,33 @@
   .zapora-accordion-grid[data-open='true'] { grid-template-rows: 1fr; }
 }
 
+@media (min-width: 1024px) {
+  .zapora-qr-preview-rail-slot {
+    min-height: 33rem;
+  }
+
+  .zapora-qr-preview-rail.is-pinned {
+    position: fixed;
+    z-index: 10;
+    top: calc(var(--zapora-header-height) + 1rem);
+    right: max(2rem, calc((100vw - 72rem) / 2 + 2rem));
+    width: min(26.25rem, calc(50vw - 2rem));
+    max-height: calc(100vh - var(--zapora-header-height) - 2rem);
+  }
+
+  .zapora-qr-preview-card {
+    padding: 1rem;
+  }
+
+  .zapora-qr-preview-card > .max-w-full {
+    padding: 0.75rem;
+  }
+
+  .zapora-qr-preview-art {
+    max-width: 13.75rem;
+  }
+}
+
 @keyframes zapora-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-7px); }

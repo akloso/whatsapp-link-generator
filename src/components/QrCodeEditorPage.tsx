@@ -81,6 +81,7 @@ function QrCodeEditorPage() {
   const [importFileName, setImportFileName] = useState('');
   const [centerImageFileName, setCenterImageFileName] = useState('');
   const [exportStatus, setExportStatus] = useState('');
+  const [isPreviewPinned, setIsPreviewPinned] = useState(false);
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -98,6 +99,37 @@ function QrCodeEditorPage() {
       return;
     }
     setRawContent('https://wa.me/919999999999');
+  }, []);
+
+  useEffect(() => {
+    const desktopLayout = window.matchMedia('(min-width: 1024px)');
+
+    const updatePreviewPinning = () => {
+      const editorSection = editorSectionRef.current;
+      if (!editorSection) {
+        setIsPreviewPinned(false);
+        return;
+      }
+
+      const headerHeight = document.querySelector('header')?.getBoundingClientRect().height ?? 64;
+      const railTop = headerHeight + 16;
+      const editorBounds = editorSection.getBoundingClientRect();
+
+      setIsPreviewPinned(
+        desktopLayout.matches && editorBounds.top <= railTop && editorBounds.bottom > railTop + 240,
+      );
+    };
+
+    updatePreviewPinning();
+    window.addEventListener('scroll', updatePreviewPinning, { passive: true });
+    window.addEventListener('resize', updatePreviewPinning);
+    desktopLayout.addEventListener('change', updatePreviewPinning);
+
+    return () => {
+      window.removeEventListener('scroll', updatePreviewPinning);
+      window.removeEventListener('resize', updatePreviewPinning);
+      desktopLayout.removeEventListener('change', updatePreviewPinning);
+    };
   }, []);
 
   const finalContent = useMemo(() => {
@@ -638,9 +670,9 @@ function QrCodeEditorPage() {
             </Section>
           </div>
 
-          <div className="min-w-0">
-            <div className="lg:sticky lg:top-[calc(var(--zapora-header-height)+1rem)] lg:z-10">
-              <div className="rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
+          <div className="min-w-0 zapora-qr-preview-rail-slot">
+            <div className={`zapora-qr-preview-rail${isPreviewPinned ? ' is-pinned' : ''}`}>
+              <div className="zapora-qr-preview-card rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Live preview</p>
@@ -673,7 +705,7 @@ function QrCodeEditorPage() {
                 {isReady ? (
                   <div
                     key={size.name}
-                    className="w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-gray-200 sm:rounded-[24px]"
+                    className="zapora-qr-preview-art w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-gray-200 sm:rounded-[24px]"
                     style={{
                       aspectRatio: `${size.w}/${size.h}`,
                       width: size.ratio === '9:16' ? 'min(100%, 220px)' : size.ratio === '4:5' ? 'min(100%, 280px)' : 'min(100%, 300px)',
