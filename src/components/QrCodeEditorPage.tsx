@@ -11,10 +11,13 @@ import {
   Palette,
   PartyPopper,
   ScanBarcode,
+  ShieldCheck,
   Smile,
+  Sparkles,
   Store,
   Ticket,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
 import { trackEvent } from '../lib/trackEvent';
@@ -391,7 +394,7 @@ function QrCodeEditorPage() {
 
   const handleDownload = async () => {
     if (!isReady) return;
-    setExportStatus('Preparing export…');
+    setExportStatus('Preparing export...');
 
     await renderPreview();
     const canvas = previewRef.current;
@@ -428,7 +431,7 @@ function QrCodeEditorPage() {
       source: 'qr_editor',
       export_format: format.toLowerCase(),
     });
-    setExportStatus(`${format} export ready.`);
+    setExportStatus(`${format} export ready. Your download has started.`);
     window.setTimeout(() => setExportStatus(''), 2200);
   };
 
@@ -437,39 +440,48 @@ function QrCodeEditorPage() {
   };
 
   return (
-    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-white py-6 sm:py-8 lg:py-10">
+    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-[radial-gradient(circle_at_82%_7%,rgba(34,211,238,0.11),transparent_22rem),radial-gradient(circle_at_12%_16%,rgba(16,185,129,0.10),transparent_24rem),#ffffff] py-6 sm:py-8 lg:py-10">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <section className="mb-5 rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-[0_16px_48px_-32px_rgba(15,23,42,0.35)] sm:mb-6 sm:px-5 sm:py-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-green-800">
-                Zapora Studio
+        <section className="relative mb-5 overflow-hidden rounded-[26px] border border-emerald-100 bg-white/90 px-4 py-5 shadow-[0_20px_60px_-42px_rgba(5,150,105,0.44)] sm:mb-6 sm:px-6 sm:py-6">
+          <div aria-hidden="true" className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-violet-100/70 blur-3xl" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-xl">
+              <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
+                <Sparkles className="h-3.5 w-3.5" /> Zapora design studio
               </p>
               <h1 className="text-2xl font-semibold tracking-tight text-gray-950 sm:text-3xl">
                 QR Code Editor
               </h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Design and export a clean, premium, scannable QR in one place.
+              <p className="mt-1.5 text-sm leading-6 text-gray-600">
+                Add content, shape the design, then export a QR built to scan reliably.
               </p>
             </div>
-
-            <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700">
-              <Palette className="h-3.5 w-3.5 text-violet-600" />
-              Premium editor
+            <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold text-gray-700 sm:justify-end">
+              {[
+                ['Import QR', Upload, 'text-cyan-700 bg-cyan-50 border-cyan-100'],
+                ['Brand colors', Palette, 'text-violet-700 bg-violet-50 border-violet-100'],
+                ['Logo or emoji', Smile, 'text-emerald-700 bg-emerald-50 border-emerald-100'],
+                ['PNG/JPG/SVG', Download, 'text-gray-700 bg-gray-50 border-gray-200'],
+                ['Safe scan area', ShieldCheck, 'text-amber-800 bg-amber-50 border-amber-100'],
+              ].map(([label, Icon, colorClass]) => {
+                const CapabilityIcon = Icon as React.ComponentType<{ className?: string }>;
+                return <span key={label as string} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 ${colorClass as string}`}><CapabilityIcon className="h-3.5 w-3.5" />{label as string}</span>;
+              })}
             </div>
           </div>
         </section>
 
         <section ref={editorSectionRef} className="grid gap-5 lg:grid-cols-[minmax(0,0.88fr)_minmax(320px,1fr)] lg:gap-6">
           <div className="min-w-0 space-y-4">
-            <Section title="Content">
-              <label className="block rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-left transition hover:bg-gray-100">
-                <span className="text-sm font-semibold text-gray-900">Upload existing QR</span>
-                <span className="mt-1 block text-xs text-gray-600">
-                  Upload a QR image to rebuild it as an editable Zapora QR.
+            <Section title="Content" icon={ScanBarcode} description="Start from a link, plain text, or an existing QR image.">
+              <label className="group block cursor-pointer rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/50 px-4 py-3.5 text-left transition hover:border-cyan-300 hover:bg-cyan-50 focus-within:ring-4 focus-within:ring-cyan-500/15">
+                <span className="flex items-start gap-3">
+                  <span className="rounded-xl bg-white p-2 text-cyan-700 shadow-sm ring-1 ring-cyan-100"><Upload className="h-4 w-4" /></span>
+                  <span className="min-w-0 flex-1"><span className="text-sm font-semibold text-gray-900">Import an existing QR</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-gray-600">Read its content, then rebuild it with your style. PNG, JPG, or WEBP.</span></span>
                 </span>
-                <span className="mt-2 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">
-                  <ImageIcon className="h-3.5 w-3.5" /> {isImportingQr ? 'Importing…' : 'Choose QR image'}
+                <span className="mt-3 inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-800 transition group-hover:border-cyan-300">
+                  <ImageIcon className="h-3.5 w-3.5" /> {isImportingQr ? 'Importing...' : 'Choose QR image'}
                 </span>
                 {importFileName ? <span className="mt-2 block truncate text-xs font-medium text-gray-700">Selected: {importFileName}</span> : null}
                 <input
@@ -486,10 +498,10 @@ function QrCodeEditorPage() {
                 />
               </label>
               {importStatus ? (
-                <p className="mt-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">{importStatus}</p>
+                <p role="status" aria-live="polite" className={`mt-2 rounded-xl px-3 py-2 text-xs font-medium ${importStatus.includes('successfully') ? 'bg-emerald-50 text-emerald-800' : importStatus.includes('couldn') || importStatus.includes('Please') ? 'bg-rose-50 text-rose-800' : 'bg-cyan-50 text-cyan-800'}`}>{importStatus}</p>
               ) : null}
 
-              <Field label="Link or text">
+              <Field label="Link or text" hint="Paste a WhatsApp link, website URL, or any text.">
                 <TextInput
                   value={rawContent}
                   onChange={(event) => handleRawContentChange(event.target.value)}
@@ -498,7 +510,7 @@ function QrCodeEditorPage() {
                 />
               </Field>
 
-              <Field label="WhatsApp message">
+              <Field label="WhatsApp message" optional hint={isWhatsAppUrl(rawContent) ? 'This stays synced with your WhatsApp link.' : 'Added when your content is a WhatsApp link.'}>
                 <Textarea
                   value={message}
                   onChange={(event) => handleMessageChange(event.target.value)}
@@ -508,7 +520,7 @@ function QrCodeEditorPage() {
                 />
               </Field>
 
-              <Field label="Title">
+              <Field label="Title" counter={`${title.length}/40`}>
                 <TextInput
                   value={title}
                   maxLength={40}
@@ -517,7 +529,7 @@ function QrCodeEditorPage() {
                 />
               </Field>
 
-              <Field label="Subtitle">
+              <Field label="Subtitle" counter={`${subtitle.length}/60`}>
                 <TextInput
                   value={subtitle}
                   maxLength={60}
@@ -527,7 +539,7 @@ function QrCodeEditorPage() {
               </Field>
             </Section>
 
-            <Section title="Color">
+            <Section title="Brand style" icon={Palette} description="Choose a restrained color pair that keeps every code easy to scan.">
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-2.5">
                 {PRESETS.map((presetOption) => (
                   <button
@@ -536,8 +548,8 @@ function QrCodeEditorPage() {
                     aria-pressed={preset.name === presetOption.name}
                     className={`min-w-0 rounded-lg border p-1.5 text-left transition sm:p-2 ${
                       preset.name === presetOption.name
-                        ? 'border-gray-950 bg-gray-50 font-semibold shadow-sm ring-2 ring-gray-950/10'
-                        : 'border-gray-200 hover:bg-gray-50'
+                        ? 'border-emerald-600 bg-emerald-50 font-semibold shadow-sm ring-2 ring-emerald-500/20'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex h-5 overflow-hidden rounded-md ring-1 ring-gray-200 sm:h-6">
@@ -555,7 +567,7 @@ function QrCodeEditorPage() {
               </div>
             </Section>
 
-            <Section title="Center content">
+            <Section title="Center mark" icon={Sparkles} description="Keep your mark small so the QR retains a protected scan area.">
               <div className="grid w-full grid-cols-3 gap-1.5 sm:w-auto sm:gap-2">
                 {(['none', 'emoji', 'image'] as const).map((type) => (
                   <button
@@ -564,7 +576,7 @@ function QrCodeEditorPage() {
                     aria-pressed={centerType === type}
                     className={`min-w-0 rounded-xl border px-2.5 py-2 text-[11px] font-medium capitalize transition sm:px-3 sm:text-xs ${
                       centerType === type
-                        ? 'border-gray-950 bg-gray-950 text-white'
+                        ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
                         : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
@@ -590,8 +602,8 @@ function QrCodeEditorPage() {
                       key={emoji}
                       onClick={() => setCenterEmoji(emoji)}
                       aria-pressed={centerEmoji === emoji}
-                      className={`flex aspect-square items-center justify-center rounded-lg text-xl leading-none transition ${
-                        centerEmoji === emoji ? 'bg-emerald-50 ring-1 ring-emerald-500' : 'hover:bg-gray-50'
+                    className={`flex aspect-square min-h-10 items-center justify-center rounded-lg text-xl leading-none transition ${
+                        centerEmoji === emoji ? 'bg-emerald-50 ring-2 ring-emerald-500' : 'hover:bg-gray-50'
                       }`}
                     >
                       {emoji}
@@ -602,7 +614,7 @@ function QrCodeEditorPage() {
 
               {centerType === 'image' ? (
                 <div className="mt-3 space-y-2">
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-600 transition hover:bg-gray-100">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-4 text-sm font-medium text-violet-800 transition hover:border-violet-300 hover:bg-violet-50 focus-within:ring-4 focus-within:ring-violet-500/15">
                     <ImageIcon className="h-4 w-4" />
                     {centerImage ? 'Replace image' : 'Upload image (PNG, JPG, WEBP)'}
                     <input type="file" accept="image/*" onChange={onUpload} className="sr-only" />
@@ -627,11 +639,11 @@ function QrCodeEditorPage() {
           </div>
 
           <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-2xl border border-gray-200 bg-[linear-gradient(180deg,#fafafa_0%,#f8fafc_100%)] p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
+            <div className="rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Live preview</p>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Live preview</p>
+                  <p className="mt-1 text-sm font-medium text-gray-700">
                     {size.name} · {size.ratio}
                   </p>
                 </div>
@@ -644,8 +656,8 @@ function QrCodeEditorPage() {
                       aria-pressed={size.name === sizeOption.name}
                       className={`min-w-0 rounded-xl border px-2 py-2 text-left transition sm:px-3 ${
                         size.name === sizeOption.name
-                          ? 'border-gray-950 bg-white text-gray-950 shadow-sm'
-                          : 'border-gray-200 bg-white/70 text-gray-600 hover:bg-white'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 shadow-sm ring-2 ring-emerald-500/15'
+                          : 'border-gray-200 bg-white/80 text-gray-600 hover:border-gray-300 hover:bg-white'
                       }`}
                     >
                       <p className="text-[11px] font-semibold leading-tight">{sizeOption.name}</p>
@@ -655,10 +667,11 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="max-w-full overflow-hidden rounded-2xl border border-gray-200 bg-white/70 p-3 sm:rounded-[28px] sm:p-6">
+              <div className="max-w-full overflow-hidden rounded-2xl border border-white/80 bg-white/70 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
                 <div className="flex w-full justify-center">
                 {isReady ? (
                   <div
+                    key={size.name}
                     className="w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-gray-200 sm:rounded-[24px]"
                     style={{
                       aspectRatio: `${size.w}/${size.h}`,
@@ -666,7 +679,7 @@ function QrCodeEditorPage() {
                       maxWidth: '100%',
                     }}
                   >
-                    <canvas ref={previewRef} className="h-full w-full" />
+                    <canvas ref={previewRef} className="h-full w-full zapora-qr-preview-enter" aria-label={`Live QR preview in ${size.name} format`} role="img" />
                   </div>
                 ) : (
                   <div className="flex min-h-[300px] w-full items-center justify-center rounded-[20px] border border-dashed border-gray-300 bg-gray-50 px-4 text-center text-sm text-gray-500 sm:min-h-[420px] sm:rounded-[24px] sm:px-6">
@@ -676,12 +689,12 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm sm:mt-5 sm:rounded-[24px] sm:p-5">
+              <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Download</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">Export setup</p>
                     <p className="mt-1 text-sm text-gray-600">
-                      Export your QR in a clean, presentation-ready format.
+                      Choose a format, then download the exact preview.
                     </p>
                   </div>
                   <ArrowUpRight className="h-4 w-4 text-gray-400" />
@@ -695,7 +708,7 @@ function QrCodeEditorPage() {
                       aria-pressed={format === formatOption}
                       className={`min-w-0 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
                         format === formatOption
-                          ? 'border-gray-950 bg-gray-950 text-white'
+                          ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
                           : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                       }`}
                     >
@@ -715,7 +728,7 @@ function QrCodeEditorPage() {
                 </Button>
 
                 <p className="mt-3 text-center text-xs text-gray-500">
-                  High error correction enabled · Safe scan area protected
+                  <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-amber-600" /> High error correction · Safe scan area protected</span>
                 </p>
                 {exportStatus ? <p role="status" aria-live="polite" className="mt-2 text-center text-xs font-medium text-green-700">{exportStatus}</p> : null}
               </div>
@@ -736,7 +749,7 @@ function QrCodeEditorPage() {
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:text-[15px]">
                 A premium QR design studio built into Zapora. Add a title, subtitle, brand colors, and a center
-                logo — all while keeping the QR safely scannable.
+                logo - all while keeping the QR safely scannable.
               </p>
 
               <div className="mt-4 grid gap-2 text-sm text-gray-700">
@@ -762,7 +775,7 @@ function QrCodeEditorPage() {
               Built for every kind of conversation
             </h3>
             <p className="mt-1.5 text-sm text-gray-600 sm:text-[15px]">
-              From storefronts to social bios — Zapora fits anywhere a chat starts.
+              From storefronts to social bios - Zapora fits anywhere a chat starts.
             </p>
 
             <div className="mt-4 grid grid-cols-1 gap-2.5 sm:mt-5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
@@ -829,20 +842,24 @@ function UseCaseCard({ icon: Icon, title }: { icon: React.ComponentType<{ classN
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, icon: Icon, description, children }: { title: string; icon?: React.ComponentType<{ className?: string }>; description?: string; children: React.ReactNode }) {
   return (
     <Surface className="min-w-0 p-4 sm:p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{title}</h3>
+      <div className="flex items-start gap-2.5">
+        {Icon ? <span className="rounded-lg bg-emerald-50 p-1.5 text-emerald-700"><Icon className="h-3.5 w-3.5" /></span> : null}
+        <div><h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-600">{title}</h3>{description ? <p className="mt-1 text-xs leading-5 text-gray-500">{description}</p> : null}</div>
+      </div>
       <div className="mt-3 space-y-3 sm:mt-4">{children}</div>
     </Surface>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, optional = false, counter, children }: { label: string; hint?: string; optional?: boolean; counter?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-gray-700">{label}</span>
+      <span className="mb-1.5 flex items-center justify-between gap-2 text-xs font-medium text-gray-700"><span>{label}{optional ? <span className="font-normal text-gray-400"> (Optional)</span> : null}</span>{counter ? <span className="font-normal text-gray-400">{counter}</span> : null}</span>
       {children}
+      {hint ? <span className="mt-1.5 block text-[11px] leading-4 text-gray-500">{hint}</span> : null}
     </label>
   );
 }
