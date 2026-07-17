@@ -1,21 +1,3 @@
-import { ShieldCheck } from 'lucide-react';
-
-export default function Features() {
-  return (
-    <section className="bg-gradient-to-b from-gray-50 to-white py-7 sm:py-8">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm ring-1 ring-green-100/50 sm:px-5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900 sm:text-base">Why choose this tool</h2>
-            <p className="text-sm text-gray-600">
-              Built for speed and trust: private input handling, clean wa.me links, and share-ready QR in one compact flow.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+import { LockKeyhole, QrCode, Smartphone, Zap } from 'lucide-react';
+const features = [{ icon: Zap, label: 'Instant generation' }, { icon: LockKeyhole, label: 'No login required' }, { icon: QrCode, label: 'QR included' }, { icon: Smartphone, label: 'Mobile-ready' }];
+export default function Features() { return <section className="border-y border-emerald-100 bg-white py-6 sm:py-8"><div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8"><div><p className="text-sm font-bold text-slate-900">A lightweight tool built around the next conversation.</p><p className="mt-1 text-sm text-slate-600">Fast to use, clear to share, and designed for the devices people have in hand.</p></div><ul className="grid grid-cols-2 gap-x-5 gap-y-3 text-xs font-semibold text-slate-700 sm:flex sm:flex-wrap">{features.map(({ icon: Icon, label }) => <li key={label} className="flex items-center gap-2 whitespace-nowrap"><span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><Icon className="h-4 w-4" /></span>{label}</li>)}</ul></div></section>; }
