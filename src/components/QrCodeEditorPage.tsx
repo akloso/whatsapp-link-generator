@@ -680,7 +680,7 @@ function QrCodeEditorPage() {
                       maxWidth: '100%',
                     }}
                   >
-                    <canvas ref={previewRef} className="h-full w-full zapora-qr-preview-enter" aria-label={`Live QR preview in ${size.name} format`} role="img" />
+                    <canvas ref={previewRef} className="block h-full w-full zapora-qr-preview-enter" aria-label={`Live QR preview in ${size.name} format`} role="img" />
                   </div>
                 ) : (
                   <div className="flex min-h-[300px] w-full items-center justify-center rounded-[20px] border border-dashed border-gray-300 bg-gray-50 px-4 text-center text-sm text-gray-500 sm:min-h-[420px] sm:rounded-[24px] sm:px-6">
