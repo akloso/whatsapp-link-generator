@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import {
-  ArrowUpRight,
   Briefcase,
   Download,
   Headset,
@@ -11,7 +10,6 @@ import {
   Palette,
   PartyPopper,
   ScanBarcode,
-  ShieldCheck,
   Smile,
   Sparkles,
   Store,
@@ -258,9 +256,9 @@ function QrCodeEditorPage() {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, W, H);
 
-      const outerPadX = Math.round(W * 0.07);
+      const outerPadX = Math.round(W * 0.055);
       const cardX = outerPadX;
-      const cardY = Math.round(H * 0.06);
+      const cardY = Math.round(H * 0.045);
       const cardW = W - outerPadX * 2;
       const cardH = H - cardY * 2;
       const cardR = Math.round(W * 0.05);
@@ -274,7 +272,7 @@ function QrCodeEditorPage() {
       ctx.fill();
       ctx.restore();
 
-      const bannerH = Math.round(cardH * 0.18);
+      const bannerH = Math.round(cardH * 0.145);
 
       ctx.save();
       roundedRectTop(ctx, cardX, cardY, cardW, bannerH, cardR);
@@ -311,8 +309,8 @@ function QrCodeEditorPage() {
       const bodyTop = cardY + bannerH;
       const bodyHeight = cardH - bannerH;
 
-      const qrMaxByWidth = cardW - outerPadX * 1.5;
-      const qrMaxByHeight = bodyHeight - Math.round(H * 0.08);
+      const qrMaxByWidth = cardW - outerPadX * 0.75;
+      const qrMaxByHeight = bodyHeight - Math.round(H * 0.045);
       const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
 
       const qrX = cardX + (cardW - qrSize) / 2;
@@ -453,7 +451,7 @@ function QrCodeEditorPage() {
                 QR Code Editor
               </h1>
               <p className="mt-1.5 text-sm leading-6 text-gray-600">
-                Add content, shape the design, then export a QR built to scan reliably.
+                Add content, shape the design, then export a polished QR.
               </p>
             </div>
             <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold text-gray-700 sm:justify-end">
@@ -462,7 +460,6 @@ function QrCodeEditorPage() {
                 ['Brand colors', Palette, 'text-violet-700 bg-violet-50 border-violet-100'],
                 ['Logo or emoji', Smile, 'text-emerald-700 bg-emerald-50 border-emerald-100'],
                 ['PNG/JPG/SVG', Download, 'text-gray-700 bg-gray-50 border-gray-200'],
-                ['Safe scan area', ShieldCheck, 'text-amber-800 bg-amber-50 border-amber-100'],
               ].map(([label, Icon, colorClass]) => {
                 const CapabilityIcon = Icon as React.ComponentType<{ className?: string }>;
                 return <span key={label as string} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 ${colorClass as string}`}><CapabilityIcon className="h-3.5 w-3.5" />{label as string}</span>;
@@ -546,15 +543,20 @@ function QrCodeEditorPage() {
                     key={presetOption.name}
                     onClick={() => applyPreset(presetOption)}
                     aria-pressed={preset.name === presetOption.name}
-                    className={`min-w-0 rounded-lg border p-1.5 text-left transition sm:p-2 ${
+                    className={`min-w-0 rounded-xl border p-1.5 text-left transition sm:p-2 ${
                       preset.name === presetOption.name
-                        ? 'border-emerald-600 bg-emerald-50 font-semibold shadow-sm ring-2 ring-emerald-500/20'
+                        ? 'border-emerald-500 bg-emerald-50 font-semibold shadow-sm ring-2 ring-emerald-500/20'
                         : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    <div className="flex h-5 overflow-hidden rounded-md ring-1 ring-gray-200 sm:h-6">
-                      <div className="flex-1" style={{ background: presetOption.banner }} />
-                      <div className="flex-1" style={{ background: presetOption.fg }} />
+                    <div className="relative h-9 overflow-hidden rounded-lg ring-1 ring-gray-200">
+                      <div className="absolute inset-x-0 top-0 h-3" style={{ background: presetOption.banner }} />
+                      <div className="absolute bottom-1.5 left-1.5 grid h-4 w-4 grid-cols-3 gap-[2px] rounded-[4px] bg-white p-[2px] shadow-sm">
+                        {Array.from({ length: 9 }).map((_, index) => (
+                          <span key={index} className="rounded-[1px]" style={{ background: index % 2 === 0 ? presetOption.fg : '#ffffff' }} />
+                        ))}
+                      </div>
+                      <div className="absolute bottom-1.5 right-1.5 h-4 w-4 rounded-full border-2 border-white shadow-sm" style={{ background: presetOption.fg }} />
                     </div>
                     <p className="mt-1 truncate text-[10px] font-medium text-gray-800 sm:text-xs">{presetOption.name}</p>
                   </button>
@@ -639,37 +641,26 @@ function QrCodeEditorPage() {
           </div>
 
           <div className="qr-editor-preview-panel min-w-0">
-            <div className="qr-editor-preview-card rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_56%,#f0fdf4_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
-              <div className="qr-preview-toolbar mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Canvas</p>
-                  <p className="mt-1 inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <span>{size.name}</span>
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">{size.ratio}</span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700"><ShieldCheck className="h-3.5 w-3.5" /> Scan safe</span>
-                  </p>
-                </div>
-
-                <div className="grid w-full grid-cols-3 gap-1.5 sm:w-auto sm:gap-2">
+            <div className="qr-editor-preview-card rounded-[26px] border border-gray-200 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_56%,#f8fafc_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
+              <div className="qr-preview-toolbar grid grid-cols-3 gap-1.5 rounded-2xl border border-gray-200 bg-white/90 p-1 shadow-sm">
                   {SIZES.map((sizeOption) => (
                     <button
                       key={sizeOption.name}
                       onClick={() => setSize(sizeOption)}
                       aria-pressed={size.name === sizeOption.name}
-                      className={`min-w-0 rounded-xl border px-2 py-2 text-left transition sm:px-3 ${
+                      className={`min-h-11 min-w-0 rounded-xl px-2 py-1.5 text-center transition ${
                         size.name === sizeOption.name
-                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 shadow-sm ring-2 ring-emerald-500/15'
-                          : 'border-gray-200 bg-white/80 text-gray-600 hover:border-gray-300 hover:bg-white'
+                          ? 'bg-gray-950 text-white shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950'
                       }`}
                     >
                       <p className="text-[11px] font-semibold leading-tight">{sizeOption.name}</p>
-                      <p className="text-[10px] text-gray-500">{sizeOption.ratio}</p>
+                      <p className={`text-[10px] ${size.name === sizeOption.name ? 'text-white/70' : 'text-gray-500'}`}>{sizeOption.ratio}</p>
                     </button>
                   ))}
-                </div>
               </div>
 
-              <div className="qr-preview-stage max-w-full overflow-hidden rounded-2xl border border-emerald-50 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
+              <div className="qr-preview-stage mt-3 max-w-full overflow-hidden rounded-2xl border border-gray-200 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
                 <div className="flex h-full w-full items-center justify-center">
                 {isReady ? (
                   <div
@@ -690,24 +681,17 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="qr-export-panel mt-4 rounded-2xl border border-emerald-100 bg-white/95 p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">Export</p>
-                    <p className="mt-1 text-sm text-gray-600">{size.w} x {size.h}px</p>
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-gray-400" />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
+              <div className="qr-export-panel mt-3 rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-[0_18px_42px_-32px_rgba(15,23,42,0.25)]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="grid grid-cols-3 gap-1.5 sm:w-[184px]">
                   {FORMATS.map((formatOption) => (
                     <button
                       key={formatOption}
                       onClick={() => setFormat(formatOption)}
                       aria-pressed={format === formatOption}
-                      className={`min-w-0 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                      className={`min-h-10 min-w-0 rounded-xl border px-3 py-2 text-sm font-medium transition ${
                         format === formatOption
-                          ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
+                          ? 'border-gray-950 bg-gray-950 text-white shadow-sm'
                           : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                       }`}
                     >
@@ -716,19 +700,18 @@ function QrCodeEditorPage() {
                   ))}
                 </div>
 
+                <p className="text-center text-xs font-medium text-gray-500 sm:flex-1">{size.w} x {size.h}px</p>
+
                 <Button
                   onClick={handleDownload}
                   disabled={!isReady}
                   variant="primary"
-                  className="mt-3 w-full sm:mt-4"
+                  className="w-full sm:w-auto"
                   icon={<Download className="h-4 w-4" />}
                 >
                   Download QR ({format})
                 </Button>
-
-                <p className="mt-3 text-center text-xs text-gray-500">
-                  <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-amber-600" /> High error correction, safe center mark</span>
-                </p>
+                </div>
                 {exportStatus ? <p role="status" aria-live="polite" className="mt-2 text-center text-xs font-medium text-green-700">{exportStatus}</p> : null}
               </div>
 
@@ -748,7 +731,7 @@ function QrCodeEditorPage() {
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:text-[15px]">
                 A premium QR design studio built into Zapora. Add a title, subtitle, brand colors, and a center
-                logo - all while keeping the QR safely scannable.
+                logo for a polished export.
               </p>
 
               <div className="mt-4 grid gap-2 text-sm text-gray-700">
@@ -756,7 +739,7 @@ function QrCodeEditorPage() {
                 <FeatureBullet text="Title & subtitle on a soft top banner" />
                 <FeatureBullet text="Center emoji, icon, or uploaded logo" />
                 <FeatureBullet text="Export sizes: Square, Story, Poster" />
-                <FeatureBullet text="Always optimized for safe scanning" />
+                <FeatureBullet text="Clean export-ready layout" />
               </div>
 
               <Button onClick={scrollToEditor} variant="primary" className="mt-5">
@@ -1063,21 +1046,21 @@ async function buildSvgExport({
 }
 
 function getQrLayout(W: number, H: number) {
-  const outerPadX = Math.round(W * 0.07);
+  const outerPadX = Math.round(W * 0.055);
   const cardX = outerPadX;
-  const cardY = Math.round(H * 0.06);
+  const cardY = Math.round(H * 0.045);
   const cardW = W - outerPadX * 2;
   const cardH = H - cardY * 2;
   const cardR = Math.round(W * 0.05);
-  const bannerH = Math.round(cardH * 0.18);
+  const bannerH = Math.round(cardH * 0.145);
   const centerX = cardX + cardW / 2;
   const titleSize = Math.round(W * 0.045);
   const titleY = cardY + bannerH / 2;
   const subtitleSize = Math.round(W * 0.026);
   const bodyTop = cardY + bannerH;
   const bodyHeight = cardH - bannerH;
-  const qrMaxByWidth = cardW - outerPadX * 1.5;
-  const qrMaxByHeight = bodyHeight - Math.round(H * 0.08);
+  const qrMaxByWidth = cardW - outerPadX * 0.75;
+  const qrMaxByHeight = bodyHeight - Math.round(H * 0.045);
   const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
   const qrX = cardX + (cardW - qrSize) / 2;
   const qrY = bodyTop + (bodyHeight - qrSize) / 2 - Math.round(H * 0.01);

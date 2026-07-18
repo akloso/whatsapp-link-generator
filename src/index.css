@@ -99,18 +99,23 @@
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    padding: 0.875rem;
+    padding: 0.75rem;
   }
 
   .qr-preview-toolbar,
   .qr-export-panel { flex: none; }
+
+  .qr-preview-toolbar {
+    min-height: 52px;
+  }
 
   .qr-preview-stage {
     display: flex;
     min-height: 0;
     flex: 1 1 auto;
     container-type: size;
-    padding: clamp(0.5rem, 1.15vw, 1rem);
+    margin-top: 0.625rem;
+    padding: clamp(0.375rem, 0.9vw, 0.875rem);
     background-image:
       linear-gradient(rgb(148 163 184 / 0.12) 1px, transparent 1px),
       linear-gradient(90deg, rgb(148 163 184 / 0.12) 1px, transparent 1px),
@@ -148,8 +153,8 @@
 
   .qr-export-panel {
     margin-top: 0.625rem;
-    padding: 0.75rem;
+    padding: 0.625rem;
   }
 
-  .qr-export-panel .mt-3 { margin-top: 0.5rem; }
+  .qr-export-panel .mt-2 { margin-top: 0.375rem; }
 }
