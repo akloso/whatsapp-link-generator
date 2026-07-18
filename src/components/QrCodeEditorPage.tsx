@@ -471,8 +471,8 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section ref={editorSectionRef} className="grid gap-5 lg:grid-cols-[minmax(0,0.88fr)_minmax(320px,1fr)] lg:gap-6">
-          <div className="min-w-0 space-y-4">
+        <section ref={editorSectionRef} className="qr-editor-workspace grid gap-5 lg:gap-0">
+          <div className="qr-editor-controls min-w-0 space-y-4">
             <Section title="Content" icon={ScanBarcode} description="Start from a link, plain text, or an existing QR image.">
               <label className="group block cursor-pointer rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/50 px-4 py-3.5 text-left transition hover:border-cyan-300 hover:bg-cyan-50 focus-within:ring-4 focus-within:ring-cyan-500/15">
                 <span className="flex items-start gap-3">
@@ -638,9 +638,9 @@ function QrCodeEditorPage() {
             </Section>
           </div>
 
-          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="qr-editor-preview-panel min-w-0">
+            <div className="qr-editor-preview-card rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
+              <div className="qr-preview-toolbar mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Live preview</p>
                   <p className="mt-1 text-sm font-medium text-gray-700">
@@ -667,15 +667,14 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="max-w-full overflow-hidden rounded-2xl border border-white/80 bg-white/70 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
-                <div className="flex w-full justify-center">
+              <div className="qr-preview-stage max-w-full overflow-hidden rounded-2xl border border-white/80 bg-white/70 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
+                <div className="flex h-full w-full items-center justify-center">
                 {isReady ? (
                   <div
                     key={size.name}
-                    className="w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-gray-200 sm:rounded-[24px]"
+                    className={`qr-preview-artwork qr-preview-artwork-${size.name.toLowerCase().replace(/\s+/g, '-')} w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-gray-200 sm:rounded-[24px]`}
                     style={{
                       aspectRatio: `${size.w}/${size.h}`,
-                      width: size.ratio === '9:16' ? 'min(100%, 220px)' : size.ratio === '4:5' ? 'min(100%, 280px)' : 'min(100%, 300px)',
                       maxWidth: '100%',
                     }}
                   >
@@ -689,7 +688,7 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
+              <div className="qr-export-panel mt-4 rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">Export setup</p>
