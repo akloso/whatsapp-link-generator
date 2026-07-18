@@ -74,7 +74,7 @@
   .qr-editor-controls {
     min-height: 0;
     overflow-y: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: auto;
     padding: 0.875rem;
     border-right: 1px solid rgb(229 231 235 / 0.88);
     scrollbar-color: rgb(203 213 225) transparent;

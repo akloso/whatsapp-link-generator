@@ -473,21 +473,23 @@ function QrCodeEditorPage() {
   return (
     <main className="qr-editor-page min-h-screen w-full max-w-full overflow-x-hidden py-6 sm:py-8 lg:py-10">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <section className="relative mb-5 overflow-hidden rounded-[26px] border border-emerald-100 bg-white/90 px-4 py-5 shadow-[0_20px_60px_-42px_rgba(5,150,105,0.44)] sm:mb-6 sm:px-6 sm:py-6">
-          <div aria-hidden="true" className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-violet-100/70 blur-3xl" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-xl">
-              <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
-                <Sparkles className="h-3.5 w-3.5" /> Zapora design studio
+        <section className="relative mb-3 overflow-hidden rounded-2xl border border-emerald-100 bg-white/90 px-3 py-2.5 shadow-[0_16px_42px_-36px_rgba(5,150,105,0.42)] sm:mb-4 sm:px-4 sm:py-3">
+          <div aria-hidden="true" className="absolute -right-12 -top-16 h-32 w-32 rounded-full bg-violet-100/60 blur-3xl" />
+          <div className="relative flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">
+                <Sparkles className="h-3 w-3" /> Zapora design studio
               </p>
-              <h1 className="text-2xl font-semibold tracking-tight text-gray-950 sm:text-3xl">
-                QR Code Editor
-              </h1>
-              <p className="mt-1.5 text-sm leading-6 text-gray-600">
-                Add content, shape the design, then export a polished QR.
-              </p>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-3">
+                <h1 className="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl">
+                  QR Code Editor
+                </h1>
+                <p className="text-xs leading-5 text-gray-600 sm:pb-0.5 sm:text-sm">
+                  Design and export a polished QR.
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold text-gray-700 sm:justify-end">
+            <div className="flex flex-wrap gap-1 text-[10px] font-semibold text-gray-700 sm:justify-end sm:text-[11px]">
               {[
                 ['Import QR', Upload, 'text-cyan-700 bg-cyan-50 border-cyan-100'],
                 ['Brand colors', Palette, 'text-violet-700 bg-violet-50 border-violet-100'],
@@ -495,7 +497,7 @@ function QrCodeEditorPage() {
                 ['PNG/JPG/SVG', Download, 'text-gray-700 bg-gray-50 border-gray-200'],
               ].map(([label, Icon, colorClass]) => {
                 const CapabilityIcon = Icon as React.ComponentType<{ className?: string }>;
-                return <span key={label as string} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 ${colorClass as string}`}><CapabilityIcon className="h-3.5 w-3.5" />{label as string}</span>;
+                return <span key={label as string} className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 ${colorClass as string}`}><CapabilityIcon className="h-3 w-3" />{label as string}</span>;
               })}
             </div>
           </div>
@@ -503,7 +505,7 @@ function QrCodeEditorPage() {
 
         <section ref={editorSectionRef} className="qr-editor-workspace qr-living-shell grid gap-5 lg:gap-0">
           <div ref={controlsPanelRef} className="qr-editor-controls min-w-0 space-y-3">
-            <Section title="Content" icon={ScanBarcode} description="Link, text, or QR import.">
+            <Section title="Content" icon={ScanBarcode}>
               <label className="group block cursor-pointer rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/45 px-4 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50 focus-within:ring-4 focus-within:ring-cyan-500/15">
                 <span className="flex items-start gap-3">
                   <span className="rounded-xl bg-white p-2 text-cyan-700 shadow-sm ring-1 ring-cyan-100"><Upload className="h-4 w-4" /></span>
