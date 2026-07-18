@@ -472,13 +472,13 @@ function QrCodeEditorPage() {
         </section>
 
         <section ref={editorSectionRef} className="qr-editor-workspace grid gap-5 lg:gap-0">
-          <div className="qr-editor-controls min-w-0 space-y-4">
-            <Section title="Content" icon={ScanBarcode} description="Start from a link, plain text, or an existing QR image.">
-              <label className="group block cursor-pointer rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/50 px-4 py-3.5 text-left transition hover:border-cyan-300 hover:bg-cyan-50 focus-within:ring-4 focus-within:ring-cyan-500/15">
+          <div className="qr-editor-controls min-w-0 space-y-3">
+            <Section title="Content" icon={ScanBarcode} description="Link, text, or QR import.">
+              <label className="group block cursor-pointer rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/45 px-4 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50 focus-within:ring-4 focus-within:ring-cyan-500/15">
                 <span className="flex items-start gap-3">
                   <span className="rounded-xl bg-white p-2 text-cyan-700 shadow-sm ring-1 ring-cyan-100"><Upload className="h-4 w-4" /></span>
                   <span className="min-w-0 flex-1"><span className="text-sm font-semibold text-gray-900">Import an existing QR</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-gray-600">Read its content, then rebuild it with your style. PNG, JPG, or WEBP.</span></span>
+                  <span className="mt-0.5 block text-xs leading-5 text-gray-600">PNG, JPG, or WEBP.</span></span>
                 </span>
                 <span className="mt-3 inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-800 transition group-hover:border-cyan-300">
                   <ImageIcon className="h-3.5 w-3.5" /> {isImportingQr ? 'Importing...' : 'Choose QR image'}
@@ -501,7 +501,7 @@ function QrCodeEditorPage() {
                 <p role="status" aria-live="polite" className={`mt-2 rounded-xl px-3 py-2 text-xs font-medium ${importStatus.includes('successfully') ? 'bg-emerald-50 text-emerald-800' : importStatus.includes('couldn') || importStatus.includes('Please') ? 'bg-rose-50 text-rose-800' : 'bg-cyan-50 text-cyan-800'}`}>{importStatus}</p>
               ) : null}
 
-              <Field label="Link or text" hint="Paste a WhatsApp link, website URL, or any text.">
+              <Field label="Link or text">
                 <TextInput
                   value={rawContent}
                   onChange={(event) => handleRawContentChange(event.target.value)}
@@ -510,7 +510,7 @@ function QrCodeEditorPage() {
                 />
               </Field>
 
-              <Field label="WhatsApp message" optional hint={isWhatsAppUrl(rawContent) ? 'This stays synced with your WhatsApp link.' : 'Added when your content is a WhatsApp link.'}>
+              <Field label="WhatsApp message" optional hint={isWhatsAppUrl(rawContent) ? 'Synced with your WhatsApp link.' : 'Used for WhatsApp links.'}>
                 <Textarea
                   value={message}
                   onChange={(event) => handleMessageChange(event.target.value)}
@@ -539,7 +539,7 @@ function QrCodeEditorPage() {
               </Field>
             </Section>
 
-            <Section title="Brand style" icon={Palette} description="Choose a restrained color pair that keeps every code easy to scan.">
+            <Section title="Brand style" icon={Palette} description="Color choices with scan contrast.">
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-2.5">
                 {PRESETS.map((presetOption) => (
                   <button
@@ -567,7 +567,7 @@ function QrCodeEditorPage() {
               </div>
             </Section>
 
-            <Section title="Center mark" icon={Sparkles} description="Keep your mark small so the QR retains a protected scan area.">
+            <Section title="Center mark" icon={Sparkles} description="Small logo, emoji, or clean center.">
               <div className="grid w-full grid-cols-3 gap-1.5 sm:w-auto sm:gap-2">
                 {(['none', 'emoji', 'image'] as const).map((type) => (
                   <button
@@ -639,12 +639,14 @@ function QrCodeEditorPage() {
           </div>
 
           <div className="qr-editor-preview-panel min-w-0">
-            <div className="qr-editor-preview-card rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_54%,#f5f3ff_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
-              <div className="qr-preview-toolbar mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="qr-editor-preview-card rounded-[26px] border border-emerald-100 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_56%,#f0fdf4_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(5,150,105,0.34)] sm:rounded-[30px] sm:p-6">
+              <div className="qr-preview-toolbar mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Live preview</p>
-                  <p className="mt-1 text-sm font-medium text-gray-700">
-                    {size.name} · {size.ratio}
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Canvas</p>
+                  <p className="mt-1 inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <span>{size.name}</span>
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">{size.ratio}</span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700"><ShieldCheck className="h-3.5 w-3.5" /> Scan safe</span>
                   </p>
                 </div>
 
@@ -667,12 +669,12 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="qr-preview-stage max-w-full overflow-hidden rounded-2xl border border-white/80 bg-white/70 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
+              <div className="qr-preview-stage max-w-full overflow-hidden rounded-2xl border border-emerald-50 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
                 <div className="flex h-full w-full items-center justify-center">
                 {isReady ? (
                   <div
                     key={size.name}
-                    className={`qr-preview-artwork qr-preview-artwork-${size.name.toLowerCase().replace(/\s+/g, '-')} w-full max-w-full overflow-hidden rounded-[20px] bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.28)] ring-1 ring-gray-200 sm:rounded-[24px]`}
+                    className={`qr-preview-artwork qr-preview-artwork-${size.name.toLowerCase().replace(/\s+/g, '-')} w-full max-w-full overflow-hidden rounded-[20px] bg-white ring-1 ring-gray-200 sm:rounded-[24px]`}
                     style={{
                       aspectRatio: `${size.w}/${size.h}`,
                       maxWidth: '100%',
@@ -688,13 +690,11 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="qr-export-panel mt-4 rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
+              <div className="qr-export-panel mt-4 rounded-2xl border border-emerald-100 bg-white/95 p-3.5 shadow-[0_18px_42px_-30px_rgba(5,150,105,0.35)] sm:mt-5 sm:rounded-[24px] sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">Export setup</p>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Choose a format, then download the exact preview.
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">Export</p>
+                    <p className="mt-1 text-sm text-gray-600">{size.w} x {size.h}px</p>
                   </div>
                   <ArrowUpRight className="h-4 w-4 text-gray-400" />
                 </div>
@@ -727,7 +727,7 @@ function QrCodeEditorPage() {
                 </Button>
 
                 <p className="mt-3 text-center text-xs text-gray-500">
-                  <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-amber-600" /> High error correction · Safe scan area protected</span>
+                  <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-amber-600" /> High error correction, safe center mark</span>
                 </p>
                 {exportStatus ? <p role="status" aria-live="polite" className="mt-2 text-center text-xs font-medium text-green-700">{exportStatus}</p> : null}
               </div>

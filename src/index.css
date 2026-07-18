@@ -54,28 +54,30 @@
 }
 
 /* The QR editor uses a contained desktop workspace so editing never displaces its canvas. */
-.qr-preview-artwork-square-post { width: min(100%, 300px); }
-.qr-preview-artwork-story { width: min(100%, 220px); }
-.qr-preview-artwork-poster { width: min(100%, 280px); }
+.qr-preview-artwork-square-post { width: min(100%, 320px); }
+.qr-preview-artwork-story { width: min(100%, 230px); }
+.qr-preview-artwork-poster { width: min(100%, 300px); }
 
 @media (min-width: 1024px) {
   .qr-editor-workspace {
     display: grid;
-    grid-template-columns: minmax(380px, 0.9fr) minmax(460px, 1.1fr);
-    height: clamp(600px, calc(100dvh - var(--zapora-header-height, 3.5rem) - 12rem), 760px);
+    grid-template-columns: minmax(360px, 0.82fr) minmax(560px, 1.18fr);
+    height: clamp(640px, calc(100dvh - var(--zapora-header-height, 3.5rem) - 8.5rem), 860px);
     overflow: hidden;
     border: 1px solid rgb(209 250 229);
-    border-radius: 30px;
-    background: rgb(255 255 255 / 0.78);
-    box-shadow: 0 24px 70px -48px rgb(5 150 105 / 0.38);
+    border-radius: 32px;
+    background:
+      linear-gradient(90deg, rgb(255 255 255 / 0.96) 0%, rgb(255 255 255 / 0.82) 45%, rgb(240 253 244 / 0.62) 100%);
+    box-shadow: 0 30px 80px -52px rgb(5 150 105 / 0.42);
   }
 
   .qr-editor-controls {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 1rem;
-    scrollbar-color: rgb(167 243 208) transparent;
+    padding: 0.875rem;
+    border-right: 1px solid rgb(220 252 231 / 0.86);
+    scrollbar-color: rgb(187 247 208) transparent;
     scrollbar-width: thin;
   }
 
@@ -83,13 +85,13 @@
   .qr-editor-controls::-webkit-scrollbar-thumb {
     border: 3px solid transparent;
     border-radius: 999px;
-    background: rgb(110 231 183);
+    background: rgb(134 239 172);
     background-clip: padding-box;
   }
 
   .qr-editor-preview-panel {
     min-height: 0;
-    padding: 1rem 1rem 1rem 0;
+    padding: 0.875rem;
   }
 
   .qr-editor-preview-card {
@@ -97,7 +99,7 @@
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    padding: 1rem;
+    padding: 0.875rem;
   }
 
   .qr-preview-toolbar,
@@ -107,22 +109,42 @@
     display: flex;
     min-height: 0;
     flex: 1 1 auto;
-    padding: 1rem;
+    padding: clamp(0.75rem, 1.5vw, 1.25rem);
+    background-image:
+      linear-gradient(rgb(16 185 129 / 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(16 185 129 / 0.055) 1px, transparent 1px),
+      radial-gradient(circle at 50% 34%, rgb(255 255 255 / 0.98), rgb(236 253 245 / 0.72) 70%);
+    background-size: 22px 22px, 22px 22px, 100% 100%;
   }
 
   .qr-preview-artwork {
     width: auto;
     height: 100%;
+    max-width: 100%;
     max-height: 100%;
+    box-shadow:
+      0 28px 70px -34px rgb(15 23 42 / 0.55),
+      0 0 0 1px rgb(226 232 240);
   }
 
-  .qr-preview-artwork-square-post { width: auto; }
-  .qr-preview-artwork-story { width: auto; }
-  .qr-preview-artwork-poster { width: auto; }
+  .qr-preview-artwork-square-post {
+    width: min(100%, 58vh, 620px);
+    height: auto;
+  }
+
+  .qr-preview-artwork-story {
+    width: min(100%, 43vh, 390px);
+    height: auto;
+  }
+
+  .qr-preview-artwork-poster {
+    width: min(100%, 50vh, 500px);
+    height: auto;
+  }
 
   .qr-export-panel {
-    margin-top: 0.75rem;
-    padding: 0.875rem;
+    margin-top: 0.625rem;
+    padding: 0.75rem;
   }
 
   .qr-export-panel .mt-3 { margin-top: 0.5rem; }
