@@ -83,6 +83,9 @@ function QrCodeEditorPage() {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const editorSectionRef = useRef<HTMLElement>(null);
+  const controlsPanelRef = useRef<HTMLDivElement>(null);
+  const centerImageInputRef = useRef<HTMLInputElement>(null);
+  const uploadScrollSnapshotRef = useRef<{ windowY: number; panelTop: number } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
@@ -117,17 +120,47 @@ function QrCodeEditorPage() {
     setBanner(nextPreset.banner);
   };
 
+  const preserveUploadScroll = () => {
+    uploadScrollSnapshotRef.current = {
+      windowY: window.scrollY,
+      panelTop: controlsPanelRef.current?.scrollTop ?? 0,
+    };
+  };
+
+  const restoreUploadScroll = () => {
+    const snapshot = uploadScrollSnapshotRef.current;
+    if (!snapshot) return;
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: snapshot.windowY, behavior: 'auto' });
+      if (controlsPanelRef.current) {
+        controlsPanelRef.current.scrollTop = snapshot.panelTop;
+      }
+    });
+  };
+
+  const openCenterImagePicker = () => {
+    preserveUploadScroll();
+    centerImageInputRef.current?.click();
+    window.setTimeout(restoreUploadScroll, 0);
+  };
+
   const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      restoreUploadScroll();
+      return;
+    }
 
     setCenterImageFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
       setCenterImage(reader.result as string);
       setCenterType('image');
+      restoreUploadScroll();
     };
     reader.readAsDataURL(file);
+    event.currentTarget.value = '';
   };
 
   const applyDecodedQrContent = (decodedValue: string) => {
@@ -438,7 +471,7 @@ function QrCodeEditorPage() {
   };
 
   return (
-    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-[radial-gradient(circle_at_82%_7%,rgba(34,211,238,0.11),transparent_22rem),radial-gradient(circle_at_12%_16%,rgba(16,185,129,0.10),transparent_24rem),#ffffff] py-6 sm:py-8 lg:py-10">
+    <main className="qr-editor-page min-h-screen w-full max-w-full overflow-x-hidden py-6 sm:py-8 lg:py-10">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <section className="relative mb-5 overflow-hidden rounded-[26px] border border-emerald-100 bg-white/90 px-4 py-5 shadow-[0_20px_60px_-42px_rgba(5,150,105,0.44)] sm:mb-6 sm:px-6 sm:py-6">
           <div aria-hidden="true" className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-violet-100/70 blur-3xl" />
@@ -468,8 +501,8 @@ function QrCodeEditorPage() {
           </div>
         </section>
 
-        <section ref={editorSectionRef} className="qr-editor-workspace grid gap-5 lg:gap-0">
-          <div className="qr-editor-controls min-w-0 space-y-3">
+        <section ref={editorSectionRef} className="qr-editor-workspace qr-living-shell grid gap-5 lg:gap-0">
+          <div ref={controlsPanelRef} className="qr-editor-controls min-w-0 space-y-3">
             <Section title="Content" icon={ScanBarcode} description="Link, text, or QR import.">
               <label className="group block cursor-pointer rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/45 px-4 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50 focus-within:ring-4 focus-within:ring-cyan-500/15">
                 <span className="flex items-start gap-3">
@@ -543,9 +576,9 @@ function QrCodeEditorPage() {
                     key={presetOption.name}
                     onClick={() => applyPreset(presetOption)}
                     aria-pressed={preset.name === presetOption.name}
-                    className={`min-w-0 rounded-xl border p-1.5 text-left transition sm:p-2 ${
+                    className={`qr-tactile-card min-w-0 rounded-xl border p-1.5 text-left transition sm:p-2 ${
                       preset.name === presetOption.name
-                        ? 'border-emerald-500 bg-emerald-50 font-semibold shadow-sm ring-2 ring-emerald-500/20'
+                        ? 'border-emerald-500 bg-emerald-50 font-semibold shadow-[0_14px_28px_-20px_rgba(5,150,105,0.8)] ring-2 ring-emerald-500/25'
                         : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -576,7 +609,7 @@ function QrCodeEditorPage() {
                     key={type}
                     onClick={() => setCenterType(type)}
                     aria-pressed={centerType === type}
-                    className={`min-w-0 rounded-xl border px-2.5 py-2 text-[11px] font-medium capitalize transition sm:px-3 sm:text-xs ${
+                    className={`qr-pill-button min-w-0 rounded-xl border px-2.5 py-2 text-[11px] font-medium capitalize transition sm:px-3 sm:text-xs ${
                       centerType === type
                         ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
                         : 'border-gray-200 text-gray-700 hover:bg-gray-50'
@@ -604,7 +637,7 @@ function QrCodeEditorPage() {
                       key={emoji}
                       onClick={() => setCenterEmoji(emoji)}
                       aria-pressed={centerEmoji === emoji}
-                    className={`flex aspect-square min-h-10 items-center justify-center rounded-lg text-xl leading-none transition ${
+                    className={`qr-emoji-button flex aspect-square min-h-10 items-center justify-center rounded-lg text-xl leading-none transition ${
                         centerEmoji === emoji ? 'bg-emerald-50 ring-2 ring-emerald-500' : 'hover:bg-gray-50'
                       }`}
                     >
@@ -616,11 +649,15 @@ function QrCodeEditorPage() {
 
               {centerType === 'image' ? (
                 <div className="mt-3 space-y-2">
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-4 text-sm font-medium text-violet-800 transition hover:border-violet-300 hover:bg-violet-50 focus-within:ring-4 focus-within:ring-violet-500/15">
+                  <button
+                    type="button"
+                    onClick={openCenterImagePicker}
+                    className="qr-upload-button flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-4 text-sm font-medium text-violet-800 transition hover:border-violet-300 hover:bg-violet-50 focus-visible:ring-4 focus-visible:ring-violet-500/15"
+                  >
                     <ImageIcon className="h-4 w-4" />
                     {centerImage ? 'Replace image' : 'Upload image (PNG, JPG, WEBP)'}
-                    <input type="file" accept="image/*" onChange={onUpload} className="sr-only" />
-                  </label>
+                  </button>
+                  <input ref={centerImageInputRef} type="file" accept="image/*" onChange={onUpload} onClick={preserveUploadScroll} className="sr-only" tabIndex={-1} aria-hidden="true" />
                   {centerImageFileName ? <p className="truncate text-xs font-medium text-gray-700">Selected: {centerImageFileName}</p> : null}
 
                   {centerImage ? (
@@ -641,8 +678,8 @@ function QrCodeEditorPage() {
           </div>
 
           <div className="qr-editor-preview-panel min-w-0">
-            <div className="qr-editor-preview-card rounded-[26px] border border-gray-200 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_56%,#f8fafc_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
-              <div className="qr-preview-toolbar grid grid-cols-3 gap-1.5 rounded-2xl border border-gray-200 bg-white/90 p-1 shadow-sm">
+            <div className="qr-editor-preview-card qr-premium-panel rounded-[26px] border border-gray-200 bg-[linear-gradient(155deg,#ffffff_0%,#f8fffb_56%,#f8fafc_100%)] p-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.28)] sm:rounded-[30px] sm:p-6">
+              <div className="qr-preview-toolbar qr-action-bar grid grid-cols-3 gap-1.5 rounded-2xl border border-gray-200 bg-white/90 p-1 shadow-sm">
                   {SIZES.map((sizeOption) => (
                     <button
                       key={sizeOption.name}
@@ -660,7 +697,7 @@ function QrCodeEditorPage() {
                   ))}
               </div>
 
-              <div className="qr-preview-stage mt-3 max-w-full overflow-hidden rounded-2xl border border-gray-200 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
+              <div className="qr-preview-stage qr-canvas-grid mt-3 max-w-full overflow-hidden rounded-2xl border border-gray-200 p-3 shadow-inner sm:rounded-[28px] sm:p-6">
                 <div className="flex h-full w-full items-center justify-center">
                 {isReady ? (
                   <div
@@ -681,7 +718,7 @@ function QrCodeEditorPage() {
                 </div>
               </div>
 
-              <div className="qr-export-panel mt-3 rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-[0_18px_42px_-32px_rgba(15,23,42,0.25)]">
+              <div className="qr-export-panel qr-export-dock mt-3 rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-[0_18px_42px_-32px_rgba(15,23,42,0.25)]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="grid grid-cols-3 gap-1.5 sm:w-[184px]">
                   {FORMATS.map((formatOption) => (
@@ -689,7 +726,7 @@ function QrCodeEditorPage() {
                       key={formatOption}
                       onClick={() => setFormat(formatOption)}
                       aria-pressed={format === formatOption}
-                      className={`min-h-10 min-w-0 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                      className={`qr-format-button min-h-10 min-w-0 rounded-xl border px-3 py-2 text-sm font-medium transition ${
                         format === formatOption
                           ? 'border-gray-950 bg-gray-950 text-white shadow-sm'
                           : 'border-gray-200 text-gray-700 hover:bg-gray-50'
