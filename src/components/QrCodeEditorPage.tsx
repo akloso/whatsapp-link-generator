@@ -280,8 +280,12 @@ function QrCodeEditorPage() {
       roundedRect(ctx, Math.round(W * 0.76), Math.round(H * 0.08), Math.round(W * 0.14), Math.round(W * 0.045), Math.round(W * 0.023));
       ctx.fill();
 
-      const layout = getQrLayout(W, H);
-      const { cardX, cardY, cardW, cardH, cardR } = layout;
+      const outerPadX = Math.round(W * 0.05);
+      const cardX = outerPadX;
+      const cardY = Math.round(H * 0.035);
+      const cardW = W - outerPadX * 2;
+      const cardH = H - cardY * 2;
+      const cardR = Math.round(W * 0.055);
 
       ctx.save();
       ctx.shadowColor = 'rgba(5, 150, 105, 0.16)';
@@ -292,7 +296,7 @@ function QrCodeEditorPage() {
       ctx.fill();
       ctx.restore();
 
-      const { bannerH } = layout;
+      const bannerH = Math.round(cardH * 0.16);
 
       ctx.save();
       roundedRectTop(ctx, cardX, cardY, cardW, bannerH, cardR);
@@ -305,49 +309,39 @@ function QrCodeEditorPage() {
 
       ctx.fillStyle = gradient;
       ctx.fillRect(cardX, cardY, cardW, bannerH);
-
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = '#ffffff';
-      roundedRect(ctx, cardX + cardW * 0.08, cardY + bannerH * 0.2, cardW * 0.26, bannerH * 0.16, bannerH * 0.08);
-      ctx.fill();
-      ctx.globalAlpha = 0.16;
-      roundedRect(ctx, cardX + cardW * 0.68, cardY + bannerH * 0.62, cardW * 0.2, bannerH * 0.14, bannerH * 0.07);
-      ctx.fill();
-      ctx.globalAlpha = 1;
       ctx.restore();
 
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      const { centerX, titleSize } = layout;
+      const centerX = cardX + cardW / 2;
+
+      const titleSize = Math.round(W * 0.047);
       ctx.font = `700 ${titleSize}px Inter, system-ui, sans-serif`;
 
       const titleY = cardY + bannerH / 2 - (subtitle ? titleSize * 0.55 : 0);
       ctx.fillText(truncate(title, 40), centerX, titleY);
 
       if (subtitle) {
-        ctx.font = `500 ${layout.subtitleSize}px Inter, system-ui, sans-serif`;
+        const subtitleSize = Math.round(W * 0.025);
+        ctx.font = `500 ${subtitleSize}px Inter, system-ui, sans-serif`;
         ctx.globalAlpha = 0.9;
         ctx.fillText(truncate(subtitle, 60), centerX, titleY + titleSize * 0.95);
         ctx.globalAlpha = 1;
       }
 
-      const { qrSize, qrX, qrY, qrPadding } = layout;
+      const bodyTop = cardY + bannerH;
+      const bodyHeight = cardH - bannerH;
 
-      ctx.save();
-      ctx.shadowColor = 'rgba(5, 150, 105, 0.08)';
-      ctx.shadowBlur = 22;
-      ctx.shadowOffsetY = 8;
-      roundedRect(ctx, layout.panelX, layout.panelY, layout.panelW, layout.panelH, layout.panelR);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
-      ctx.fill();
-      ctx.restore();
+      const qrMaxByWidth = cardW - outerPadX * 0.45;
+      const qrMaxByHeight = bodyHeight - Math.round(H * 0.075);
+      const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
 
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.12)';
-      ctx.lineWidth = Math.max(2, Math.round(W * 0.002));
-      roundedRect(ctx, layout.panelX, layout.panelY, layout.panelW, layout.panelH, layout.panelR);
-      ctx.stroke();
+      const qrX = cardX + (cardW - qrSize) / 2;
+      const qrY = bodyTop + (bodyHeight - qrSize) / 2 - Math.round(H * 0.004);
+
+      const qrPadding = Math.round(qrSize * 0.035);
 
       ctx.save();
       ctx.shadowColor = 'rgba(15, 23, 42, 0.09)';
@@ -367,7 +361,9 @@ function QrCodeEditorPage() {
 
       ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
 
-      const { logoSize, logoX, logoY } = layout;
+      const logoSize = Math.round(qrSize * 0.17);
+      const logoX = qrX + (qrSize - logoSize) / 2;
+      const logoY = qrY + (qrSize - logoSize) / 2;
 
       if (centerType !== 'none') {
         const logoPadding = Math.round(logoSize * 0.2);
@@ -386,9 +382,6 @@ function QrCodeEditorPage() {
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.shadowColor = 'transparent';
-        ctx.strokeStyle = 'rgba(16, 185, 129, 0.14)';
-        ctx.lineWidth = Math.max(2, Math.round(W * 0.0018));
-        ctx.stroke();
 
         if (centerType === 'emoji') {
           const centerX = logoX + logoSize / 2;
@@ -418,19 +411,11 @@ function QrCodeEditorPage() {
         }
       }
 
-      const makerText = 'Powered by Zapora';
-      ctx.font = `600 ${layout.footerSize}px Inter, system-ui, sans-serif`;
-      const makerWidth = ctx.measureText(makerText).width + Math.round(W * 0.07);
-      const makerHeight = Math.round(layout.footerSize * 2.15);
-      const makerX = centerX - makerWidth / 2;
-      const makerY = layout.footerY - makerHeight * 0.62;
-      roundedRect(ctx, makerX, makerY, makerWidth, makerHeight, makerHeight / 2);
-      ctx.fillStyle = 'rgba(240, 253, 244, 0.82)';
-      ctx.fill();
-      ctx.fillStyle = 'rgba(15, 31, 23, 0.42)';
+      const footerSize = Math.round(W * 0.02);
+      ctx.fillStyle = 'rgba(15, 31, 23, 0.38)';
+      ctx.font = `600 ${footerSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(makerText, centerX, layout.footerY);
+      ctx.fillText('Powered by Zapora', centerX, cardY + cardH - Math.round(H * 0.025));
     },
     [banner, centerEmoji, centerImage, centerType, isReady, size, subtitle, title],
   );
@@ -1061,13 +1046,13 @@ async function buildSvgExport({
   const escapedSubtitle = escapeXml(truncate(subtitle, 60));
   const gradientMid = shade(banner, 8);
   const gradientEnd = shade(banner, -18);
-  const footerY = layout.footerY;
+  const footerY = layout.cardY + layout.cardH - Math.round(H * 0.025);
   const logoPadding = Math.round(layout.logoSize * 0.2);
   const logoRadius = Math.round(layout.logoSize * 0.18);
 
   let centerMarkup = '';
   if (centerType !== 'none') {
-    centerMarkup += `<rect x="${layout.logoX - logoPadding}" y="${layout.logoY - logoPadding}" width="${layout.logoSize + logoPadding * 2}" height="${layout.logoSize + logoPadding * 2}" rx="${Math.round(layout.logoSize * 0.25)}" fill="#ffffff" stroke="#10b981" stroke-opacity="0.14" stroke-width="${Math.max(2, Math.round(W * 0.0018))}" filter="url(#soft-logo-shadow)" />`;
+    centerMarkup += `<rect x="${layout.logoX - logoPadding}" y="${layout.logoY - logoPadding}" width="${layout.logoSize + logoPadding * 2}" height="${layout.logoSize + logoPadding * 2}" rx="${Math.round(layout.logoSize * 0.25)}" fill="#ffffff" />`;
     if (centerType === 'emoji') {
       centerMarkup += `<foreignObject x="${layout.logoX}" y="${layout.logoY}" width="${layout.logoSize}" height="${layout.logoSize}"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;line-height:1;font-size:${Math.round(layout.logoSize * 0.82)}px;font-family:Apple Color Emoji, Segoe UI Emoji, Inter, sans-serif;">${escapeXml(centerEmoji)}</div></foreignObject>`;
     } else if (centerType === 'image' && centerImage) {
@@ -1095,9 +1080,6 @@ async function buildSvgExport({
     <filter id="soft-qr-shadow" x="-8%" y="-8%" width="116%" height="116%">
       <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0f172a" flood-opacity="0.09" />
     </filter>
-    <filter id="soft-logo-shadow" x="-18%" y="-18%" width="136%" height="136%">
-      <feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#0f172a" flood-opacity="0.12" />
-    </filter>
   </defs>
   <rect width="${W}" height="${H}" fill="#ffffff" />
   <rect width="${W}" height="${H}" fill="url(#artboard-glow)" />
@@ -1105,85 +1087,40 @@ async function buildSvgExport({
   <rect x="${Math.round(W * 0.76)}" y="${Math.round(H * 0.08)}" width="${Math.round(W * 0.14)}" height="${Math.round(W * 0.045)}" rx="${Math.round(W * 0.023)}" fill="#fbbf24" fill-opacity="0.12" />
   <rect x="${layout.cardX}" y="${layout.cardY}" width="${layout.cardW}" height="${layout.cardH}" rx="${layout.cardR}" fill="#ffffff" filter="url(#soft-card-shadow)" />
   <path d="${topRoundedRectPath(layout.cardX, layout.cardY, layout.cardW, layout.bannerH, layout.cardR)}" fill="url(#banner-gradient)" />
-  <rect x="${layout.cardX + layout.cardW * 0.08}" y="${layout.cardY + layout.bannerH * 0.2}" width="${layout.cardW * 0.26}" height="${layout.bannerH * 0.16}" rx="${layout.bannerH * 0.08}" fill="#ffffff" fill-opacity="0.22" />
-  <rect x="${layout.cardX + layout.cardW * 0.68}" y="${layout.cardY + layout.bannerH * 0.62}" width="${layout.cardW * 0.2}" height="${layout.bannerH * 0.14}" rx="${layout.bannerH * 0.07}" fill="#ffffff" fill-opacity="0.16" />
   <text x="${layout.centerX}" y="${layout.titleY - (subtitle ? layout.titleSize * 0.55 : 0)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="${layout.titleSize}" font-family="Inter, system-ui, sans-serif" font-weight="700">${escapedTitle}</text>
   ${subtitle ? `<text x="${layout.centerX}" y="${layout.titleY + layout.titleSize * 0.4}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" fill-opacity="0.9" font-size="${layout.subtitleSize}" font-family="Inter, system-ui, sans-serif" font-weight="500">${escapedSubtitle}</text>` : ''}
-  <rect x="${layout.panelX}" y="${layout.panelY}" width="${layout.panelW}" height="${layout.panelH}" rx="${layout.panelR}" fill="#ffffff" fill-opacity="0.72" stroke="#10b981" stroke-opacity="0.12" stroke-width="${Math.max(2, Math.round(W * 0.002))}" />
   <rect x="${layout.qrX - layout.qrPadding}" y="${layout.qrY - layout.qrPadding}" width="${layout.qrSize + layout.qrPadding * 2}" height="${layout.qrSize + layout.qrPadding * 2}" rx="${Math.round(layout.qrSize * 0.06)}" fill="#ffffff" filter="url(#soft-qr-shadow)" />
   <g transform="translate(${layout.qrX} ${layout.qrY}) scale(${qrScale})">${qrInner}</g>
   ${centerMarkup}
-  <rect x="${layout.centerX - (layout.footerSize * 10) / 2}" y="${footerY - layout.footerSize * 1.1}" width="${layout.footerSize * 10}" height="${layout.footerSize * 2.15}" rx="${layout.footerSize * 1.075}" fill="#f0fdf4" fill-opacity="0.82" />
-  <text x="${layout.centerX}" y="${footerY}" text-anchor="middle" dominant-baseline="middle" fill="rgba(15,31,23,0.42)" font-size="${layout.footerSize}" font-family="Inter, system-ui, sans-serif" font-weight="600">Powered by Zapora</text>
+  <text x="${layout.centerX}" y="${footerY}" text-anchor="middle" fill="rgba(15,31,23,0.38)" font-size="${layout.footerSize}" font-family="Inter, system-ui, sans-serif" font-weight="600">Powered by Zapora</text>
 </svg>`;
 }
 
 function getQrLayout(W: number, H: number) {
-  const ratio = H / W;
-  const isStory = ratio > 1.55;
-  const isPoster = ratio > 1.12 && ratio <= 1.55;
-
-  const outerPadX = Math.round(W * (isStory ? 0.07 : isPoster ? 0.058 : 0.052));
+  const outerPadX = Math.round(W * 0.05);
   const cardX = outerPadX;
-  const cardY = Math.round(H * (isStory ? 0.052 : isPoster ? 0.043 : 0.04));
+  const cardY = Math.round(H * 0.035);
   const cardW = W - outerPadX * 2;
   const cardH = H - cardY * 2;
-  const cardR = Math.round(W * (isStory ? 0.07 : isPoster ? 0.058 : 0.055));
-  const bannerH = Math.round(cardH * (isStory ? 0.12 : isPoster ? 0.135 : 0.145));
+  const cardR = Math.round(W * 0.055);
+  const bannerH = Math.round(cardH * 0.16);
   const centerX = cardX + cardW / 2;
-  const titleSize = Math.round(W * (isStory ? 0.05 : isPoster ? 0.048 : 0.047));
+  const titleSize = Math.round(W * 0.047);
   const titleY = cardY + bannerH / 2;
-  const subtitleSize = Math.round(W * (isStory ? 0.027 : 0.025));
+  const subtitleSize = Math.round(W * 0.025);
   const bodyTop = cardY + bannerH;
   const bodyHeight = cardH - bannerH;
-  const qrMaxByWidth = cardW - outerPadX * (isStory ? 0.34 : isPoster ? 0.38 : 0.42);
-  const qrMaxByHeight = bodyHeight - Math.round(H * (isStory ? 0.19 : isPoster ? 0.115 : 0.09));
+  const qrMaxByWidth = cardW - outerPadX * 0.45;
+  const qrMaxByHeight = bodyHeight - Math.round(H * 0.075);
   const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
   const qrX = cardX + (cardW - qrSize) / 2;
-  const qrY = bodyTop + (bodyHeight - qrSize) / 2 - Math.round(H * (isStory ? 0.018 : isPoster ? 0.008 : 0.002));
-  const qrPadding = Math.round(qrSize * 0.036);
-  const logoSize = Math.round(qrSize * (isStory ? 0.158 : 0.165));
+  const qrY = bodyTop + (bodyHeight - qrSize) / 2 - Math.round(H * 0.004);
+  const qrPadding = Math.round(qrSize * 0.035);
+  const logoSize = Math.round(qrSize * 0.17);
   const logoX = qrX + (qrSize - logoSize) / 2;
   const logoY = qrY + (qrSize - logoSize) / 2;
-  const footerSize = Math.round(W * (isStory ? 0.022 : 0.019));
-  const footerY = cardY + cardH - Math.round(H * (isStory ? 0.038 : isPoster ? 0.03 : 0.028));
-  const panelPadX = Math.round(qrPadding * (isStory ? 2.6 : isPoster ? 2.25 : 2.05));
-  const panelPadY = Math.round(qrPadding * (isStory ? 3.2 : isPoster ? 2.45 : 2.1));
-  const panelX = qrX - panelPadX;
-  const panelY = qrY - panelPadY;
-  const panelW = qrSize + panelPadX * 2;
-  const panelH = qrSize + panelPadY * 2;
-  const panelR = Math.round(qrSize * (isStory ? 0.075 : 0.065));
-
-  return {
-    outerPadX,
-    cardX,
-    cardY,
-    cardW,
-    cardH,
-    cardR,
-    bannerH,
-    centerX,
-    titleSize,
-    titleY,
-    subtitleSize,
-    bodyTop,
-    bodyHeight,
-    qrSize,
-    qrX,
-    qrY,
-    qrPadding,
-    logoSize,
-    logoX,
-    logoY,
-    footerSize,
-    footerY,
-    panelX,
-    panelY,
-    panelW,
-    panelH,
-    panelR,
-  };
+  const footerSize = Math.round(W * 0.02);
+  return { outerPadX, cardX, cardY, cardW, cardH, cardR, bannerH, centerX, titleSize, titleY, subtitleSize, bodyTop, bodyHeight, qrSize, qrX, qrY, qrPadding, logoSize, logoX, logoY, footerSize };
 }
 
 function extractSvgInnerMarkup(svg: string) {
