@@ -63,7 +63,7 @@
     display: grid;
     grid-template-columns: minmax(360px, 0.82fr) minmax(560px, 1.18fr);
     height: clamp(640px, calc(100dvh - var(--zapora-header-height, 3.5rem) - 8.5rem), 860px);
-    overflow: clip;
+    overflow: hidden;
     border: 1px solid rgb(209 250 229);
     border-radius: 32px;
     background:
@@ -75,6 +75,7 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 0.875rem;
     border-right: 1px solid rgb(229 231 235 / 0.88);
     scrollbar-color: rgb(203 213 225) transparent;

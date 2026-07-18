@@ -155,12 +155,12 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
       </div>
 
       {isMobileOpen ? (
-        <nav className="border-t border-gray-100 bg-white px-4 py-3 shadow-sm sm:hidden" aria-label="Mobile">
+        <nav className="relative z-50 border-t border-gray-100 bg-white px-4 py-3 shadow-sm sm:hidden" aria-label="Mobile">
           <div className="space-y-1">
             <button
               type="button"
               onClick={() => setMobileToolsOpen((v) => !v)}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
+              className="flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
               aria-expanded={mobileToolsOpen}
             >
               All Tools <ChevronDown className={`h-4 w-4 transition-transform ${mobileToolsOpen ? 'rotate-180' : ''}`} />
@@ -168,18 +168,18 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
             {mobileToolsOpen ? (
               <div className="space-y-1 rounded-2xl border border-emerald-100 bg-emerald-50/30 p-1.5">
                 {tools.map((t) => (
-                  <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); closeMobileMenu(); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-white font-semibold text-emerald-800 shadow-sm' : 'text-gray-700 hover:bg-white/80'}`}>{t.label}</a>
+                  <a key={t.page} href={getPath(t.page)} onClick={(e) => { e.preventDefault(); onNavigate(t.page); closeMobileMenu(); }} className={`block min-h-11 rounded-xl px-3 py-2.5 text-sm ${currentPage === t.page ? 'bg-white font-semibold text-emerald-800 shadow-sm' : 'text-gray-700 hover:bg-white/80'}`}>{t.label}</a>
                 ))}
-                <button type="button" onClick={() => setMobileOtherToolsOpen((v) => !v)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40" aria-expanded={mobileOtherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${mobileOtherToolsOpen ? 'rotate-180' : ''}`} /></button>
+                <button type="button" onClick={() => setMobileOtherToolsOpen((v) => !v)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40" aria-expanded={mobileOtherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${mobileOtherToolsOpen ? 'rotate-180' : ''}`} /></button>
                 {mobileOtherToolsOpen ? (
                   <div className="space-y-1 border-l border-emerald-200 pl-2">
-                    <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} className="block rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-white/80">ICR Trends Dashboard</a>
-                    <a href={htmlWidgetPreviewUrl} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} className="block rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-white/80">HTML &amp; Widget Preview</a>
+                    <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={(event) => { event.stopPropagation(); closeMobileMenu(); }} className="block min-h-11 rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-white/80">ICR Trends Dashboard</a>
+                    <a href={htmlWidgetPreviewUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => { event.stopPropagation(); closeMobileMenu(); }} className="block min-h-11 rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-white/80">HTML &amp; Widget Preview</a>
                   </div>
                 ) : null}
               </div>
             ) : null}
-            {navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); closeMobileMenu(); }} className={`block rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}
+            {navItems.map((item) => <a key={item.page} href={getPath(item.page)} onClick={(e) => { e.preventDefault(); onNavigate(item.page); closeMobileMenu(); }} className={`block min-h-11 rounded-xl px-3 py-2.5 text-sm ${currentPage === item.page ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}>{item.label}</a>)}
           </div>
         </nav>
       ) : null}

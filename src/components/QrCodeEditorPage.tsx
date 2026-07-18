@@ -85,7 +85,6 @@ function QrCodeEditorPage() {
   const editorSectionRef = useRef<HTMLElement>(null);
   const controlsPanelRef = useRef<HTMLDivElement>(null);
   const centerImageInputRef = useRef<HTMLInputElement>(null);
-  const uploadScrollSnapshotRef = useRef<{ windowY: number; panelTop: number } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(QR_EDITOR_STORAGE_KEY);
@@ -120,35 +119,14 @@ function QrCodeEditorPage() {
     setBanner(nextPreset.banner);
   };
 
-  const preserveUploadScroll = () => {
-    uploadScrollSnapshotRef.current = {
-      windowY: window.scrollY,
-      panelTop: controlsPanelRef.current?.scrollTop ?? 0,
-    };
-  };
-
-  const restoreUploadScroll = () => {
-    const snapshot = uploadScrollSnapshotRef.current;
-    if (!snapshot) return;
-
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: snapshot.windowY, behavior: 'auto' });
-      if (controlsPanelRef.current) {
-        controlsPanelRef.current.scrollTop = snapshot.panelTop;
-      }
-    });
-  };
-
   const openCenterImagePicker = () => {
-    preserveUploadScroll();
     centerImageInputRef.current?.click();
-    window.setTimeout(restoreUploadScroll, 0);
   };
 
   const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
-      restoreUploadScroll();
+      event.currentTarget.value = '';
       return;
     }
 
@@ -157,7 +135,6 @@ function QrCodeEditorPage() {
     reader.onload = () => {
       setCenterImage(reader.result as string);
       setCenterType('image');
-      restoreUploadScroll();
     };
     reader.readAsDataURL(file);
     event.currentTarget.value = '';
@@ -654,7 +631,7 @@ function QrCodeEditorPage() {
                     <ImageIcon className="h-4 w-4" />
                     {centerImage ? 'Replace image' : 'Upload image (PNG, JPG, WEBP)'}
                   </button>
-                  <input ref={centerImageInputRef} type="file" accept="image/*" onChange={onUpload} onClick={preserveUploadScroll} className="sr-only" tabIndex={-1} aria-hidden="true" />
+                  <input ref={centerImageInputRef} type="file" accept="image/*" onChange={onUpload} className="hidden" tabIndex={-1} aria-hidden="true" />
                   {centerImageFileName ? <p className="truncate text-xs font-medium text-gray-700">Selected: {centerImageFileName}</p> : null}
 
                   {centerImage ? (
