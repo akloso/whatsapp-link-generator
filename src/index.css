@@ -63,7 +63,7 @@
     display: grid;
     grid-template-columns: minmax(360px, 0.82fr) minmax(560px, 1.18fr);
     height: clamp(640px, calc(100dvh - var(--zapora-header-height, 3.5rem) - 8.5rem), 860px);
-    overflow: hidden;
+    overflow: clip;
     border: 1px solid rgb(209 250 229);
     border-radius: 32px;
     background:

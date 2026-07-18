@@ -480,14 +480,9 @@ function QrCodeEditorPage() {
               <p className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">
                 <Sparkles className="h-3 w-3" /> Zapora design studio
               </p>
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-3">
-                <h1 className="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl">
-                  QR Code Editor
-                </h1>
-                <p className="text-xs leading-5 text-gray-600 sm:pb-0.5 sm:text-sm">
-                  Design and export a polished QR.
-                </p>
-              </div>
+              <h1 className="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl">
+                QR Code Editor
+              </h1>
             </div>
             <div className="flex flex-wrap gap-1 text-[10px] font-semibold text-gray-700 sm:justify-end sm:text-[11px]">
               {[
