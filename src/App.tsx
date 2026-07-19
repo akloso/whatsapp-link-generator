@@ -357,11 +357,13 @@ function App() {
     );
   }
 
+  const isStandaloneEditor = currentPage === 'qrCodeEditor';
+
   return (
-    <div className="min-h-screen bg-white [--zapora-header-height:4rem]">
-      <Header currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} />
+    <div className={`min-h-screen bg-white ${isStandaloneEditor ? '[--zapora-header-height:0px]' : '[--zapora-header-height:4rem]'}`}>
+      {isStandaloneEditor ? null : <Header currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} />}
       {pageContent}
-      <Footer currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />
+      {isStandaloneEditor ? null : <Footer currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />}
     </div>
   );
 }

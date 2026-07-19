@@ -403,3 +403,50 @@
     }
   }
 }
+
+@layer components {
+  .qr-editor-page .qr-studio-topbar {
+    min-height: 74px;
+  }
+
+  .qr-editor-page .qr-editor-workspace {
+    height: auto;
+  }
+
+  .qr-editor-page .qr-canvas-plain {
+    background-image:
+      radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.88), rgb(236 253 245 / 0.7) 48%, rgb(204 251 241 / 0.58) 100%);
+  }
+
+  .qr-editor-page .qr-preview-bright {
+    filter: saturate(1.04) brightness(1.04);
+  }
+
+  @media (min-width: 1024px) {
+    .qr-editor-page .qr-editor-workspace {
+      height: calc(100dvh - 74px);
+      grid-template-columns: 420px minmax(0, 1fr);
+      padding: 1.25rem;
+    }
+
+    .qr-editor-page .qr-editor-controls {
+      width: 420px;
+    }
+
+    .qr-editor-page .qr-editor-preview-panel {
+      padding-left: 1.25rem;
+    }
+
+    .qr-editor-page .qr-preview-artwork-square-post { width: min(100%, 68cqh, 620px); }
+    .qr-editor-page .qr-preview-artwork-story { width: min(100%, 38cqh, 360px); }
+    .qr-editor-page .qr-preview-artwork-poster { width: min(100%, 54cqh, 510px); }
+  }
+
+  @media (max-width: 1023px) {
+    .qr-editor-page {
+      height: auto;
+      min-height: 100dvh;
+      overflow-y: auto;
+    }
+  }
+}

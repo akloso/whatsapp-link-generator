@@ -74,6 +74,10 @@ function QrCodeEditorPage() {
   const [importStatus, setImportStatus] = useState('');
   const [isImportingQr, setIsImportingQr] = useState(false);
   const [exportStatus, setExportStatus] = useState('');
+  const [showFooter, setShowFooter] = useState(true);
+  const [showGrid, setShowGrid] = useState(true);
+  const [brightPreview, setBrightPreview] = useState(false);
+  const [showDecor, setShowDecor] = useState(true);
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -327,7 +331,7 @@ function QrCodeEditorPage() {
       const bodyHeight = cardH - bannerH;
 
       const qrMaxByWidth = cardW - outerPadX * 0.45;
-      const footerBarH = Math.round(cardH * 0.105);
+      const footerBarH = showFooter ? Math.round(cardH * 0.105) : 0;
       const qrMaxByHeight = bodyHeight - footerBarH - Math.round(H * 0.045);
       const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
 
@@ -404,41 +408,43 @@ function QrCodeEditorPage() {
         }
       }
 
-      const footerY = cardY + cardH - footerBarH;
-      ctx.strokeStyle = 'rgba(15, 23, 42, 0.08)';
-      ctx.lineWidth = Math.max(1, W * 0.001);
-      ctx.beginPath();
-      ctx.moveTo(cardX, footerY);
-      ctx.lineTo(cardX + cardW, footerY);
-      ctx.stroke();
+      if (showFooter) {
+        const footerY = cardY + cardH - footerBarH;
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.08)';
+        ctx.lineWidth = Math.max(1, W * 0.001);
+        ctx.beginPath();
+        ctx.moveTo(cardX, footerY);
+        ctx.lineTo(cardX + cardW, footerY);
+        ctx.stroke();
 
-      const buttonW = Math.round(cardW * 0.34);
-      const buttonH = Math.round(footerBarH * 0.54);
-      const buttonX = cardX + Math.round(cardW * 0.06);
-      const buttonY = footerY + (footerBarH - buttonH) / 2;
-      roundedRect(ctx, buttonX, buttonY, buttonW, buttonH, Math.round(buttonH * 0.45));
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(15, 23, 42, 0.11)';
-      ctx.stroke();
-      ctx.fillStyle = '#16a34a';
-      ctx.font = `700 ${Math.round(W * 0.025)}px Inter, system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('☘', buttonX + Math.round(buttonH * 0.55), buttonY + buttonH / 2);
-      ctx.fillStyle = '#111827';
-      ctx.font = `700 ${Math.round(W * 0.019)}px Inter, system-ui, sans-serif`;
-      ctx.fillText(truncate(title, 22), buttonX + buttonW * 0.56, buttonY + buttonH / 2);
+        const buttonW = Math.round(cardW * 0.34);
+        const buttonH = Math.round(footerBarH * 0.54);
+        const buttonX = cardX + Math.round(cardW * 0.06);
+        const buttonY = footerY + (footerBarH - buttonH) / 2;
+        roundedRect(ctx, buttonX, buttonY, buttonW, buttonH, Math.round(buttonH * 0.45));
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.11)';
+        ctx.stroke();
+        ctx.fillStyle = '#16a34a';
+        ctx.font = `700 ${Math.round(W * 0.025)}px Inter, system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('☘', buttonX + Math.round(buttonH * 0.55), buttonY + buttonH / 2);
+        ctx.fillStyle = '#111827';
+        ctx.font = `700 ${Math.round(W * 0.019)}px Inter, system-ui, sans-serif`;
+        ctx.fillText(truncate(title, 22), buttonX + buttonW * 0.56, buttonY + buttonH / 2);
 
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
-      ctx.font = `500 ${Math.round(W * 0.016)}px Inter, system-ui, sans-serif`;
-      ctx.textAlign = 'right';
-      ctx.fillText('Powered by', cardX + cardW - Math.round(cardW * 0.15), footerY + footerBarH / 2);
-      ctx.fillStyle = '#111827';
-      ctx.font = `800 ${Math.round(W * 0.024)}px Inter, system-ui, sans-serif`;
-      ctx.fillText('⚡ Zapora', cardX + cardW - Math.round(cardW * 0.04), footerY + footerBarH / 2);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+        ctx.font = `500 ${Math.round(W * 0.016)}px Inter, system-ui, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText('Powered by', cardX + cardW - Math.round(cardW * 0.15), footerY + footerBarH / 2);
+        ctx.fillStyle = '#111827';
+        ctx.font = `800 ${Math.round(W * 0.024)}px Inter, system-ui, sans-serif`;
+        ctx.fillText('⚡ Zapora', cardX + cardW - Math.round(cardW * 0.04), footerY + footerBarH / 2);
+      }
     },
-    [banner, centerEmoji, centerImage, centerType, isReady, size, subtitle, title],
+    [banner, centerEmoji, centerImage, centerType, isReady, showFooter, size, subtitle, title],
   );
 
   useEffect(() => {
@@ -465,6 +471,7 @@ function QrCodeEditorPage() {
         centerType,
         centerEmoji,
         centerImage,
+        showFooter,
       });
       const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
       url = URL.createObjectURL(blob);
@@ -490,9 +497,9 @@ function QrCodeEditorPage() {
 
 
   return (
-    <main className="qr-editor-page min-h-screen w-full max-w-full overflow-x-hidden bg-[#f7f3ff]">
-      <header className="qr-studio-topbar sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 px-4 py-3 shadow-[0_16px_48px_-42px_rgba(15,23,42,0.45)] backdrop-blur-xl sm:px-6">
-        <div className="mx-auto flex max-w-[1920px] flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <main className="qr-editor-page h-dvh w-full max-w-full overflow-hidden bg-[#f7f3ff]">
+      <header className="qr-studio-topbar z-30 flex min-h-[74px] items-center border-b border-slate-200/70 bg-white/90 px-5 py-3 shadow-[0_16px_48px_-42px_rgba(15,23,42,0.45)] backdrop-blur-xl sm:px-6">
+        <div className="mx-auto flex w-full max-w-none flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-5">
             <div className="inline-flex items-center gap-3 pr-5 lg:border-r lg:border-slate-200">
               <span className="grid h-9 w-9 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-[0_14px_30px_-18px_rgba(5,150,105,0.9)]"><Zap className="h-5 w-5 fill-current" /></span>
@@ -539,8 +546,8 @@ function QrCodeEditorPage() {
         </div>
       </header>
 
-      <section ref={editorSectionRef} className="qr-editor-workspace qr-living-shell mx-auto grid w-full max-w-[1920px] gap-0 p-3 sm:p-5 lg:grid-cols-[500px_minmax(0,1fr)] lg:p-6">
-        <aside ref={controlsPanelRef} className="qr-editor-controls order-2 min-w-0 overflow-hidden rounded-[24px] bg-gradient-to-b from-slate-950 via-[#11243a] to-[#164e63] text-white shadow-[0_28px_90px_-54px_rgba(15,23,42,0.95)] lg:order-1 lg:rounded-[20px]">
+      <section ref={editorSectionRef} className="qr-editor-workspace qr-living-shell mx-auto grid w-full max-w-none gap-0 p-3 sm:p-5 lg:grid-cols-[420px_minmax(0,1fr)] lg:p-6">
+        <aside ref={controlsPanelRef} className="qr-editor-controls order-2 min-w-0 overflow-hidden rounded-[22px] bg-gradient-to-b from-slate-950 via-[#11243a] to-[#164e63] text-white shadow-[0_28px_90px_-54px_rgba(15,23,42,0.95)] lg:order-1 lg:rounded-[22px]">
           <EditorSection title="Content" icon={ScanBarcode}>
             <Field label="WhatsApp Link">
               <DarkInputWrap icon={<LinkGlyph />} ok>
@@ -599,8 +606,8 @@ function QrCodeEditorPage() {
             <p className="text-xs leading-5 text-slate-400">Recommended: Square image, at least 512x512px.</p>
           </EditorSection>
 
-          <EditorSection title="Footer" icon={Download} trailing={<button type="button" className="h-7 w-12 rounded-full bg-emerald-500 p-1"><span className="block h-5 w-5 translate-x-5 rounded-full bg-white" /></button>}>
-            <p className="text-xs text-slate-400">The export includes a clean Zapora powered-by footer.</p>
+          <EditorSection title="Footer" icon={Download} trailing={<button type="button" onClick={() => setShowFooter((value) => !value)} aria-pressed={showFooter} className={`h-7 w-12 rounded-full p-1 transition ${showFooter ? 'bg-emerald-500' : 'bg-white/15'}`}><span className={`block h-5 w-5 rounded-full bg-white transition ${showFooter ? 'translate-x-5' : 'translate-x-0'}`} /></button>}>
+            <p className="text-xs text-slate-400">{showFooter ? 'The export includes a clean Zapora powered-by footer.' : 'Footer hidden from the preview and export.'}</p>
           </EditorSection>
         </aside>
 
@@ -615,10 +622,15 @@ function QrCodeEditorPage() {
               ))}
             </div>
 
-            <div className="qr-preview-stage qr-canvas-grid relative mt-5 flex min-h-[520px] items-center justify-center overflow-hidden rounded-[30px] border border-white/70 p-4 sm:p-8">
-              <PlantDecor />
+            <div className={`qr-preview-stage relative mt-5 flex min-h-[520px] items-center justify-center overflow-hidden rounded-[30px] border border-white/70 p-4 sm:p-8 ${showGrid ? 'qr-canvas-grid' : 'qr-canvas-plain'} ${brightPreview ? 'qr-preview-bright' : ''}`}>
+              {showDecor ? <PlantDecor /> : null}
+              <PresentationPlatform />
               <div className="absolute right-5 top-1/3 z-10 hidden overflow-hidden rounded-3xl bg-white/90 shadow-xl backdrop-blur md:block">
-                {[Grid3X3, SunMedium, Layers].map((Icon, index) => <button key={index} type="button" className="grid h-14 w-14 place-items-center border-b border-slate-100 text-slate-600 last:border-b-0 hover:bg-emerald-50"><Icon className="h-5 w-5" /></button>)}
+                {[
+                  { icon: Grid3X3, label: 'Toggle grid', active: showGrid, onClick: () => setShowGrid((value) => !value) },
+                  { icon: SunMedium, label: 'Toggle brightness', active: brightPreview, onClick: () => setBrightPreview((value) => !value) },
+                  { icon: Layers, label: 'Toggle decorations', active: showDecor, onClick: () => setShowDecor((value) => !value) },
+                ].map(({ icon: Icon, label, active, onClick }) => <button key={label} type="button" aria-pressed={active} aria-label={label} onClick={onClick} className="grid h-14 w-14 place-items-center border-b border-slate-100 text-slate-600 transition last:border-b-0 hover:bg-emerald-50 aria-pressed:text-emerald-700"><Icon className="h-5 w-5" /></button>)}
               </div>
               {isReady ? (
                 <div key={size.name} className={`qr-preview-artwork qr-preview-artwork-${size.name.toLowerCase().replace(/\s+/g, '-')} relative z-[2] w-full max-w-full overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-amber-300/60`} style={{ aspectRatio: `${size.w}/${size.h}`, maxWidth: '100%' }}>
@@ -658,6 +670,10 @@ function DarkColorField({ label, value, onChange, readonly = false }: { label: s
 
 function EditorSection({ title, icon: Icon, children, trailing }: { title: string; icon: React.ComponentType<{ className?: string }>; children: React.ReactNode; trailing?: React.ReactNode }) {
   return <section className="border-b border-white/10 p-5 last:border-b-0"><div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><Icon className="h-4 w-4 text-slate-300" /><h2 className="text-xs font-black uppercase tracking-wide text-slate-200">{title}</h2></div>{trailing ?? <ChevronDown className="h-4 w-4 text-slate-300" />}</div><div className="space-y-5">{children}</div></section>;
+}
+
+function PresentationPlatform() {
+  return <div aria-hidden="true" className="absolute bottom-[7%] left-1/2 z-[1] h-24 w-[44rem] max-w-[70%] -translate-x-1/2 rounded-[100%] bg-white/70 shadow-[0_0_40px_8px_rgba(52,211,153,0.35),inset_0_-16px_24px_rgba(20,184,166,0.18)]" />;
 }
 
 function PlantDecor() {
@@ -784,6 +800,7 @@ async function buildSvgExport({
   centerType,
   centerEmoji,
   centerImage,
+  showFooter,
 }: {
   size: SizeOption;
   finalContent: string;
@@ -794,6 +811,7 @@ async function buildSvgExport({
   centerType: CenterType;
   centerEmoji: string;
   centerImage: string | null;
+  showFooter: boolean;
 }) {
   const W = size.w;
   const H = size.h;
@@ -811,7 +829,8 @@ async function buildSvgExport({
   const escapedSubtitle = escapeXml(truncate(subtitle, 60));
   const gradientMid = shade(banner, 8);
   const gradientEnd = shade(banner, -18);
-  const footerY = layout.cardY + layout.cardH - Math.round(H * 0.025);
+  const footerBarH = showFooter ? Math.round(layout.cardH * 0.105) : 0;
+  const footerY = layout.cardY + layout.cardH - footerBarH;
   const logoPadding = Math.round(layout.logoSize * 0.2);
   const logoRadius = Math.round(layout.logoSize * 0.18);
 
@@ -857,7 +876,10 @@ async function buildSvgExport({
   <rect x="${layout.qrX - layout.qrPadding}" y="${layout.qrY - layout.qrPadding}" width="${layout.qrSize + layout.qrPadding * 2}" height="${layout.qrSize + layout.qrPadding * 2}" rx="${Math.round(layout.qrSize * 0.06)}" fill="#ffffff" filter="url(#soft-qr-shadow)" />
   <g transform="translate(${layout.qrX} ${layout.qrY}) scale(${qrScale})">${qrInner}</g>
   ${centerMarkup}
-  <text x="${layout.centerX}" y="${footerY}" text-anchor="middle" fill="rgba(15,31,23,0.38)" font-size="${layout.footerSize}" font-family="Inter, system-ui, sans-serif" font-weight="600">Powered by Zapora</text>
+  ${showFooter ? `<line x1="${layout.cardX}" y1="${footerY}" x2="${layout.cardX + layout.cardW}" y2="${footerY}" stroke="rgba(15,23,42,0.08)" stroke-width="1" />
+  <rect x="${layout.cardX + Math.round(layout.cardW * 0.06)}" y="${footerY + Math.round(footerBarH * 0.23)}" width="${Math.round(layout.cardW * 0.34)}" height="${Math.round(footerBarH * 0.54)}" rx="${Math.round(footerBarH * 0.27)}" fill="#ffffff" stroke="rgba(15,23,42,0.11)" />
+  <text x="${layout.cardX + Math.round(layout.cardW * 0.225)}" y="${footerY + footerBarH / 2}" text-anchor="middle" dominant-baseline="middle" fill="#111827" font-size="${Math.round(W * 0.019)}" font-family="Inter, system-ui, sans-serif" font-weight="700">${escapedTitle}</text>
+  <text x="${layout.cardX + layout.cardW - Math.round(layout.cardW * 0.04)}" y="${footerY + footerBarH / 2}" text-anchor="end" dominant-baseline="middle" fill="#111827" font-size="${Math.round(W * 0.024)}" font-family="Inter, system-ui, sans-serif" font-weight="800">⚡ Zapora</text>` : ''}
 </svg>`;
 }
 
