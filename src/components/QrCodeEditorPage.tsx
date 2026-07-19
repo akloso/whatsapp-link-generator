@@ -2,24 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import {
-  Briefcase,
+  Check,
+  ChevronDown,
   Download,
-  Headset,
-  Image as ImageIcon,
-  Megaphone,
+  Grid3X3,
+  Layers,
   Palette,
-  PartyPopper,
   ScanBarcode,
-  Smile,
+  Smartphone,
   Sparkles,
-  Store,
-  Ticket,
-  Trash2,
+  SunMedium,
   Upload,
+  Zap,
 } from 'lucide-react';
 import { QR_EDITOR_STORAGE_KEY } from './qrEditorConstants';
 import { trackEvent } from '../lib/trackEvent';
-import { Button, Surface, TextInput, Textarea } from './ui';
+import { Button } from './ui';
 
 type Preset = {
   name: string;
@@ -39,12 +37,11 @@ type FormatOption = 'PNG' | 'JPG' | 'SVG';
 type CenterType = 'none' | 'emoji' | 'image';
 
 const PRESETS: Preset[] = [
-  { name: 'Classic', fg: '#0f1f17', bg: '#ffffff', banner: '#16a34a' },
-  { name: 'WhatsApp', fg: '#0b3d2e', bg: '#ffffff', banner: '#25d366' },
-  { name: 'Midnight', fg: '#0b1220', bg: '#ffffff', banner: '#1e293b' },
-  { name: 'Royal', fg: '#1e1b4b', bg: '#ffffff', banner: '#4f46e5' },
-  { name: 'Sunset', fg: '#3b0a0a', bg: '#ffffff', banner: '#f97316' },
-  { name: 'Berry', fg: '#3b0764', bg: '#ffffff', banner: '#a21caf' },
+  { name: 'Emerald', fg: '#111827', bg: '#ffffff', banner: '#16a34a' },
+  { name: 'Ocean', fg: '#0f172a', bg: '#ffffff', banner: '#0ea5e9' },
+  { name: 'Sunset', fg: '#24130f', bg: '#ffffff', banner: '#fb923c' },
+  { name: 'Royal', fg: '#111827', bg: '#ffffff', banner: '#5b7cfa' },
+  { name: 'Purple', fg: '#231942', bg: '#ffffff', banner: '#a855f7' },
 ];
 
 const SIZES: SizeOption[] = [
@@ -62,22 +59,20 @@ type BarcodeDetectorLike = new (options: { formats: string[] }) => {
 
 function QrCodeEditorPage() {
   const [rawContent, setRawContent] = useState('');
-  const [message, setMessage] = useState('');
-  const [title, setTitle] = useState('Scan to chat');
-  const [subtitle, setSubtitle] = useState('Connect with us on WhatsApp');
+  const [message, setMessage] = useState("Hi! I'm interested in your product.");
+  const [title, setTitle] = useState('Chat with us');
+  const [subtitle] = useState("We're here to help!");
   const [preset, setPreset] = useState<Preset>(PRESETS[1]);
   const [fg, setFg] = useState(PRESETS[1].fg);
   const [banner, setBanner] = useState(PRESETS[1].banner);
-  const [centerType, setCenterType] = useState<CenterType>('none');
-  const [centerEmoji, setCenterEmoji] = useState('💬');
+  const [centerType, setCenterType] = useState<CenterType>('emoji');
+  const [centerEmoji, setCenterEmoji] = useState('⚡');
   const [centerImage, setCenterImage] = useState<string | null>(null);
   const [size, setSize] = useState<SizeOption>(SIZES[0]);
   const [format, setFormat] = useState<FormatOption>('PNG');
   const [status, setStatus] = useState('');
   const [importStatus, setImportStatus] = useState('');
   const [isImportingQr, setIsImportingQr] = useState(false);
-  const [importFileName, setImportFileName] = useState('');
-  const [centerImageFileName, setCenterImageFileName] = useState('');
   const [exportStatus, setExportStatus] = useState('');
 
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -97,7 +92,7 @@ function QrCodeEditorPage() {
       }
       return;
     }
-    setRawContent('https://wa.me/919999999999');
+    setRawContent('https://wa.me/918448848888');
   }, []);
 
   const finalContent = useMemo(() => {
@@ -130,7 +125,6 @@ function QrCodeEditorPage() {
       return;
     }
 
-    setCenterImageFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
       setCenterImage(reader.result as string);
@@ -165,12 +159,10 @@ function QrCodeEditorPage() {
   };
 
   const handleImportQr = async (file: File) => {
-    setImportFileName(file.name);
     setImportStatus('Reading QR image...');
 
     const acceptedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!acceptedTypes.includes(file.type)) {
-      setImportFileName(file.name);
       setImportStatus('Please upload a PNG, JPG, or WEBP QR image.');
       return;
     }
@@ -335,11 +327,12 @@ function QrCodeEditorPage() {
       const bodyHeight = cardH - bannerH;
 
       const qrMaxByWidth = cardW - outerPadX * 0.45;
-      const qrMaxByHeight = bodyHeight - Math.round(H * 0.075);
+      const footerBarH = Math.round(cardH * 0.105);
+      const qrMaxByHeight = bodyHeight - footerBarH - Math.round(H * 0.045);
       const qrSize = Math.min(qrMaxByWidth, qrMaxByHeight);
 
       const qrX = cardX + (cardW - qrSize) / 2;
-      const qrY = bodyTop + (bodyHeight - qrSize) / 2 - Math.round(H * 0.004);
+      const qrY = bodyTop + (bodyHeight - footerBarH - qrSize) / 2 + Math.round(H * 0.012);
 
       const qrPadding = Math.round(qrSize * 0.035);
 
@@ -411,11 +404,39 @@ function QrCodeEditorPage() {
         }
       }
 
-      const footerSize = Math.round(W * 0.02);
-      ctx.fillStyle = 'rgba(15, 31, 23, 0.38)';
-      ctx.font = `600 ${footerSize}px Inter, system-ui, sans-serif`;
+      const footerY = cardY + cardH - footerBarH;
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.08)';
+      ctx.lineWidth = Math.max(1, W * 0.001);
+      ctx.beginPath();
+      ctx.moveTo(cardX, footerY);
+      ctx.lineTo(cardX + cardW, footerY);
+      ctx.stroke();
+
+      const buttonW = Math.round(cardW * 0.34);
+      const buttonH = Math.round(footerBarH * 0.54);
+      const buttonX = cardX + Math.round(cardW * 0.06);
+      const buttonY = footerY + (footerBarH - buttonH) / 2;
+      roundedRect(ctx, buttonX, buttonY, buttonW, buttonH, Math.round(buttonH * 0.45));
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.11)';
+      ctx.stroke();
+      ctx.fillStyle = '#16a34a';
+      ctx.font = `700 ${Math.round(W * 0.025)}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('Powered by Zapora', centerX, cardY + cardH - Math.round(H * 0.025));
+      ctx.textBaseline = 'middle';
+      ctx.fillText('☘', buttonX + Math.round(buttonH * 0.55), buttonY + buttonH / 2);
+      ctx.fillStyle = '#111827';
+      ctx.font = `700 ${Math.round(W * 0.019)}px Inter, system-ui, sans-serif`;
+      ctx.fillText(truncate(title, 22), buttonX + buttonW * 0.56, buttonY + buttonH / 2);
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+      ctx.font = `500 ${Math.round(W * 0.016)}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillText('Powered by', cardX + cardW - Math.round(cardW * 0.15), footerY + footerBarH / 2);
+      ctx.fillStyle = '#111827';
+      ctx.font = `800 ${Math.round(W * 0.024)}px Inter, system-ui, sans-serif`;
+      ctx.fillText('⚡ Zapora', cardX + cardW - Math.round(cardW * 0.04), footerY + footerBarH / 2);
     },
     [banner, centerEmoji, centerImage, centerType, isReady, size, subtitle, title],
   );
@@ -467,448 +488,191 @@ function QrCodeEditorPage() {
     window.setTimeout(() => setExportStatus(''), 2200);
   };
 
-  const scrollToEditor = () => {
-    editorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
 
   return (
-    <main className="qr-editor-page min-h-screen w-full max-w-full overflow-x-hidden py-4 sm:py-5 lg:py-6">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <section className="qr-studio-titlebar relative mb-3 overflow-hidden rounded-[22px] border border-emerald-100/80 bg-white/80 px-3 py-2.5 shadow-[0_18px_48px_-38px_rgba(5,150,105,0.45)] backdrop-blur sm:px-4">
-          <div aria-hidden="true" className="absolute -right-10 -top-16 h-32 w-32 rounded-full bg-cyan-100/70 blur-3xl" />
-          <div className="relative flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+    <main className="qr-editor-page min-h-screen w-full max-w-full overflow-x-hidden bg-[#f7f3ff]">
+      <header className="qr-studio-topbar sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 px-4 py-3 shadow-[0_16px_48px_-42px_rgba(15,23,42,0.45)] backdrop-blur-xl sm:px-6">
+        <div className="mx-auto flex max-w-[1920px] flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-5">
+            <div className="inline-flex items-center gap-3 pr-5 lg:border-r lg:border-slate-200">
+              <span className="grid h-9 w-9 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-[0_14px_30px_-18px_rgba(5,150,105,0.9)]"><Zap className="h-5 w-5 fill-current" /></span>
+              <span className="text-xl font-black tracking-tight text-slate-950">Zapora</span>
+            </div>
             <div className="min-w-0">
-              <p className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/90 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800">
-                <Sparkles className="h-3 w-3" /> Zapora QR Studio
-              </p>
-              <h1 className="text-lg font-semibold tracking-tight text-gray-900 sm:text-xl">
-                QR Code Editor
-              </h1>
-            </div>
-            <div className="flex flex-wrap gap-1 text-[10px] font-semibold text-gray-700 sm:justify-end">
-              {[
-                ['Import QR', Upload, 'text-cyan-700 bg-cyan-50 border-cyan-100'],
-                ['Brand colors', Palette, 'text-violet-700 bg-violet-50 border-violet-100'],
-                ['Logo or emoji', Smile, 'text-emerald-700 bg-emerald-50 border-emerald-100'],
-                ['PNG/JPG/SVG', Download, 'text-gray-700 bg-gray-50 border-gray-200'],
-              ].map(([label, Icon, colorClass]) => {
-                const CapabilityIcon = Icon as React.ComponentType<{ className?: string }>;
-                return <span key={label as string} className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 shadow-sm ${colorClass as string}`}><CapabilityIcon className="h-3 w-3" />{label as string}</span>;
-              })}
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-lg font-black tracking-tight text-slate-950 sm:text-xl">QR Code Editor</h1>
+                <span className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Live export canvas</span>
+              </div>
             </div>
           </div>
-        </section>
 
-        <section ref={editorSectionRef} className="qr-editor-workspace qr-living-shell grid gap-4 lg:gap-0">
-          <div ref={controlsPanelRef} className="qr-editor-controls order-2 min-w-0 space-y-3 lg:order-1">
-            <Section title="Content" icon={ScanBarcode}>
-              <label className="group block cursor-pointer rounded-2xl border border-dashed border-cyan-200/90 bg-cyan-50/55 px-3 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50 focus-within:ring-4 focus-within:ring-cyan-500/15">
-                <span className="flex items-start gap-3">
-                  <span className="rounded-xl bg-white p-2 text-cyan-700 shadow-sm ring-1 ring-cyan-100"><Upload className="h-4 w-4" /></span>
-                  <span className="min-w-0 flex-1"><span className="text-sm font-semibold text-gray-900">Import an existing QR</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-gray-600">PNG, JPG, or WEBP.</span></span>
-                </span>
-                <span className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-800 shadow-sm transition group-hover:border-cyan-300">
-                  <ImageIcon className="h-3.5 w-3.5" /> {isImportingQr ? 'Importing...' : 'Choose QR image'}
-                </span>
-                {importFileName ? <span className="mt-2 block truncate text-xs font-medium text-gray-700">Selected: {importFileName}</span> : null}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void handleImportQr(file);
-                    }
-                    event.currentTarget.value = '';
-                  }}
-                  className="sr-only"
-                />
-              </label>
-              {importStatus ? (
-                <p role="status" aria-live="polite" className={`mt-2 rounded-xl px-3 py-2 text-xs font-medium ${importStatus.includes('successfully') ? 'bg-emerald-50 text-emerald-800' : importStatus.includes('couldn') || importStatus.includes('Please') ? 'bg-rose-50 text-rose-800' : 'bg-cyan-50 text-cyan-800'}`}>{importStatus}</p>
-              ) : null}
-
-              <Field label="Link or text">
-                <TextInput
-                  value={rawContent}
-                  onChange={(event) => handleRawContentChange(event.target.value)}
-                  placeholder="https://wa.me/91XXXXXXXXXX"
-                  className=""
-                />
-              </Field>
-
-              <Field label="WhatsApp message" optional hint={isWhatsAppUrl(rawContent) ? 'Synced with your WhatsApp link.' : 'Used for WhatsApp links.'}>
-                <Textarea
-                  value={message}
-                  onChange={(event) => handleMessageChange(event.target.value)}
-                  rows={3}
-                  placeholder="Optional pre-filled WhatsApp message"
-                  className="min-h-[88px]"
-                />
-              </Field>
-
-              <Field label="Title" counter={`${title.length}/40`}>
-                <TextInput
-                  value={title}
-                  maxLength={40}
-                  onChange={(event) => setTitle(event.target.value)}
-                  className=""
-                />
-              </Field>
-
-              <Field label="Subtitle" counter={`${subtitle.length}/60`}>
-                <TextInput
-                  value={subtitle}
-                  maxLength={60}
-                  onChange={(event) => setSubtitle(event.target.value)}
-                  className=""
-                />
-              </Field>
-            </Section>
-
-            <Section title="Brand style" icon={Palette}>
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-2.5">
-                {PRESETS.map((presetOption) => (
-                  <button
-                    key={presetOption.name}
-                    onClick={() => applyPreset(presetOption)}
-                    aria-pressed={preset.name === presetOption.name}
-                    className={`qr-tactile-card min-w-0 rounded-2xl border p-1.5 text-left transition sm:p-2 ${
-                      preset.name === presetOption.name
-                        ? 'border-emerald-400 bg-white font-semibold shadow-[0_18px_38px_-28px_rgba(5,150,105,0.75)] ring-2 ring-emerald-300/45'
-                        : 'border-white/90 bg-white/85 shadow-sm hover:border-emerald-200 hover:bg-white'
-                    }`}
-                  >
-                    <div className="relative h-10 overflow-hidden rounded-xl ring-1 ring-emerald-100/80">
-                      <div className="absolute inset-x-0 top-0 h-4" style={{ background: presetOption.banner }} />
-                      <div className="absolute bottom-1.5 left-1.5 grid h-5 w-5 grid-cols-3 gap-[2px] rounded-md bg-white p-[2px] shadow-sm">
-                        {Array.from({ length: 9 }).map((_, index) => (
-                          <span key={index} className="rounded-[1px]" style={{ background: index % 2 === 0 ? presetOption.fg : '#ffffff' }} />
-                        ))}
-                      </div>
-                      <div className="absolute bottom-1.5 right-1.5 h-5 w-5 rounded-full border-2 border-white shadow-sm" style={{ background: presetOption.fg }} />
-                    </div>
-                    <p className="mt-1 truncate text-[10px] font-medium text-gray-800 sm:text-xs">{presetOption.name}</p>
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5 pt-1.5 sm:gap-3">
-                <ColorField label="QR color" value={fg} onChange={setFg} />
-                <ColorField label="Banner" value={banner} onChange={setBanner} />
-              </div>
-            </Section>
-
-            <Section title="Center mark" icon={Sparkles}>
-              <div className="grid w-full grid-cols-3 gap-1.5 sm:w-auto sm:gap-2">
-                {(['none', 'emoji', 'image'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setCenterType(type)}
-                    aria-pressed={centerType === type}
-                    className={`qr-pill-button min-w-0 rounded-xl border px-2.5 py-2 text-[11px] font-medium capitalize transition sm:px-3 sm:text-xs ${
-                      centerType === type
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm ring-2 ring-emerald-200/70'
-                        : 'border-white bg-white/80 text-gray-700 shadow-sm hover:border-emerald-200 hover:bg-white'
-                    }`}
-                  >
-                    {type === 'none' ? (
-                      'None'
-                    ) : type === 'emoji' ? (
-                      <span className="inline-flex min-w-0 items-center gap-1">
-                        <Smile className="h-3.5 w-3.5" /> Emoji
-                      </span>
-                    ) : (
-                      <span className="inline-flex min-w-0 items-center gap-1">
-                        <ImageIcon className="h-3.5 w-3.5" /> Image
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {centerType === 'emoji' ? (
-                <div className="mt-3 grid grid-cols-6 gap-1.5">
-                  {EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => setCenterEmoji(emoji)}
-                      aria-pressed={centerEmoji === emoji}
-                    className={`qr-emoji-button flex aspect-square min-h-10 items-center justify-center rounded-lg text-xl leading-none transition ${
-                        centerEmoji === emoji ? 'bg-white shadow-sm ring-2 ring-emerald-400' : 'bg-white/60 hover:bg-white'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {centerType === 'image' ? (
-                <div className="mt-3 space-y-2">
-                  <button
-                    type="button"
-                    onClick={openCenterImagePicker}
-                    className="qr-upload-button flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-4 text-sm font-medium text-violet-800 transition hover:border-violet-300 hover:bg-violet-50 focus-visible:ring-4 focus-visible:ring-violet-500/15"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                    {centerImage ? 'Replace image' : 'Upload image (PNG, JPG, WEBP)'}
-                  </button>
-                  <input ref={centerImageInputRef} type="file" accept="image/*" onChange={onUpload} className="hidden" tabIndex={-1} aria-hidden="true" />
-                  {centerImageFileName ? <p className="truncate text-xs font-medium text-gray-700">Selected: {centerImageFileName}</p> : null}
-
-                  {centerImage ? (
-                    <button
-                      onClick={() => {
-                        setCenterImage(null);
-                        setCenterImageFileName('');
-                        setCenterType('none');
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs text-gray-500 transition hover:text-red-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Remove image
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </Section>
-          </div>
-
-          <div className="qr-editor-preview-panel order-1 min-w-0 lg:order-2">
-            <div className="qr-editor-preview-card qr-premium-panel rounded-[28px] border border-white/80 bg-white/55 p-3 shadow-[0_28px_80px_-48px_rgba(5,150,105,0.45)] backdrop-blur sm:rounded-[34px] sm:p-4">
-              <div className="qr-preview-toolbar qr-action-bar mx-auto grid w-full max-w-[430px] grid-cols-3 gap-1 rounded-full border border-white/90 bg-white/85 p-1 shadow-sm backdrop-blur">
-                  {SIZES.map((sizeOption) => (
-                    <button
-                      key={sizeOption.name}
-                      onClick={() => setSize(sizeOption)}
-                      aria-pressed={size.name === sizeOption.name}
-                      className={`min-h-10 min-w-0 rounded-full px-2 py-1.5 text-center transition ${
-                        size.name === sizeOption.name
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-900'
-                      }`}
-                    >
-                      <p className="text-[11px] font-semibold leading-tight">{sizeOption.name}</p>
-                      <p className={`text-[10px] ${size.name === sizeOption.name ? 'text-white/70' : 'text-gray-500'}`}>{sizeOption.ratio}</p>
-                    </button>
-                  ))}
-              </div>
-
-              <div className="qr-preview-stage qr-canvas-grid mt-3 max-w-full overflow-hidden rounded-[26px] border border-white/80 p-3 shadow-inner sm:rounded-[32px] sm:p-5">
-                <div className="flex h-full w-full items-center justify-center">
-                {isReady ? (
-                  <div
-                    key={size.name}
-                    className={`qr-preview-artwork qr-preview-artwork-${size.name.toLowerCase().replace(/\s+/g, '-')} w-full max-w-full overflow-hidden rounded-[22px] bg-white ring-1 ring-emerald-100/80 sm:rounded-[28px]`}
-                    style={{
-                      aspectRatio: `${size.w}/${size.h}`,
-                      maxWidth: '100%',
-                    }}
-                  >
-                    <canvas ref={previewRef} className="block h-full w-full zapora-qr-preview-enter" aria-label={`Live QR preview in ${size.name} format`} role="img" />
-                  </div>
-                ) : (
-                  <div className="flex min-h-[300px] w-full items-center justify-center rounded-[22px] border border-dashed border-emerald-200 bg-white/70 px-4 text-center text-sm text-gray-500 sm:min-h-[420px] sm:rounded-[28px] sm:px-6">
-                    Add a link or text to generate your QR preview.
-                  </div>
-                )}
-                </div>
-              </div>
-
-              <div className="qr-export-panel qr-export-dock mt-3 rounded-[24px] border border-white/90 bg-white/90 p-2.5 shadow-[0_18px_46px_-34px_rgba(5,150,105,0.48)] backdrop-blur">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="grid grid-cols-3 gap-1.5 sm:w-[184px]">
-                  {FORMATS.map((formatOption) => (
-                    <button
-                      key={formatOption}
-                      onClick={() => setFormat(formatOption)}
-                      aria-pressed={format === formatOption}
-                      className={`qr-format-button min-h-10 min-w-0 rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                        format === formatOption
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm'
-                          : 'border-white bg-white text-gray-700 hover:border-emerald-200 hover:bg-emerald-50/70'
-                      }`}
-                    >
-                      {formatOption}
-                    </button>
-                  ))}
-                </div>
-
-                <p className="text-center text-xs font-medium text-gray-500 sm:flex-1">{size.w} x {size.h}px</p>
-
-                <Button
-                  onClick={handleDownload}
-                  disabled={!isReady}
-                  variant="primary"
-                  className="w-full sm:w-auto"
-                  icon={<Download className="h-4 w-4" />}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus-within:ring-4 focus-within:ring-emerald-500/15">
+              <Upload className="h-4 w-4" /> {isImportingQr ? 'Importing...' : 'Import QR'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void handleImportQr(file);
+                  event.currentTarget.value = '';
+                }}
+                className="sr-only"
+              />
+            </label>
+            <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              {FORMATS.map((formatOption) => (
+                <button
+                  key={formatOption}
+                  onClick={() => setFormat(formatOption)}
+                  aria-pressed={format === formatOption}
+                  className={`min-h-11 min-w-[72px] border-r border-slate-200 px-4 text-sm font-black last:border-r-0 ${format === formatOption ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-400' : 'text-slate-800 hover:bg-slate-50'}`}
                 >
-                  Download QR ({format})
-                </Button>
+                  {formatOption}
+                </button>
+              ))}
+            </div>
+            <Button onClick={handleDownload} disabled={!isReady} variant="primary" className="min-w-[180px] rounded-2xl bg-emerald-600 shadow-[0_16px_34px_-22px_rgba(5,150,105,0.9)]" icon={<Download className="h-4 w-4" />}>
+              Download QR
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <section ref={editorSectionRef} className="qr-editor-workspace qr-living-shell mx-auto grid w-full max-w-[1920px] gap-0 p-3 sm:p-5 lg:grid-cols-[500px_minmax(0,1fr)] lg:p-6">
+        <aside ref={controlsPanelRef} className="qr-editor-controls order-2 min-w-0 overflow-hidden rounded-[24px] bg-gradient-to-b from-slate-950 via-[#11243a] to-[#164e63] text-white shadow-[0_28px_90px_-54px_rgba(15,23,42,0.95)] lg:order-1 lg:rounded-[20px]">
+          <EditorSection title="Content" icon={ScanBarcode}>
+            <Field label="WhatsApp Link">
+              <DarkInputWrap icon={<LinkGlyph />} ok>
+                <input value={rawContent} onChange={(event) => handleRawContentChange(event.target.value)} placeholder="https://wa.me/91XXXXXXXXXX" className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500" />
+              </DarkInputWrap>
+            </Field>
+            <Field label="Button Text" counter={`${title.length}/25`}>
+              <DarkInputWrap>
+                <input value={title} maxLength={25} onChange={(event) => setTitle(event.target.value)} className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500" />
+              </DarkInputWrap>
+            </Field>
+            <Field label="WhatsApp Message" optional counter={`${message.length}/140`}>
+              <textarea value={message} maxLength={140} onChange={(event) => handleMessageChange(event.target.value)} rows={3} className="min-h-[82px] w-full resize-none rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-sm font-medium leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-500/15" />
+            </Field>
+            {importStatus ? <p role="status" aria-live="polite" className={`rounded-xl px-3 py-2 text-xs font-semibold ${importStatus.includes('successfully') ? 'bg-emerald-400/15 text-emerald-100' : importStatus.includes('couldn') || importStatus.includes('Please') ? 'bg-rose-400/15 text-rose-100' : 'bg-cyan-400/15 text-cyan-100'}`}>{importStatus}</p> : null}
+          </EditorSection>
+
+          <EditorSection title="Brand Style" icon={Palette}>
+            <div>
+              <p className="mb-2 text-xs font-bold text-white">Color Presets</p>
+              <div className="grid grid-cols-5 gap-3">
+                {PRESETS.map((presetOption) => (
+                  <button key={presetOption.name} onClick={() => applyPreset(presetOption)} aria-pressed={preset.name === presetOption.name} className="group min-w-0 text-center">
+                    <span className={`relative block h-12 overflow-hidden rounded-xl border p-1 shadow-lg transition ${preset.name === presetOption.name ? 'border-emerald-300 ring-2 ring-emerald-400' : 'border-white/15 hover:border-white/40'}`}>
+                      <span className="block h-full rounded-lg" style={{ background: `linear-gradient(135deg, ${presetOption.banner}, ${presetOption.fg})` }} />
+                      {preset.name === presetOption.name ? <Check className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 p-0.5 text-white" /> : null}
+                    </span>
+                    <span className="mt-2 block truncate text-[11px] font-medium text-slate-300">{presetOption.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-bold text-white">Custom Colors</p>
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                <DarkColorField label="Banner Color" value={banner} onChange={setBanner} />
+                <DarkColorField label="QR Color" value={fg} onChange={setFg} />
+                <DarkColorField label="Foreground Text" value="#ffffff" onChange={() => undefined} readonly />
+              </div>
+            </div>
+          </EditorSection>
+
+          <EditorSection title="Center Mark" icon={Sparkles}>
+            <div className="flex items-center gap-4">
+              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-white text-4xl text-emerald-600 shadow-inner">{centerType === 'image' && centerImage ? <img src={centerImage} alt="Center mark" className="h-full w-full rounded-full object-cover" /> : centerEmoji}</div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setCenterType('emoji')} className="rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white transition hover:bg-white/10">Use Emoji</button>
+                <button type="button" onClick={openCenterImagePicker} className="rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white transition hover:bg-white/10">Change Image</button>
+                <button type="button" onClick={() => { setCenterImage(null); setCenterType('none'); }} className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/20">Remove</button>
+              </div>
+              <input ref={centerImageInputRef} type="file" accept="image/*" onChange={onUpload} className="hidden" tabIndex={-1} aria-hidden="true" />
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              {EMOJIS.map((emoji) => <button key={emoji} onClick={() => { setCenterEmoji(emoji); setCenterType('emoji'); }} aria-pressed={centerEmoji === emoji && centerType === 'emoji'} className="grid aspect-square place-items-center rounded-xl bg-white/5 text-xl transition hover:bg-white/10 aria-pressed:bg-emerald-500/30">{emoji}</button>)}
+            </div>
+            <p className="text-xs leading-5 text-slate-400">Recommended: Square image, at least 512x512px.</p>
+          </EditorSection>
+
+          <EditorSection title="Footer" icon={Download} trailing={<button type="button" className="h-7 w-12 rounded-full bg-emerald-500 p-1"><span className="block h-5 w-5 translate-x-5 rounded-full bg-white" /></button>}>
+            <p className="text-xs text-slate-400">The export includes a clean Zapora powered-by footer.</p>
+          </EditorSection>
+        </aside>
+
+        <div className="qr-editor-preview-panel order-1 min-w-0 lg:order-2">
+          <div className="qr-editor-preview-card relative min-h-[640px] overflow-hidden rounded-[30px] border border-white/80 bg-gradient-to-br from-[#fff7ed] via-[#f0fdfa] to-[#e0f2fe] p-4 shadow-[0_36px_100px_-64px_rgba(20,184,166,0.7)] sm:p-6 lg:min-h-full lg:rounded-[34px]">
+            <div className="qr-preview-toolbar qr-action-bar mx-auto grid w-full max-w-[540px] grid-cols-3 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/85 p-1 shadow-sm backdrop-blur-xl">
+              {SIZES.map((sizeOption) => (
+                <button key={sizeOption.name} onClick={() => setSize(sizeOption)} aria-pressed={size.name === sizeOption.name} className={`flex min-h-14 items-center justify-center gap-3 rounded-2xl px-2 transition ${size.name === sizeOption.name ? 'border border-emerald-300 bg-white text-slate-950 shadow-[0_16px_30px_-24px_rgba(5,150,105,0.8)]' : 'text-slate-500 hover:bg-white/70'}`}>
+                  <span className={`grid h-7 w-7 place-items-center rounded-xl ${size.name === sizeOption.name ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}><Smartphone className="h-4 w-4" /></span>
+                  <span className="text-left"><span className="block text-sm font-black leading-tight">{sizeOption.name}</span><span className="block text-xs font-medium text-slate-500">{sizeOption.ratio}</span></span>
+                </button>
+              ))}
+            </div>
+
+            <div className="qr-preview-stage qr-canvas-grid relative mt-5 flex min-h-[520px] items-center justify-center overflow-hidden rounded-[30px] border border-white/70 p-4 sm:p-8">
+              <PlantDecor />
+              <div className="absolute right-5 top-1/3 z-10 hidden overflow-hidden rounded-3xl bg-white/90 shadow-xl backdrop-blur md:block">
+                {[Grid3X3, SunMedium, Layers].map((Icon, index) => <button key={index} type="button" className="grid h-14 w-14 place-items-center border-b border-slate-100 text-slate-600 last:border-b-0 hover:bg-emerald-50"><Icon className="h-5 w-5" /></button>)}
+              </div>
+              {isReady ? (
+                <div key={size.name} className={`qr-preview-artwork qr-preview-artwork-${size.name.toLowerCase().replace(/\s+/g, '-')} relative z-[2] w-full max-w-full overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-amber-300/60`} style={{ aspectRatio: `${size.w}/${size.h}`, maxWidth: '100%' }}>
+                  <canvas ref={previewRef} className="block h-full w-full zapora-qr-preview-enter" aria-label={`Live QR preview in ${size.name} format`} role="img" />
                 </div>
-                {exportStatus ? <p role="status" aria-live="polite" className="mt-2 text-center text-xs font-medium text-green-700">{exportStatus}</p> : null}
+              ) : <div className="relative z-[2] rounded-3xl border border-dashed border-emerald-300 bg-white/75 px-8 py-14 text-center text-sm font-semibold text-slate-600">Add a link or text to generate your QR preview.</div>}
+            </div>
+
+            <div className="qr-export-panel qr-export-dock mt-4 rounded-[28px] bg-slate-950/95 p-5 text-white shadow-[0_24px_60px_-40px_rgba(15,23,42,0.9)] backdrop-blur-xl">
+              <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr_auto] lg:items-center">
+                <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Output Size</p><p className="mt-2 text-xl font-medium">{size.w} x {size.h} px <span className="ml-3 rounded-lg bg-emerald-500/20 px-3 py-1 text-sm font-bold text-emerald-300">{size.ratio}</span></p></div>
+                <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Format</p><div className="mt-2 grid max-w-xs grid-cols-3 gap-2">{FORMATS.map((formatOption) => <button key={formatOption} onClick={() => setFormat(formatOption)} aria-pressed={format === formatOption} className={`min-h-12 rounded-xl text-sm font-black transition ${format === formatOption ? 'bg-emerald-500 text-white ring-2 ring-emerald-300/70' : 'bg-white/10 text-white hover:bg-white/15'}`}>{formatOption}</button>)}</div></div>
+                <Button onClick={handleDownload} disabled={!isReady} variant="primary" className="min-w-[260px] rounded-2xl bg-emerald-600 py-4 text-base" icon={<Download className="h-5 w-5" />}>Download QR</Button>
               </div>
-
-              {status ? <p className="mt-4 text-sm text-gray-500">{status}</p> : null}
+              {exportStatus ? <p role="status" aria-live="polite" className="mt-3 text-center text-xs font-semibold text-emerald-300">{exportStatus}</p> : null}
             </div>
+            {status ? <p className="mt-4 text-sm text-slate-600">{status}</p> : null}
           </div>
-        </section>
-
-        <section className="qr-editor-support mt-6 space-y-4 sm:mt-8 sm:space-y-5">
-          <div className="grid gap-4 rounded-2xl border border-emerald-100/70 bg-white/62 p-4 shadow-[0_18px_48px_-42px_rgba(5,150,105,0.36)] backdrop-blur sm:rounded-[24px] sm:p-5 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="min-w-0">
-              <p className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                QR Code Editor
-              </p>
-              <h2 className="mt-3 text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl">
-                Design QR codes worth scanning.
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-500">
-                A premium QR design studio built into Zapora. Add a title, subtitle, brand colors, and a center
-                logo for a polished export.
-              </p>
-
-              <div className="mt-4 grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
-                <FeatureBullet text="Color presets and custom picker" />
-                <FeatureBullet text="Title & subtitle on a soft top banner" />
-                <FeatureBullet text="Center emoji, icon, or uploaded logo" />
-                <FeatureBullet text="Export sizes: Square, Story, Poster" />
-                <FeatureBullet text="Clean export-ready layout" />
-              </div>
-
-              <Button onClick={scrollToEditor} variant="secondary" className="mt-5">
-                Customize QR Code
-              </Button>
-            </div>
-
-            <div className="hidden min-h-[190px] items-center justify-center opacity-80 lg:flex">
-              <PromoMockup />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold tracking-tight text-gray-900 sm:text-xl">
-              Built for every kind of conversation
-            </h3>
-            <p className="mt-1.5 text-sm text-gray-500">
-              From storefronts to social bios - Zapora fits anywhere a chat starts.
-            </p>
-
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:mt-5 sm:grid-cols-2 xl:grid-cols-4">
-              <UseCaseCard icon={Store} title="Small businesses" />
-              <UseCaseCard icon={ImageIcon} title="Instagram sellers" />
-              <UseCaseCard icon={Briefcase} title="Service providers" />
-              <UseCaseCard icon={PartyPopper} title="Events" />
-              <UseCaseCard icon={Ticket} title="Flyers & posters" />
-              <UseCaseCard icon={Headset} title="Customer support" />
-              <UseCaseCard icon={Megaphone} title="Marketing campaigns" />
-            </div>
-          </div>
-        </section>
-      </div>
-
+        </div>
+      </section>
       <canvas ref={qrCanvasRef} className="hidden" />
-
     </main>
   );
 }
 
-function FeatureBullet({ text }: { text: string }) {
-  return (
-    <p className="inline-flex items-start gap-2">
-      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-      <span>{text}</span>
-    </p>
-  );
+function LinkGlyph() {
+  return <span className="text-slate-300">↗</span>;
 }
 
-function PromoMockup() {
-  return (
-    <div className="relative w-full max-w-[290px] rounded-[26px] border border-gray-200 bg-white p-4 shadow-[0_22px_45px_-38px_rgba(15,23,42,0.55)]">
-      <div className="mb-3 rounded-xl bg-emerald-500 px-3 py-2 text-center text-xs font-semibold text-white">
-        Scan to chat
-      </div>
-      <div className="rounded-2xl border border-gray-200 p-4">
-        <div className="aspect-square rounded-xl bg-gray-100 p-3">
-          <div className="grid h-full grid-cols-7 gap-1.5">
-            {Array.from({ length: 49 }).map((_, idx) => (
-              <span
-                key={idx}
-                className={`rounded-[3px] ${idx % 3 === 0 || idx % 5 === 0 ? 'bg-gray-950' : 'bg-white ring-1 ring-gray-200'}`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="absolute -right-2 -top-2 rounded-full border border-emerald-200 bg-emerald-50 p-2">
-        <ScanBarcode className="h-4 w-4 text-emerald-700" />
-      </div>
-    </div>
-  );
+function DarkInputWrap({ children, icon, ok = false }: { children: React.ReactNode; icon?: React.ReactNode; ok?: boolean }) {
+  return <div className="flex min-h-12 items-center gap-3 rounded-xl border border-white/15 bg-white/[0.03] px-4 transition focus-within:border-emerald-300 focus-within:ring-4 focus-within:ring-emerald-500/15">{icon}<div className="min-w-0 flex-1">{children}</div>{ok ? <Check className="h-5 w-5 text-emerald-400" /> : null}</div>;
 }
 
-function UseCaseCard({ icon: Icon, title }: { icon: React.ComponentType<{ className?: string }>; title: string }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-emerald-100/70 bg-white/58 px-3 py-2.5 text-gray-600 shadow-[0_12px_28px_-26px_rgba(5,150,105,0.3)] sm:rounded-2xl sm:px-3.5">
-      <div className="rounded-full bg-emerald-50/80 p-2 ring-1 ring-emerald-100">
-        <Icon className="h-4 w-4 text-emerald-700" />
-      </div>
-      <p className="text-sm font-medium text-gray-600">{title}</p>
-    </div>
-  );
+function DarkColorField({ label, value, onChange, readonly = false }: { label: string; value: string; onChange: (value: string) => void; readonly?: boolean }) {
+  return <label className="block min-w-0"><span className="mb-1.5 block text-xs font-medium text-slate-300">{label}</span><span className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-2"><span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-white/20" style={{ backgroundColor: value }}>{!readonly ? <input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={`${label} color picker`} /> : null}</span><input value={value} readOnly={readonly} onChange={(event) => onChange(event.target.value)} className="min-w-0 flex-1 bg-transparent font-mono text-xs uppercase text-white outline-none" /></span></label>;
 }
 
-function Section({ title, icon: Icon, description, children }: { title: string; icon?: React.ComponentType<{ className?: string }>; description?: string; children: React.ReactNode }) {
-  return (
-    <Surface className="min-w-0 border-emerald-100/80 bg-white/72 p-3.5 shadow-[0_18px_46px_-38px_rgba(5,150,105,0.42)] backdrop-blur sm:p-4">
-      <div className="flex items-start gap-2.5">
-        {Icon ? <span className="rounded-xl bg-emerald-50 p-1.5 text-emerald-700 ring-1 ring-emerald-100"><Icon className="h-3.5 w-3.5" /></span> : null}
-        <div><h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-900">{title}</h3>{description ? <p className="mt-1 text-xs leading-5 text-gray-500">{description}</p> : null}</div>
-      </div>
-      <div className="mt-3 space-y-3 sm:mt-4">{children}</div>
-    </Surface>
-  );
+function EditorSection({ title, icon: Icon, children, trailing }: { title: string; icon: React.ComponentType<{ className?: string }>; children: React.ReactNode; trailing?: React.ReactNode }) {
+  return <section className="border-b border-white/10 p-5 last:border-b-0"><div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><Icon className="h-4 w-4 text-slate-300" /><h2 className="text-xs font-black uppercase tracking-wide text-slate-200">{title}</h2></div>{trailing ?? <ChevronDown className="h-4 w-4 text-slate-300" />}</div><div className="space-y-5">{children}</div></section>;
 }
 
-function Field({ label, hint, optional = false, counter, children }: { label: string; hint?: string; optional?: boolean; counter?: string; children: React.ReactNode }) {
+function PlantDecor() {
+  return <><div aria-hidden="true" className="absolute -left-12 bottom-10 z-[1] h-56 w-56 rounded-full bg-gradient-to-tr from-emerald-300/45 to-lime-200/20 blur-2xl" /><div aria-hidden="true" className="absolute -right-16 bottom-4 z-[1] h-44 w-44 rounded-full bg-gradient-to-tr from-lime-300/50 to-emerald-200/20 blur-2xl" /><div aria-hidden="true" className="absolute bottom-10 left-[18%] z-[1] h-7 w-32 rounded-full bg-emerald-300/35 blur-xl" /></>;
+}
+
+
+function Field({ label, optional = false, counter, children }: { label: string; optional?: boolean; counter?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 flex items-center justify-between gap-2 text-xs font-medium text-gray-700"><span>{label}{optional ? <span className="font-normal text-gray-400"> (Optional)</span> : null}</span>{counter ? <span className="font-normal text-gray-400">{counter}</span> : null}</span>
+      <span className="mb-2 flex items-center justify-between gap-2 text-xs font-bold text-white">
+        <span>{label}{optional ? <span className="font-medium text-slate-400"> (Optional)</span> : null}</span>
+        {counter ? <span className="font-medium text-slate-400">{counter}</span> : null}
+      </span>
       {children}
-      {hint ? <span className="mt-1.5 block text-[11px] leading-4 text-gray-500">{hint}</span> : null}
-    </label>
-  );
-}
-
-function ColorField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-gray-700">{label}</span>
-      <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-white/85 px-2 py-1.5 shadow-sm transition focus-within:border-emerald-300 focus-within:ring-4 focus-within:ring-emerald-500/10">
-        <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-white shadow-sm ring-1 ring-emerald-100" style={{ backgroundColor: value }}>
-          <input
-            type="color"
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer appearance-none border-0 opacity-0"
-            aria-label={`${label} color picker`}
-          />
-        </div>
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="min-w-0 flex-1 bg-transparent font-mono text-xs uppercase text-gray-700 outline-none"
-        />
-      </div>
     </label>
   );
 }
@@ -922,6 +686,7 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
+
 
 function roundedRectTop(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
