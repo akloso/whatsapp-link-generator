@@ -13,11 +13,12 @@ import SeoContent from './components/SeoContent';
 import BlogListPage from './components/BlogListPage';
 import BlogPostPage from './components/BlogPostPage';
 import WhatsAppButtonMaker from './components/WhatsAppButtonMaker';
+import SplitzapPage from './components/SplitzapPage';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 import { blogPostsBySlug } from './data/blogPosts';
 import { IcrTrendsDashboardRoute } from './features/icr-trends-dashboard/IcrTrendsDashboardRoute';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard' | 'splitzap';
 
 const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/privacy') return { page: 'privacy' };
@@ -28,6 +29,7 @@ const routeToPage = (pathname: string): { page: PageKey; slug?: string } => {
   if (pathname === '/whatsapp-button-maker') return { page: 'whatsappButtonMaker' };
   if (pathname === '/bulk-whatsapp-link-generator') return { page: 'bulkWhatsappGenerator' };
   if (pathname === '/icr-trends-dashboard') return { page: 'icrTrendsDashboard' };
+  if (pathname === '/splitzap') return { page: 'splitzap' };
   if (pathname.startsWith('/blog/')) return { page: 'blogPost', slug: pathname.replace('/blog/', '') };
   return { page: 'home' };
 };
@@ -45,7 +47,7 @@ type SeoMetadata = {
 
 const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
   home: {
-    title: 'Zapora — WhatsApp Links & QR Codes Made Simple',
+    title: 'Zapora - WhatsApp Links & QR Codes Made Simple',
     description:
       'Create clean WhatsApp chat links, QR codes, bulk links, and click-to-chat buttons in seconds. Free, fast, and easy to use.',
     canonicalPath: '/',
@@ -54,13 +56,13 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
   privacy: {
     title: 'Privacy Policy | Zapora',
     description:
-      'Read Zapora’s privacy policy to understand what information may be collected, how it is used, and how to contact us.',
+      'Read Zapora privacy policy to understand what information may be collected, how it is used, and how to contact us.',
     canonicalPath: '/privacy',
   },
   terms: {
     title: 'Terms of Use | Zapora',
     description:
-      'Read the terms of use for Zapora’s WhatsApp link generator, QR code editor, and related free tools.',
+      'Read the terms of use for Zapora WhatsApp link generator, QR code editor, and related free tools.',
     canonicalPath: '/terms',
   },
   contact: {
@@ -69,25 +71,25 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
     canonicalPath: '/contact',
   },
   qrCodeEditor: {
-    title: 'QR Code Editor — Customize WhatsApp QR Codes | Zapora',
+    title: 'QR Code Editor - Customize WhatsApp QR Codes | Zapora',
     description:
       'Design and download custom WhatsApp QR codes with colors, banners, center icons, and export options for PNG, JPG, and SVG.',
     canonicalPath: '/qr-code-editor',
   },
   blog: {
-    title: 'Zapora Blog — WhatsApp Links, QR Codes & Chat Tools',
+    title: 'Zapora Blog - WhatsApp Links, QR Codes & Chat Tools',
     description:
       'Read practical guides on WhatsApp links, QR codes, click-to-chat buttons, and simple ways to help customers start conversations faster.',
     canonicalPath: '/blog',
   },
   whatsappButtonMaker: {
-    title: 'WhatsApp Button Maker — Create Click-to-Chat Buttons | Zapora',
+    title: 'WhatsApp Button Maker - Create Click-to-Chat Buttons | Zapora',
     description:
       'Create clean WhatsApp click-to-chat buttons for your website with custom labels, colors, icons, and placement options.',
     canonicalPath: '/whatsapp-button-maker',
   },
   bulkWhatsappGenerator: {
-    title: 'Bulk WhatsApp Link Generator — Create Multiple Links | Zapora',
+    title: 'Bulk WhatsApp Link Generator - Create Multiple Links | Zapora',
     description:
       'Generate multiple WhatsApp chat links at once using manual input or CSV upload. Fast, simple, private, and free to use.',
     canonicalPath: '/bulk-whatsapp-link-generator',
@@ -99,11 +101,18 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
     canonicalPath: '/icr-trends-dashboard',
     robots: 'noindex, nofollow, noarchive, nosnippet',
   },
+  splitzap: {
+    title: 'Splitzap - Split Expenses & Share on WhatsApp | Zapora',
+    description:
+      'Split bills, calculate settlements, manage groups, and share concise expense summaries on WhatsApp.',
+    canonicalPath: '/splitzap',
+    ogType: 'website',
+  },
 };
 
 const blogSeoBySlug: Record<string, SeoMetadata> = {
   'how-to-create-whatsapp-link': {
-    title: 'How to Create a WhatsApp Link — Step-by-Step Guide | Zapora',
+    title: 'How to Create a WhatsApp Link - Step-by-Step Guide | Zapora',
     description:
       'Learn how to create a WhatsApp chat link with a phone number and pre-filled message, then share it across your website, social bio, ads, and campaigns.',
     canonicalPath: '/blog/how-to-create-whatsapp-link',
@@ -191,7 +200,21 @@ function App() {
   }, [currentBlogSlug, currentPage]);
 
   const navigateTo = (page: Exclude<PageKey, 'blogPost'>, blogSlug?: string) => {
-    const targetPath = page === 'home' ? '/' : page === 'qrCodeEditor' ? '/qr-code-editor' : page === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : page === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : page === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : page === 'blog' && blogSlug ? `/blog/${blogSlug}` : `/${page}`;
+    const targetPath = page === 'home'
+      ? '/'
+      : page === 'qrCodeEditor'
+        ? '/qr-code-editor'
+        : page === 'whatsappButtonMaker'
+          ? '/whatsapp-button-maker'
+          : page === 'bulkWhatsappGenerator'
+            ? '/bulk-whatsapp-link-generator'
+            : page === 'icrTrendsDashboard'
+              ? '/icr-trends-dashboard'
+              : page === 'splitzap'
+                ? '/splitzap'
+                : page === 'blog' && blogSlug
+                  ? `/blog/${blogSlug}`
+                  : `/${page}`;
     window.history.pushState({}, '', targetPath);
     setCurrentPage(page === 'blog' && blogSlug ? 'blogPost' : page);
     setCurrentBlogSlug(blogSlug);
@@ -306,7 +329,7 @@ function App() {
           {
             heading: 'Response time',
             content:
-              'Our typical response window is one to two business days. For urgent issues, include “Urgent” in your subject line.',
+              'Our typical response window is one to two business days. For urgent issues, include Urgent in your subject line.',
           },
         ]}
         extra={
@@ -327,6 +350,8 @@ function App() {
     pageContent = <BulkLinkGenerator />;
   } else if (currentPage === 'icrTrendsDashboard') {
     pageContent = <IcrTrendsDashboardRoute />;
+  } else if (currentPage === 'splitzap') {
+    pageContent = <SplitzapPage />;
   } else if (currentPage === 'blog') {
     pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
   } else if (currentPage === 'blogPost') {
@@ -357,11 +382,13 @@ function App() {
     );
   }
 
+  const layoutPage = currentPage === 'blogPost' ? 'blog' : currentPage === 'splitzap' ? 'home' : currentPage;
+
   return (
     <div className="min-h-screen bg-white [--zapora-header-height:4rem]">
-      <Header currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} />
+      <Header currentPage={layoutPage} onNavigate={(page) => navigateTo(page)} />
       {pageContent}
-      <Footer currentPage={currentPage === 'blogPost' ? 'blog' : currentPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />
+      <Footer currentPage={layoutPage} onNavigate={(page) => navigateTo(page)} onGetStarted={scrollToGenerator} />
     </div>
   );
 }
