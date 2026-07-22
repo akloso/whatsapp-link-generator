@@ -17,7 +17,19 @@
   <script src="/splitzap-assets/chunk-08.js"></script>
   <script src="/splitzap-assets/chunk-09.js"></script>
   <script>
-    const splitzapHtml = (window.__splitzapChunks || []).map((chunk) => atob(chunk)).join('');
+    function decodeBase64Utf8(base64) {
+      var binary = atob(base64);
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+
+    var splitzapHtml = (window.__splitzapChunks || [])
+      .map(function (chunk) { return decodeBase64Utf8(chunk); })
+      .join('');
+
     document.open();
     document.write(splitzapHtml);
     document.close();
