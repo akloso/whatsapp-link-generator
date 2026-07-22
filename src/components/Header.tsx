@@ -1,8 +1,8 @@
 import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard';
-type HeaderProps = { currentPage: PageKey; onNavigate: (page: PageKey) => void };
+type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard' | 'splitzap';
+type HeaderProps = { currentPage: Exclude<PageKey, 'splitzap'>; onNavigate: (page: PageKey) => void };
 
 const tools = [
   { label: 'WhatsApp Link Generator', desc: 'Create single wa.me links', page: 'home' as PageKey },
@@ -13,6 +13,7 @@ const tools = [
 const navItems = [{ label: 'Blog', page: 'blog' as PageKey }, { label: 'Privacy', page: 'privacy' as PageKey }, { label: 'Contact', page: 'contact' as PageKey }];
 const getPath = (p: PageKey) => p === 'home' ? '/' : p === 'qrCodeEditor' ? '/qr-code-editor' : p === 'whatsappButtonMaker' ? '/whatsapp-button-maker' : p === 'bulkWhatsappGenerator' ? '/bulk-whatsapp-link-generator' : p === 'icrTrendsDashboard' ? '/icr-trends-dashboard' : `/${p}`;
 
+const splitzapPath = '/splitzap';
 const icrDashboardPath = '/icr-trends-dashboard';
 const htmlWidgetPreviewUrl = 'https://akloso.github.io/HTML---Widget-Preview/';
 const submenuWidth = 256;
@@ -140,6 +141,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                         aria-hidden="true"
                         className={`absolute top-0 h-full w-3 ${otherToolsDirection === 'right' ? '-left-3' : '-right-3'}`}
                       />
+                      <a href={splitzapPath} onClick={(e) => { e.preventDefault(); onNavigate('splitzap'); }} className="block rounded-xl border border-transparent p-3 text-sm font-semibold text-gray-900 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem">Splitzap</a>
                       <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-transparent p-3 text-sm font-semibold text-gray-900 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem">ICR Trends Dashboard</a>
                       <a href={htmlWidgetPreviewUrl} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-transparent p-3 text-sm font-semibold text-gray-900 hover:border-emerald-100 hover:bg-white focus-visible:border-emerald-100 focus-visible:bg-white focus-visible:outline-none" role="menuitem">HTML &amp; Widget Preview</a>
                     </div>
@@ -173,6 +175,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
                 <button type="button" onClick={() => setMobileOtherToolsOpen((v) => !v)} className="flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40" aria-expanded={mobileOtherToolsOpen}>Other Tools <ChevronDown className={`h-4 w-4 transition-transform ${mobileOtherToolsOpen ? 'rotate-180' : ''}`} /></button>
                 {mobileOtherToolsOpen ? (
                   <div className="space-y-1 border-l border-emerald-200 pl-2">
+                    <a href={splitzapPath} onClick={(e) => { e.preventDefault(); onNavigate('splitzap'); closeMobileMenu(); }} className="block min-h-11 rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-white/80">Splitzap</a>
                     <a href={icrDashboardPath} target="_blank" rel="noopener noreferrer" onClick={(event) => { event.stopPropagation(); closeMobileMenu(); }} className="block min-h-11 rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-white/80">ICR Trends Dashboard</a>
                     <a href={htmlWidgetPreviewUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => { event.stopPropagation(); closeMobileMenu(); }} className="block min-h-11 rounded-xl px-3 py-2.5 text-sm text-gray-700 hover:bg-white/80">HTML &amp; Widget Preview</a>
                   </div>
