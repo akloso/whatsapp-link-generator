@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+.splitzap-root {
+  --background: 0.982 0.008 95;
+  --foreground: 0.22 0.03 165;
+  --surface: 1 0 0;
+  --surface-2: 0.962 0.012 120;
+  --primary: 0.52 0.115 176;
+  --primary-foreground: 0.99 0.01 150;
+  --secondary: 0.945 0.03 160;
+  --secondary-foreground: 0.32 0.06 172;
+  --muted: 0.955 0.012 140;
+  --muted-foreground: 0.52 0.02 160;
+  --positive: 0.55 0.13 165;
+  --negative: 0.6 0.17 30;
+  --border: 0.91 0.014 150;
+  --ring: 0.52 0.115 176;
+  --gradient-hero: linear-gradient(150deg, oklch(0.42 0.1 178), oklch(0.56 0.13 168));
+  --shadow-card:
+    0 1px 2px oklch(0.3 0.03 165 / 0.06),
+    0 8px 24px -12px oklch(0.3 0.03 165 / 0.18);
+  --shadow-float: 0 10px 30px -8px oklch(0.4 0.08 170 / 0.35);
+
+  min-height: 100dvh;
+  background: oklch(var(--background));
+  color: oklch(var(--foreground));
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+.splitzap-root *,
+.splitzap-root *::before,
+.splitzap-root *::after {
+  box-sizing: border-box;
+}
+
+.splitzap-root h1,
+.splitzap-root h2,
+.splitzap-root h3 {
+  font-family: 'Bricolage Grotesque', 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.splitzap-root button,
+.splitzap-root input,
+.splitzap-root select {
+  font: inherit;
+}
+
+.splitzap-root button {
+  cursor: pointer;
+}
+
+.splitzap-root .hero-surface {
+  background-image: var(--gradient-hero);
+}
+
+.splitzap-root .card-soft {
+  background-color: oklch(var(--surface));
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-card);
+}
+
+.splitzap-root .tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.splitzap-root .press {
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.splitzap-root .press:active {
+  transform: scale(0.97);
+}
+
+.splitzap-root .rounded-xl {
+  border-radius: 1.25rem;
+}
+
+.splitzap-root .rounded-2xl {
+  border-radius: 1.5rem;
+}
+
+.splitzap-root .rounded-3xl {
+  border-radius: 1.75rem;
+}
+
+.splitzap-root .rounded-lg {
+  border-radius: 1rem;
+}
+
+.splitzap-root .animate-in.slide-in-from-bottom {
+  animation: splitzap-slide-in 0.2s ease-out both;
+}
+
+@keyframes splitzap-slide-in {
+  from {
+    opacity: 0.7;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splitzap-root *,
+  .splitzap-root *::before,
+  .splitzap-root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
