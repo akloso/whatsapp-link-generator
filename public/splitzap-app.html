@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#f8fafc">
   <title>Splitzap</title>
 </head>
 <body>
@@ -23,24 +23,368 @@
 
   var chunks = await Promise.all(paths.map(async function (path) {
     var response = await fetch(path, { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(path + ' failed with status ' + response.status);
-    }
+    if (!response.ok) throw new Error(path + ' failed with status ' + response.status);
     return response.text();
   }));
 
   var binary = atob(chunks.join(''));
   var bytes = new Uint8Array(binary.length);
-  for (var i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
+  for (var i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  var html = new TextDecoder('utf-8').decode(bytes);
+
+  var appShellCss = `
+<style id="splitzap-native-shell-styles">
+@media (max-width: 768px) {
+  :root {
+    --sz-shell-bg:#f8fafc;
+    --sz-shell-surface:#ffffff;
+    --sz-shell-ink:#0f172a;
+    --sz-shell-muted:#64748b;
+    --sz-shell-line:#e8eef5;
+    --sz-shell-brand:#0f766e;
+    --sz-shell-mint:#14b8a6;
+    --sz-shell-shadow:0 14px 40px rgba(15,23,42,.10);
+    --sz-shell-safe-top:env(safe-area-inset-top,0px);
+    --sz-shell-safe-bottom:env(safe-area-inset-bottom,0px);
+  }
+  html, body { height:100%; overflow:hidden !important; background:var(--sz-shell-bg) !important; }
+  body { overscroll-behavior:none; -webkit-font-smoothing:antialiased; }
+  body::before, body::after { display:none !important; }
+  button, [role="button"] { min-height:44px; touch-action:manipulation; }
+  input, select, textarea { font-size:16px !important; }
+
+  .top { display:none !important; }
+  .app {
+    width:100% !important;
+    max-width:540px !important;
+    height:100dvh !important;
+    min-height:0 !important;
+    overflow-x:hidden !important;
+    overflow-y:auto !important;
+    overscroll-behavior-y:contain;
+    scroll-behavior:smooth;
+    padding:calc(76px + var(--sz-shell-safe-top)) 16px calc(112px + var(--sz-shell-safe-bottom)) !important;
+    background:var(--sz-shell-bg) !important;
+    scrollbar-width:none;
+  }
+  .app::-webkit-scrollbar { display:none; }
+
+  #sz-native-bar {
+    display:flex !important;
+    position:fixed;
+    z-index:1000;
+    top:0;
+    left:50%;
+    transform:translateX(-50%);
+    width:min(100%,540px);
+    min-height:calc(64px + var(--sz-shell-safe-top));
+    padding:calc(10px + var(--sz-shell-safe-top)) 14px 10px;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:rgba(248,250,252,.94);
+    border-bottom:1px solid rgba(226,232,240,.88);
+    backdrop-filter:blur(18px) saturate(140%);
+    -webkit-backdrop-filter:blur(18px) saturate(140%);
+  }
+  .sz-native-left { display:flex; align-items:center; gap:10px; min-width:0; }
+  .sz-native-back, .sz-native-add {
+    width:44px; height:44px; min-height:44px; border:0; border-radius:15px;
+    display:grid; place-items:center; background:#fff; color:var(--sz-shell-ink);
+    box-shadow:0 5px 18px rgba(15,23,42,.07); font-weight:900; font-size:20px;
+  }
+  .sz-native-add { color:white; background:linear-gradient(135deg,var(--sz-shell-brand),var(--sz-shell-mint)); box-shadow:0 10px 24px rgba(15,118,110,.24); }
+  .sz-native-mark { width:38px; height:38px; border-radius:13px; display:grid; place-items:center; flex:0 0 auto; color:white; font-weight:950; background:linear-gradient(135deg,var(--sz-shell-brand),var(--sz-shell-mint)); }
+  .sz-native-copy { min-width:0; }
+  .sz-native-copy b { display:block; font-size:17px; line-height:1.05; letter-spacing:-.035em; }
+  .sz-native-copy span { display:block; margin-top:3px; font-size:10px; font-weight:850; color:var(--sz-shell-muted); letter-spacing:.045em; text-transform:uppercase; }
+
+  .hero {
+    border-radius:28px !important;
+    padding:20px !important;
+    margin-bottom:14px !important;
+    background:linear-gradient(145deg,#0f172a 0%,#123c3a 58%,#0f766e 100%) !important;
+    box-shadow:0 22px 48px rgba(15,23,42,.16) !important;
+    isolation:isolate;
+  }
+  .hero::before { width:190px !important; height:190px !important; right:-70px !important; top:-72px !important; background:rgba(45,212,191,.15) !important; }
+  .hero::after { width:110px !important; height:110px !important; right:82px !important; bottom:-50px !important; background:rgba(96,165,250,.10) !important; }
+  .hero h2 { font-size:30px !important; line-height:1.02 !important; letter-spacing:-.065em !important; }
+  .hero p { max-width:280px; color:rgba(255,255,255,.68) !important; }
+  .ctaGrid { grid-template-columns:1fr !important; gap:10px !important; }
+  .cta {
+    min-height:74px;
+    border-radius:20px !important;
+    padding:14px 15px !important;
+    display:grid !important;
+    grid-template-columns:42px 1fr auto;
+    grid-template-rows:auto auto;
+    align-items:center;
+    column-gap:10px;
+    text-align:left;
+    box-shadow:none !important;
+  }
+  .cta.primary { background:linear-gradient(135deg,#14b8a6,#0f766e) !important; }
+  .cta.secondary { background:rgba(255,255,255,.10) !important; border:1px solid rgba(255,255,255,.12) !important; }
+  .cta .emoji { grid-row:1 / 3; margin:0 !important; width:42px; height:42px; border-radius:14px; display:grid !important; place-items:center; background:rgba(255,255,255,.13); }
+  .cta .name { align-self:end; }
+  .cta .tiny { align-self:start; margin-top:2px !important; }
+  .cta::after { content:'›' !important; position:static !important; width:auto !important; height:auto !important; background:none !important; grid-column:3; grid-row:1 / 3; font-size:28px; opacity:.75; }
+
+  .miniStatGrid, .summaryStatGrid { gap:8px !important; }
+  .miniStat { border-radius:16px !important; padding:11px 10px !important; background:rgba(255,255,255,.09) !important; }
+  .miniStat b { font-size:16px !important; }
+
+  .card {
+    border-radius:22px !important;
+    border:1px solid var(--sz-shell-line) !important;
+    background:#fff !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
+    box-shadow:0 8px 26px rgba(15,23,42,.055) !important;
+    padding:15px !important;
+  }
+  .card::before { display:none !important; }
+  .featureStrip {
+    border-radius:20px !important;
+    border:1px solid #dbeafe !important;
+    background:linear-gradient(135deg,#eff6ff,#f0fdfa) !important;
+    box-shadow:none !important;
+  }
+  .sectionHead h3 { font-size:17px !important; }
+  .item {
+    border-radius:18px !important;
+    border:1px solid #edf2f7 !important;
+    background:#fff !important;
+    box-shadow:none !important;
+    min-height:74px;
+  }
+  .item:active { transform:scale(.992); background:#f8fafc !important; }
+  .itemIcon { border-radius:14px !important; box-shadow:none !important; }
+  .tinyBtn { min-height:36px !important; border-radius:11px !important; }
+
+  .activityTabs, .segment {
+    position:sticky;
+    top:calc(64px + var(--sz-shell-safe-top));
+    z-index:8;
+    border-radius:16px !important;
+    background:#eef2f7 !important;
+    padding:4px !important;
+    box-shadow:0 6px 18px rgba(15,23,42,.05);
+  }
+  .activityTabs button, .segment button { border-radius:13px !important; min-height:40px !important; }
+
+  .bottom, .bottomNav {
+    position:fixed !important;
+    z-index:1000 !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:0 !important;
+    transform:translateX(-50%) !important;
+    width:min(100%,540px) !important;
+    padding:8px 14px calc(8px + var(--sz-shell-safe-bottom)) !important;
+    background:rgba(248,250,252,.94) !important;
+    border-top:1px solid rgba(226,232,240,.9) !important;
+    backdrop-filter:blur(18px) saturate(140%) !important;
+    -webkit-backdrop-filter:blur(18px) saturate(140%) !important;
+  }
+  .bottomWrap, .nav {
+    border:0 !important;
+    box-shadow:none !important;
+    background:#fff !important;
+    border-radius:20px !important;
+    padding:5px !important;
+  }
+  .navBtn, .nav button {
+    min-height:54px !important;
+    border-radius:16px !important;
+    transition:transform .16s ease, background .16s ease, color .16s ease !important;
+  }
+  .navBtn.active, .nav button.active {
+    background:#e8f8f5 !important;
+    color:var(--sz-shell-brand) !important;
+    box-shadow:none !important;
+  }
+  .navBtn:active, .nav button:active { transform:scale(.96); }
+
+  #sz-fab {
+    display:grid !important;
+    position:fixed;
+    z-index:1010;
+    right:max(18px,calc((100vw - 540px)/2 + 18px));
+    bottom:calc(84px + var(--sz-shell-safe-bottom));
+    width:58px;
+    height:58px;
+    min-height:58px;
+    border:0;
+    border-radius:20px;
+    place-items:center;
+    color:#fff;
+    font-size:29px;
+    font-weight:400;
+    background:linear-gradient(135deg,#0f766e,#14b8a6);
+    box-shadow:0 14px 30px rgba(15,118,110,.28);
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  #sz-fab:active { transform:scale(.94); box-shadow:0 8px 20px rgba(15,118,110,.22); }
+
+  .sheetOverlay, .overlay { align-items:flex-end !important; }
+  .sheet {
+    width:min(100%,540px) !important;
+    max-height:94dvh !important;
+    border-radius:28px 28px 0 0 !important;
+    background:#f8fafc !important;
+    box-shadow:0 -24px 60px rgba(15,23,42,.20) !important;
+  }
+  .sheetHead { padding-top:16px !important; background:rgba(248,250,252,.96) !important; }
+  .sheetBody { padding-bottom:calc(24px + var(--sz-shell-safe-bottom)) !important; }
+
+  .btn, .btnGhost, .btnSoft, .btnDanger, .btnWhats,
+  .ghost, .soft, .danger, .whatsapp {
+    border-radius:16px !important;
+    min-height:48px !important;
   }
 
-  var html = new TextDecoder('utf-8').decode(bytes);
+  .empty { padding:30px 16px !important; }
+  .emptyIcon { width:64px !important; height:64px !important; border-radius:20px !important; }
+  .toast { bottom:calc(92px + var(--sz-shell-safe-bottom)) !important; }
+
+  body.sz-keyboard-open .bottom,
+  body.sz-keyboard-open .bottomNav,
+  body.sz-keyboard-open #sz-fab { opacity:0 !important; pointer-events:none !important; }
+  body.sz-keyboard-open .bottom,
+  body.sz-keyboard-open .bottomNav { transform:translate(-50%,120%) !important; }
+  body.sz-keyboard-open #sz-fab { transform:translateY(120%) !important; }
+  body.sz-keyboard-open .app { padding-bottom:24px !important; }
+
+  .sz-screen-enter { animation:szScreenEnter .24s cubic-bezier(.2,.8,.2,1); }
+  @keyframes szScreenEnter { from { opacity:.5; transform:translateX(12px); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+  }
+}
+@media (min-width:769px) {
+  #sz-native-bar, #sz-fab { display:none !important; }
+}
+</style>`;
+
+  var appShellJs = `
+<script id="splitzap-native-shell-script">
+(function(){
+  if (window.innerWidth > 768) return;
+
+  function haptic(){ try { if (navigator.vibrate) navigator.vibrate(14); } catch(e){} }
+  function invoke(name){
+    haptic();
+    if (window.App && typeof window.App[name] === 'function') window.App[name]();
+  }
+
+  function installShell(){
+    if (!document.getElementById('sz-native-bar')) {
+      var bar = document.createElement('header');
+      bar.id = 'sz-native-bar';
+      bar.innerHTML = '<div class="sz-native-left"><button class="sz-native-back" aria-label="Back to Zapora">‹</button><div class="sz-native-mark">S</div><div class="sz-native-copy"><b>Splitzap</b><span>Shared expenses</span></div></div><button class="sz-native-add" aria-label="Add expense">+</button>';
+      document.body.appendChild(bar);
+      bar.querySelector('.sz-native-back').addEventListener('click', function(){ haptic(); window.parent.location.href = '/'; });
+      bar.querySelector('.sz-native-add').addEventListener('click', function(){ invoke('openExpense'); });
+    }
+
+    if (!document.getElementById('sz-fab')) {
+      var fab = document.createElement('button');
+      fab.id = 'sz-fab';
+      fab.setAttribute('aria-label','Add expense');
+      fab.textContent = '+';
+      fab.addEventListener('click', function(){ invoke('openExpense'); });
+      document.body.appendChild(fab);
+    }
+  }
+
+  function cleanHome(){
+    var app = document.querySelector('.app');
+    if (!app) return;
+    var heads = app.querySelectorAll('.sectionHead h3, .head h3');
+    heads.forEach(function(head){
+      if ((head.textContent || '').trim().toLowerCase() === 'quick actions') {
+        var card = head.closest('.card');
+        if (card) card.style.display = 'none';
+      }
+    });
+  }
+
+  function animateScreen(){
+    var app = document.querySelector('.app');
+    if (!app) return;
+    app.classList.remove('sz-screen-enter');
+    void app.offsetWidth;
+    app.classList.add('sz-screen-enter');
+    cleanHome();
+  }
+
+  function installNavigationHistory(){
+    document.addEventListener('click', function(event){
+      var button = event.target.closest('.navBtn, .nav button');
+      if (!button) return;
+      var label = (button.textContent || '').trim().toLowerCase();
+      if (!label) return;
+      var tab = label.indexOf('activity') >= 0 ? 'activity' : label.indexOf('groups') >= 0 ? 'groups' : label.indexOf('home') >= 0 ? 'home' : '';
+      if (!tab) return;
+      var next = '#splitzap-' + tab;
+      if (location.hash !== next) history.pushState({splitzapTab:tab},'',next);
+      setTimeout(animateScreen,0);
+    }, true);
+
+    window.addEventListener('popstate', function(event){
+      var tab = event.state && event.state.splitzapTab;
+      if (!tab && location.hash.indexOf('#splitzap-') === 0) tab = location.hash.replace('#splitzap-','');
+      if (!tab) return;
+      var buttons = Array.prototype.slice.call(document.querySelectorAll('.navBtn, .nav button'));
+      var target = buttons.find(function(btn){ return (btn.textContent || '').trim().toLowerCase().indexOf(tab) >= 0; });
+      if (target) target.click();
+    });
+  }
+
+  function installKeyboardAwareness(){
+    if (!window.visualViewport) return;
+    var update = function(){
+      var keyboardOpen = window.innerHeight - window.visualViewport.height > 150;
+      document.body.classList.toggle('sz-keyboard-open', keyboardOpen);
+    };
+    window.visualViewport.addEventListener('resize', update);
+    window.visualViewport.addEventListener('scroll', update);
+    update();
+  }
+
+  function installTouchFeedback(){
+    document.addEventListener('click', function(event){
+      if (event.target.closest('button, [role="button"]')) haptic();
+    }, true);
+  }
+
+  installShell();
+  installNavigationHistory();
+  installKeyboardAwareness();
+  installTouchFeedback();
+  cleanHome();
+
+  var root = document.querySelector('.app');
+  if (root) {
+    var observer = new MutationObserver(function(){
+      installShell();
+      cleanHome();
+    });
+    observer.observe(root,{childList:true,subtree:false});
+  }
+})();
+<\/script>`;
+
+  html = html.replace('</head>', appShellCss + '</head>');
+  html = html.replace('</body>', appShellJs + '</body>');
+
   document.open();
   document.write(html);
   document.close();
 })().catch(function (error) {
-  document.body.innerHTML = '<div style="font-family:system-ui;padding:24px;text-align:center"><strong>Splitzap could not load.</strong><p style="color:#64748b">Refresh the page and try again.</p></div>';
+  document.body.innerHTML = '<div style="font-family:system-ui;padding:32px;text-align:center"><strong>Splitzap could not load.</strong><p style="color:#64748b">Refresh the page and try again.</p></div>';
   console.error(error);
 });
 </script>
