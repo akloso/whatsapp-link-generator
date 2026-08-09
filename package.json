@@ -8,9 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "splitzap:extract": "node scripts/build-splitzap.mjs --extract",
-    "splitzap:build": "node scripts/build-splitzap.mjs"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
