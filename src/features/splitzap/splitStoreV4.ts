@@ -125,27 +125,66 @@ function normalizeSplit(rawMode: unknown, rawSplit: unknown) {
   );
 }
 
-function normalizeExpense(raw: any): Expense {
-  const mode: SplitMode = raw.mode === 'exact' ? 'exact' : raw.mode === 'percentage' || raw.mode === 'shares' ? 'percentage' : 'equal';
-  const charges = Array.isArray(raw.additionalCharges) ? raw.additionalCharges : [];
-  const chargeTotal = charges.reduce((sum, charge) => sum + Math.max(0, Number(charge.amount) || 0), 0);
-  const fallbackBase = Math.max(0, (Number(raw.amount) || 0) - chargeTotal);
+function recordOf(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
+function numberRecord(value: unknown): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(recordOf(value))
+      .map(([id, amount]) => [id, Math.max(0, Number(amount) || 0)] as const)
+      .filter(([, amount]) => amount > 0),
+  );
+}
+
+function textRecord(value: unknown): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(recordOf(value))
+      .filter(([, text]) => typeof text === 'string')
+      .map(([id, text]) => [id, String(text)]),
+  );
+}
+
+function normalizeExpense(rawValue: unknown): Expense {
+  const raw = recordOf(rawValue);
+  const rawMode = raw.mode;
+  const mode: SplitMode = rawMode === 'exact' ? 'exact' : rawMode === 'percentage' || rawMode === 'shares' ? 'percentage' : 'equal';
+  const charges = (Array.isArray(raw.additionalCharges) ? raw.additionalCharges : []).map(recordOf);
+  const normalizedCharges: AdditionalCharge[] = charges.map((charge) => ({
+    id: typeof charge.id === 'string' && charge.id ? charge.id : uid(),
+    description: typeof charge.description === 'string' && charge.description.trim() ? charge.description.trim() : 'Charge',
+    amount: Math.max(0, Number(charge.amount) || 0),
+    distribution: charge.distribution === 'proportional' ? 'proportional' : 'equal',
+  }));
+  const chargeTotal = normalizedCharges.reduce((sum, charge) => sum + charge.amount, 0);
+  const totalAmount = Math.max(0, Number(raw.amount) || 0);
+  const fallbackBase = Math.max(0, totalAmount - chargeTotal);
+  const personalItems: PersonalItem[] = (Array.isArray(raw.personalItems) ? raw.personalItems : [])
+    .map(recordOf)
+    .map((item) => ({
+      id: typeof item.id === 'string' && item.id ? item.id : uid(),
+      memberId: typeof item.memberId === 'string' ? item.memberId : '',
+      description: typeof item.description === 'string' && item.description.trim() ? item.description.trim() : 'Personal item',
+      amount: Math.max(0, Number(item.amount) || 0),
+    }))
+    .filter((item) => item.memberId && item.amount > 0);
+
   return {
-    ...raw,
-    amount: Math.max(0, Number(raw.amount) || 0),
+    id: typeof raw.id === 'string' && raw.id ? raw.id : uid(),
+    groupId: typeof raw.groupId === 'string' ? raw.groupId : '',
+    description: typeof raw.description === 'string' ? raw.description : '',
+    amount: totalAmount,
     baseAmount: Number.isFinite(Number(raw.baseAmount)) ? Math.max(0, Number(raw.baseAmount)) : fallbackBase,
-    payments: raw.payments && typeof raw.payments === 'object' ? raw.payments : {},
-    split: normalizeSplit(raw.mode, raw.split),
-    splitLabels: raw.splitLabels && typeof raw.splitLabels === 'object' ? raw.splitLabels : {},
+    paidBy: typeof raw.paidBy === 'string' ? raw.paidBy : '',
+    payments: numberRecord(raw.payments),
+    split: normalizeSplit(rawMode, raw.split),
+    splitLabels: textRecord(raw.splitLabels),
     mode,
-    personalItems: Array.isArray(raw.personalItems) ? raw.personalItems : [],
-    additionalCharges: charges.map((charge) => ({
-      ...charge,
-      id: charge.id || uid(),
-      description: charge.description?.trim() || 'Charge',
-      amount: Math.max(0, Number(charge.amount) || 0),
-      distribution: charge.distribution === 'proportional' ? 'proportional' : 'equal',
-    })),
+    category: typeof raw.category === 'string' ? raw.category : 'general',
+    date: typeof raw.date === 'string' ? raw.date : new Date().toISOString(),
+    note: typeof raw.note === 'string' ? raw.note : undefined,
+    personalItems,
+    additionalCharges: normalizedCharges,
   };
 }
 
