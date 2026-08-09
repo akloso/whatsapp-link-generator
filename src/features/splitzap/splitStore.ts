@@ -47,6 +47,8 @@ export type Group = {
 
 export type SplitData = {
   me: string;
+  /** The real display name entered by the person using this device. */
+  myName?: string;
   groups: Group[];
   expenses: Expense[];
   settlements: Settlement[];
@@ -72,24 +74,35 @@ export const uid = () => Math.random().toString(36).slice(2, 10);
 
 const emptyData = (me = uid()): SplitData => ({
   me,
+  myName: '',
   groups: [],
   expenses: [],
   settlements: [],
 });
 
-const EMPTY: SplitData = { me: 'me', groups: [], expenses: [], settlements: [] };
+const EMPTY: SplitData = { me: 'me', myName: '', groups: [], expenses: [], settlements: [] };
 
 function normalize(data: SplitData): SplitData {
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+  const storedName = typeof data.myName === 'string' ? data.myName.trim() : '';
+  const inferredName =
+    storedName ||
+    groups
+      .flatMap((group) => group.members)
+      .find((member) => member.id === data.me && member.name.trim() && member.name.trim().toLowerCase() !== 'you')
+      ?.name.trim() ||
+    '';
+
   return {
     me: data.me || uid(),
-    groups: Array.isArray(data.groups) ? data.groups : [],
+    myName: inferredName,
+    groups,
     expenses: Array.isArray(data.expenses)
       ? data.expenses.map((expense) => ({
           ...expense,
-          splitLabels:
-            expense.splitLabels && typeof expense.splitLabels === 'object'
-              ? expense.splitLabels
-              : {},
+          splitLabels: expense.splitLabels && typeof expense.splitLabels === 'object'
+            ? expense.splitLabels
+            : {},
           personalItems: Array.isArray(expense.personalItems) ? expense.personalItems : [],
         }))
       : [],
