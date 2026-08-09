@@ -4,6 +4,13 @@ export type Member = { id: string; name: string };
 
 export type SplitMode = 'equal' | 'exact' | 'shares';
 
+export type PersonalItem = {
+  id: string;
+  memberId: string;
+  description: string;
+  amount: number;
+};
+
 export type Expense = {
   id: string;
   groupId: string;
@@ -15,6 +22,7 @@ export type Expense = {
   category: string;
   date: string;
   note?: string;
+  personalItems?: PersonalItem[];
 };
 
 export type Settlement = {
@@ -42,7 +50,8 @@ export type SplitData = {
   settlements: Settlement[];
 };
 
-const KEY = 'splitzap.v1';
+const KEY = 'splitzap.v2';
+const LEGACY_KEY = 'splitzap.v1';
 
 export const CATEGORIES = [
   { id: 'general', label: 'General', emoji: '🧾' },
@@ -59,90 +68,82 @@ export const CURRENCIES = ['₹', '$', '€', '£', '¥'];
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
-function seed(): SplitData {
-  const meId = uid();
-  const a = uid();
-  const b = uid();
-  const gid = uid();
-  const now = new Date();
-  const day = (n: number) => new Date(now.getTime() - n * 86400000).toISOString();
+const emptyData = (me = uid()): SplitData => ({
+  me,
+  groups: [],
+  expenses: [],
+  settlements: [],
+});
 
+const EMPTY: SplitData = { me: 'me', groups: [], expenses: [], settlements: [] };
+
+function normalize(data: SplitData): SplitData {
   return {
-    me: meId,
-    groups: [
-      {
-        id: gid,
-        name: 'Goa Trip',
-        emoji: '🏖️',
-        currency: '₹',
-        createdAt: day(9),
-        members: [
-          { id: meId, name: 'You' },
-          { id: a, name: 'Aditi' },
-          { id: b, name: 'Rohan' },
-        ],
-      },
-    ],
-    expenses: [
-      {
-        id: uid(),
-        groupId: gid,
-        description: 'Beach shack dinner',
-        amount: 2400,
-        paidBy: meId,
-        split: { [meId]: 1, [a]: 1, [b]: 1 },
-        mode: 'equal',
-        category: 'food',
-        date: day(2),
-      },
-      {
-        id: uid(),
-        groupId: gid,
-        description: 'Airbnb 2 nights',
-        amount: 9000,
-        paidBy: a,
-        split: { [meId]: 1, [a]: 1, [b]: 1 },
-        mode: 'equal',
-        category: 'stay',
-        date: day(5),
-      },
-      {
-        id: uid(),
-        groupId: gid,
-        description: 'Cab from airport',
-        amount: 1500,
-        paidBy: b,
-        split: { [meId]: 1, [a]: 1, [b]: 1 },
-        mode: 'equal',
-        category: 'transport',
-        date: day(6),
-      },
-    ],
-    settlements: [],
+    me: data.me || uid(),
+    groups: Array.isArray(data.groups) ? data.groups : [],
+    expenses: Array.isArray(data.expenses)
+      ? data.expenses.map((expense) => ({
+          ...expense,
+          personalItems: Array.isArray(expense.personalItems) ? expense.personalItems : [],
+        }))
+      : [],
+    settlements: Array.isArray(data.settlements) ? data.settlements : [],
   };
+}
+
+function isUntouchedDemo(data: SplitData) {
+  if (data.groups.length !== 1 || data.expenses.length !== 3 || data.settlements.length !== 0) {
+    return false;
+  }
+
+  const group = data.groups[0];
+  if (!group || group.name !== 'Goa Trip') return false;
+
+  const memberNames = group.members.map((member) => member.name).sort().join('|');
+  if (memberNames !== ['Aditi', 'Rohan', 'You'].sort().join('|')) return false;
+
+  const descriptions = data.expenses
+    .map((expense) => expense.description)
+    .sort()
+    .join('|');
+
+  return descriptions === ['Airbnb 2 nights', 'Beach shack dinner', 'Cab from airport'].sort().join('|');
 }
 
 let listeners: Array<() => void> = [];
 let cache: SplitData | null = null;
 
-const EMPTY: SplitData = { me: 'me', groups: [], expenses: [], settlements: [] };
-
 function read(): SplitData {
   if (cache) return cache;
   if (typeof window === 'undefined') return EMPTY;
+
   try {
-    const raw = window.localStorage.getItem(KEY);
-    cache = raw ? (JSON.parse(raw) as SplitData) : seed();
+    const current = window.localStorage.getItem(KEY);
+    if (current) {
+      cache = normalize(JSON.parse(current) as SplitData);
+      return cache;
+    }
+
+    const legacy = window.localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const parsed = normalize(JSON.parse(legacy) as SplitData);
+      cache = isUntouchedDemo(parsed) ? emptyData(parsed.me || uid()) : parsed;
+      window.localStorage.setItem(KEY, JSON.stringify(cache));
+      return cache;
+    }
+
+    cache = emptyData();
   } catch {
-    cache = seed();
+    cache = emptyData();
   }
-  return cache!;
+
+  return cache;
 }
 
 function write(next: SplitData) {
-  cache = next;
+  cache = normalize(next);
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.localStorage.setItem(KEY, JSON.stringify(cache));
   }
   listeners.forEach((listener) => listener());
 }
@@ -156,8 +157,10 @@ export function useSplitData() {
     if (!window.localStorage.getItem(KEY)) write(initial);
     setData(initial);
     setHydrated(true);
+
     const listener = () => setData({ ...read() });
     listeners.push(listener);
+
     return () => {
       listeners = listeners.filter((item) => item !== listener);
     };
@@ -170,13 +173,38 @@ export function useSplitData() {
   return { data, update, hydrated };
 }
 
-export function shareOf(expense: Expense, memberId: string): number {
+export function personalTotalOf(expense: Expense) {
+  return (expense.personalItems ?? []).reduce(
+    (sum, item) => sum + Math.max(0, Number(item.amount) || 0),
+    0,
+  );
+}
+
+export function sharedAmountOf(expense: Expense) {
+  return Math.max(0, expense.amount - personalTotalOf(expense));
+}
+
+export function personalShareOf(expense: Expense, memberId: string) {
+  return (expense.personalItems ?? [])
+    .filter((item) => item.memberId === memberId)
+    .reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
+}
+
+export function sharedShareOf(expense: Expense, memberId: string): number {
   const entries = Object.entries(expense.split).filter(([, value]) => value > 0);
   if (!entries.length) return 0;
+
   if (expense.mode === 'exact') return expense.split[memberId] ?? 0;
-  const total = entries.reduce((sum, [, value]) => sum + value, 0);
+
+  const totalWeight = entries.reduce((sum, [, value]) => sum + value, 0);
   const weight = expense.split[memberId] ?? 0;
-  return total ? (expense.amount * weight) / total : 0;
+  const sharedAmount = sharedAmountOf(expense);
+
+  return totalWeight ? (sharedAmount * weight) / totalWeight : 0;
+}
+
+export function shareOf(expense: Expense, memberId: string): number {
+  return sharedShareOf(expense, memberId) + personalShareOf(expense, memberId);
 }
 
 export function groupBalances(
@@ -213,6 +241,7 @@ export function simplify(balance: Record<string, number>): Debt[] {
     .filter(([, value]) => value < -0.01)
     .map(([id, value]) => ({ id, value: -value }))
     .sort((a, b) => b.value - a.value);
+
   const creditors = Object.entries(balance)
     .filter(([, value]) => value > 0.01)
     .map(([id, value]) => ({ id, value }))
@@ -226,9 +255,11 @@ export function simplify(balance: Record<string, number>): Debt[] {
     const debtor = debtors[debtorIndex]!;
     const creditor = creditors[creditorIndex]!;
     const amount = Math.min(debtor.value, creditor.value);
+
     result.push({ from: debtor.id, to: creditor.id, amount });
     debtor.value -= amount;
     creditor.value -= amount;
+
     if (debtor.value < 0.01) debtorIndex += 1;
     if (creditor.value < 0.01) creditorIndex += 1;
   }
