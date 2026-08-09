@@ -91,23 +91,35 @@ function normalize(data: SplitData): SplitData {
   };
 }
 
-function isUntouchedDemo(data: SplitData) {
-  if (data.groups.length !== 1 || data.expenses.length !== 3 || data.settlements.length !== 0) {
-    return false;
-  }
+function stripLegacyDemo(data: SplitData): SplitData {
+  const demoDescriptions = new Set([
+    'Beach shack dinner',
+    'Airbnb 2 nights',
+    'Cab from airport',
+  ]);
 
-  const group = data.groups[0];
-  if (!group || group.name !== 'Goa Trip') return false;
+  const demoGroupIds = new Set(
+    data.groups
+      .filter((group) => {
+        if (group.name !== 'Goa Trip') return false;
+        const names = group.members.map((member) => member.name).sort().join('|');
+        if (names !== ['Aditi', 'Rohan', 'You'].sort().join('|')) return false;
+        const descriptions = data.expenses
+          .filter((expense) => expense.groupId === group.id)
+          .map((expense) => expense.description);
+        return descriptions.length >= 3 && [...demoDescriptions].every((item) => descriptions.includes(item));
+      })
+      .map((group) => group.id),
+  );
 
-  const memberNames = group.members.map((member) => member.name).sort().join('|');
-  if (memberNames !== ['Aditi', 'Rohan', 'You'].sort().join('|')) return false;
+  if (!demoGroupIds.size) return data;
 
-  const descriptions = data.expenses
-    .map((expense) => expense.description)
-    .sort()
-    .join('|');
-
-  return descriptions === ['Airbnb 2 nights', 'Beach shack dinner', 'Cab from airport'].sort().join('|');
+  return {
+    ...data,
+    groups: data.groups.filter((group) => !demoGroupIds.has(group.id)),
+    expenses: data.expenses.filter((expense) => !demoGroupIds.has(expense.groupId)),
+    settlements: data.settlements.filter((settlement) => !demoGroupIds.has(settlement.groupId)),
+  };
 }
 
 let listeners: Array<() => void> = [];
@@ -127,7 +139,7 @@ function read(): SplitData {
     const legacy = window.localStorage.getItem(LEGACY_KEY);
     if (legacy) {
       const parsed = normalize(JSON.parse(legacy) as SplitData);
-      cache = isUntouchedDemo(parsed) ? emptyData(parsed.me || uid()) : parsed;
+      cache = stripLegacyDemo(parsed);
       window.localStorage.setItem(KEY, JSON.stringify(cache));
       return cache;
     }
