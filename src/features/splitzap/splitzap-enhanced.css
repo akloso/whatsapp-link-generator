@@ -1,0 +1,3 @@
+.splitzap-root .bg-foreground\/45 {
+  background-color: oklch(var(--foreground) / 0.45);
+}
