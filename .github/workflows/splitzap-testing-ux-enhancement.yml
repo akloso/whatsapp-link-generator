@@ -21,31 +21,20 @@ jobs:
       - name: Apply UX patch
         run: python3 .github/splitzap_ux_patch.py
 
-      - name: Repair share newline escape
+      - name: Repair generated formatter escapes
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('src/features/splitzap/SplitzapAppV4.tsx')
           s = p.read_text()
-          broken = "return lines.join('" + "\n" + "');"
-          fixed = "return lines.join('\\n');"
-          if broken not in s:
-              raise SystemExit('broken newline marker not found')
-          p.write_text(s.replace(broken, fixed, 1))
-          PY
-
-      - name: Find odd template lines
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          lines = Path('src/features/splitzap/SplitzapAppV4.tsx').read_text().splitlines()
-          total = 0
-          for i, line in enumerate(lines, 1):
-              n = line.count('`')
-              total += n
-              if n % 2:
-                  print(f'ODD {i}: count={n}: {line}')
-          print('TOTAL BACKTICKS', total, 'PARITY', total % 2)
+          broken_newline = "return lines.join('" + "\n" + "');"
+          if broken_newline in s:
+              s = s.replace(broken_newline, "return lines.join('\\n');", 1)
+          broken_title = "const lines = ['*💸 Splitzap*', `*${expense.description} · ${shareMoney(expense.amount, group.currency)}*'];"
+          fixed_title = "const lines = ['*💸 Splitzap*', `*${expense.description} · ${shareMoney(expense.amount, group.currency)}*`];"
+          if broken_title not in s:
+              raise SystemExit('broken share title marker not found')
+          p.write_text(s.replace(broken_title, fixed_title, 1))
           PY
 
       - name: Set up Node
@@ -59,3 +48,15 @@ jobs:
 
       - name: TypeScript check
         run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit enhancements
+        run: |
+          git config user.name "Splitzap Enhancement"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/features/splitzap/SplitzapAppV4.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Refine Splitzap expense UX and settlement insights"
+          git push origin testing
