@@ -18,6 +18,8 @@ export type Expense = {
   amount: number;
   paidBy: string;
   split: Record<string, number>;
+  /** Optional memberId -> human label, used for exact allocations. */
+  splitLabels?: Record<string, string>;
   mode: SplitMode;
   category: string;
   date: string;
@@ -84,6 +86,10 @@ function normalize(data: SplitData): SplitData {
     expenses: Array.isArray(data.expenses)
       ? data.expenses.map((expense) => ({
           ...expense,
+          splitLabels:
+            expense.splitLabels && typeof expense.splitLabels === 'object'
+              ? expense.splitLabels
+              : {},
           personalItems: Array.isArray(expense.personalItems) ? expense.personalItems : [],
         }))
       : [],
