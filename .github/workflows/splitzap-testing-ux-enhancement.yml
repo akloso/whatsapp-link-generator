@@ -34,8 +34,19 @@ jobs:
           p.write_text(s.replace(broken, fixed, 1))
           PY
 
-      - name: Show generated Add Expense and dialogs
-        run: nl -ba src/features/splitzap/SplitzapAppV4.tsx | sed -n '400,550p'
+      - name: Find odd template lines
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          lines = Path('src/features/splitzap/SplitzapAppV4.tsx').read_text().splitlines()
+          total = 0
+          for i, line in enumerate(lines, 1):
+              n = line.count('`')
+              total += n
+              if n % 2:
+                  print(f'ODD {i}: count={n}: {line}')
+          print('TOTAL BACKTICKS', total, 'PARITY', total % 2)
+          PY
 
       - name: Set up Node
         uses: actions/setup-node@v4
