@@ -2,11 +2,14 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Camera,
   Check,
   ChevronRight,
   Copy,
   History,
   Home,
+  ImagePlus,
+  Loader2,
   MessageCircle,
   MoreHorizontal,
   Pencil,
@@ -41,6 +44,7 @@ import {
   type Group,
   type HistoryChange,
   type PersonalItem,
+  type ReceiptItem,
   type SplitData,
   type SplitMode,
 } from './splitStoreV4';
@@ -48,6 +52,8 @@ import {
 type View = { name: 'home' } | { name: 'activity' } | { name: 'group'; groupId: string };
 type GroupTab = 'expenses' | 'balances' | 'insights';
 type PersonalDraft = { id?: string; memberId: string; description: string; amount: string };
+type ScanExpenseSeed = { groupId: string; description: string; amount: number; personalItems: PersonalItem[]; additionalCharges: AdditionalCharge[]; receiptItems: ReceiptItem[] };
+type ParsedReceipt = { merchant: string; detectedTotal: number | null; items: ReceiptItem[]; charges: AdditionalCharge[] };
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -214,6 +220,8 @@ function HomeScreen({ navigate }: { navigate: (view: View) => void }) {
   const { data, update, hydrated } = useSplitData();
   const [addOpen, setAddOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanSeed, setScanSeed] = useState<ScanExpenseSeed | null>(null);
   const [showIntro, setShowIntro] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
@@ -240,7 +248,7 @@ function HomeScreen({ navigate }: { navigate: (view: View) => void }) {
   const overall = totalOwed - totalOwe;
   const introVisible = hydrated && (data.groups.length === 0 || showIntro);
 
-  return <AppShell onAdd={() => data.groups.length ? setAddOpen(true) : setGroupOpen(true)} view={{ name: 'home' }} navigate={navigate}><Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<button type="button" onClick={() => setGroupOpen(true)} className="press flex items-center gap-1 rounded-full bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"><Plus size={14} /> Group</button>} />{!hydrated ? <section className="space-y-3 px-5 pt-2"><div className="splitzap-skeleton h-44 rounded-3xl" /><div className="splitzap-skeleton h-20 rounded-3xl" /></section> : introVisible ? <IntroPanel hasGroups={data.groups.length > 0} onPrimary={() => data.groups.length ? setShowIntro(false) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onInstall={installPrompt ? install : undefined} /> : <><section className="px-5"><div className="hero-surface splitzap-hero rounded-3xl p-5 text-primary-foreground" style={{ boxShadow: 'var(--shadow-float)' }}><div className="hero-glow" aria-hidden="true" /><p className="text-xs font-semibold uppercase tracking-widest opacity-70">Your overall balance</p><p className="tabular mt-1 text-4xl font-extrabold"><AnimatedMoney value={overall} /><span className="ml-2 text-sm font-semibold opacity-80">{overall >= 0 ? "you're owed" : 'you owe'}</span></p><div className="mt-4 grid grid-cols-2 gap-3"><div className="hero-stat rounded-2xl bg-primary-foreground/12 p-3"><p className="text-[11px] font-semibold opacity-75">You are owed</p><p className="tabular text-lg font-bold"><AnimatedMoney value={totalOwed} /></p></div><div className="hero-stat rounded-2xl bg-primary-foreground/12 p-3"><p className="text-[11px] font-semibold opacity-75">You owe</p><p className="tabular text-lg font-bold"><AnimatedMoney value={totalOwe} /></p></div></div></div></section><section className="px-5 pt-6"><div className="mb-3 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Groups</p><p className="mt-0.5 text-xs text-muted-foreground">{data.groups.length} active {data.groups.length === 1 ? 'group' : 'groups'}</p></div><button type="button" onClick={() => setGroupOpen(true)} className="press text-xs font-bold text-primary">+ New group</button></div><div className="space-y-2.5">{summaries.map(({ group, mine, spent }, index) => <button type="button" key={group.id} onClick={() => navigate({ name: 'group', groupId: group.id })} className="card-soft group-card list-enter press flex w-full items-center gap-3 p-3.5 text-left" style={{ animationDelay: `${index * 55}ms` }}><span className="group-emoji grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-2 text-2xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate font-bold">{group.name}</p><p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Users size={12} /> {group.members.length} people · {money(spent, group.currency)} spent</p></div><div className="text-right"><p className="text-[11px] font-semibold text-muted-foreground">{Math.abs(mine) < 0.01 ? 'settled' : mine > 0 ? 'you get' : 'you owe'}</p><p className={`tabular font-bold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? '—' : money(mine, group.currency)}</p></div><ChevronRight size={16} className="shrink-0 text-muted-foreground" /></button>)}</div></section></>}{data.groups.length ? <AddExpenseSheet open={addOpen} onClose={() => setAddOpen(false)} data={data} update={update} /> : null}<NewGroupSheet open={groupOpen} onClose={() => setGroupOpen(false)} data={data} update={update} onCreated={(groupId) => navigate({ name: 'group', groupId })} /></AppShell>;
+  return <AppShell onAdd={() => data.groups.length ? setAddOpen(true) : setGroupOpen(true)} view={{ name: 'home' }} navigate={navigate}><Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5"><button type="button" onClick={() => data.groups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan a bill" title="Scan bill" className="press grid size-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="press flex items-center gap-1 rounded-full bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"><Plus size={14} /> Group</button></div>} />{!hydrated ? <section className="space-y-3 px-5 pt-2"><div className="splitzap-skeleton h-44 rounded-3xl" /><div className="splitzap-skeleton h-20 rounded-3xl" /></section> : introVisible ? <IntroPanel hasGroups={data.groups.length > 0} onPrimary={() => data.groups.length ? setShowIntro(false) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onInstall={installPrompt ? install : undefined} /> : <><section className="px-5"><div className="hero-surface splitzap-hero rounded-3xl p-5 text-primary-foreground" style={{ boxShadow: 'var(--shadow-float)' }}><div className="hero-glow" aria-hidden="true" /><p className="text-xs font-semibold uppercase tracking-widest opacity-70">Your overall balance</p><p className="tabular mt-1 text-4xl font-extrabold"><AnimatedMoney value={overall} /><span className="ml-2 text-sm font-semibold opacity-80">{overall >= 0 ? "you're owed" : 'you owe'}</span></p><div className="mt-4 grid grid-cols-2 gap-3"><div className="hero-stat rounded-2xl bg-primary-foreground/12 p-3"><p className="text-[11px] font-semibold opacity-75">You are owed</p><p className="tabular text-lg font-bold"><AnimatedMoney value={totalOwed} /></p></div><div className="hero-stat rounded-2xl bg-primary-foreground/12 p-3"><p className="text-[11px] font-semibold opacity-75">You owe</p><p className="tabular text-lg font-bold"><AnimatedMoney value={totalOwe} /></p></div></div></div></section><section className="px-5 pt-6"><div className="mb-3 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Groups</p><p className="mt-0.5 text-xs text-muted-foreground">{data.groups.length} active {data.groups.length === 1 ? 'group' : 'groups'}</p></div><button type="button" onClick={() => setGroupOpen(true)} className="press text-xs font-bold text-primary">+ New group</button></div><div className="space-y-2.5">{summaries.map(({ group, mine, spent }, index) => <button type="button" key={group.id} onClick={() => navigate({ name: 'group', groupId: group.id })} className="card-soft group-card list-enter press flex w-full items-center gap-3 p-3.5 text-left" style={{ animationDelay: `${index * 55}ms` }}><span className="group-emoji grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-2 text-2xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate font-bold">{group.name}</p><p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Users size={12} /> {group.members.length} people · {money(spent, group.currency)} spent</p></div><div className="text-right"><p className="text-[11px] font-semibold text-muted-foreground">{Math.abs(mine) < 0.01 ? 'settled' : mine > 0 ? 'you get' : 'you owe'}</p><p className={`tabular font-bold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? '—' : money(mine, group.currency)}</p></div><ChevronRight size={16} className="shrink-0 text-muted-foreground" /></button>)}</div></section></>}{data.groups.length ? <AddExpenseSheet open={addOpen} onClose={() => { setAddOpen(false); setScanSeed(null); }} data={data} update={update} seed={scanSeed} /> : null}<ReceiptScanner open={scannerOpen} onClose={() => setScannerOpen(false)} data={data} onUse={(seed) => { setScanSeed(seed); setScannerOpen(false); setAddOpen(true); }} /><NewGroupSheet open={groupOpen} onClose={() => setGroupOpen(false)} data={data} update={update} onCreated={(groupId) => navigate({ name: 'group', groupId })} /></AppShell>;
 }
 
 function ActivityScreen({ navigate }: { navigate: (view: View) => void }) {
@@ -346,12 +354,13 @@ function ExpenseBreakdown({ expense, group, data, onHistory }: { expense: Expens
   const labels = group.members.flatMap((member) => {
     const name = displayName(group, data, member.id);
     const label = expense.mode === 'exact' ? expense.splitLabels?.[member.id]?.trim() : '';
-    const personalItems = (expense.personalItems ?? []).filter((item) => item.memberId === member.id);
+    const personalItems = (expense.receiptItems?.length ? [] : expense.personalItems ?? []).filter((item) => item.memberId === member.id);
     return [...(label ? [{ key: `label-${member.id}`, text: `${name}: ${label}` }] : []), ...personalItems.map((item) => ({ key: item.id, text: `${name}: ${item.description} · ${shareMoney(item.amount, group.currency)}` }))];
   });
   const chargeLine = (expense.additionalCharges ?? []).filter((charge) => charge.amount > 0).map((charge) => `${charge.description} ${shareMoney(charge.amount, group.currency)}`).join(' · ');
   const historyCount = (data.history ?? []).filter((entry) => entry.expenseId === expense.id).length;
-  return <div className="space-y-3"><div className="result-total rounded-3xl bg-surface-2 p-4"><p className="text-sm font-extrabold">💸 Splitzap</p><p className="mt-2 text-xl font-extrabold">{expense.description} · {shareMoney(expense.amount, group.currency)}</p>{chargeLine ? <p className="mt-1.5 rounded-xl bg-secondary px-2.5 py-2 text-xs font-bold text-secondary-foreground">Additional charges: {chargeLine}</p> : null}<p className="mt-1.5 text-sm text-muted-foreground">Paid by: {payerSummary(expense, group, data, true)}</p></div><div className="result-section rounded-3xl border border-border bg-surface p-4"><p className="text-sm font-extrabold">Settlement</p><div className="mt-3 space-y-2">{debts.length ? debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-3"><span className="min-w-0 flex-1 truncate text-sm font-semibold">{displayName(group, data, debt.from)} → {displayName(group, data, debt.to)}</span><span className="tabular text-sm font-extrabold">{shareMoney(debt.amount, group.currency)}</span></div>) : <div className="rounded-2xl bg-surface-2 px-3 py-3 text-sm font-semibold text-muted-foreground">Everyone is settled for this expense.</div>}</div></div>{labels.length ? <div className="result-section rounded-3xl border border-border bg-surface p-4"><p className="text-sm font-extrabold">Details</p><div className="mt-3 space-y-2">{labels.map((detail) => <div key={detail.key} className="rounded-2xl bg-surface-2 px-3 py-2.5 text-sm">{detail.text}</div>)}</div></div> : null}{historyCount && onHistory ? <button type="button" onClick={onHistory} className="press flex w-full items-center justify-center gap-2 rounded-2xl bg-surface-2 py-2.5 text-xs font-bold text-muted-foreground"><History size={14} /> View edit history ({historyCount})</button> : null}</div>;
+  const receiptItems = expense.receiptItems ?? [];
+  return <div className="space-y-3"><div className="result-total rounded-3xl bg-surface-2 p-4"><p className="text-sm font-extrabold">💸 Splitzap</p><p className="mt-2 text-xl font-extrabold">{expense.description} · {shareMoney(expense.amount, group.currency)}</p>{chargeLine ? <p className="mt-1.5 rounded-xl bg-secondary px-2.5 py-2 text-xs font-bold text-secondary-foreground">Additional charges: {chargeLine}</p> : null}<p className="mt-1.5 text-sm text-muted-foreground">Paid by: {payerSummary(expense, group, data, true)}</p></div>{receiptItems.length ? <div className="result-section rounded-3xl border border-border bg-surface p-4"><div className="flex items-center justify-between"><p className="text-sm font-extrabold">Scanned bill items</p><span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-bold text-primary">{receiptItems.length} items</span></div><div className="mt-3 space-y-1.5">{receiptItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-xl bg-surface-2 px-3 py-2.5"><div className="min-w-0"><p className="truncate text-xs font-bold">{item.description}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{item.memberId ? displayName(group, data, item.memberId) : 'Shared'}</p></div><span className="tabular text-xs font-extrabold">{shareMoney(item.amount, group.currency)}</span></div>)}</div></div> : null}<div className="result-section rounded-3xl border border-border bg-surface p-4"><p className="text-sm font-extrabold">Settlement</p><div className="mt-3 space-y-2">{debts.length ? debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-3"><span className="min-w-0 flex-1 truncate text-sm font-semibold">{displayName(group, data, debt.from)} → {displayName(group, data, debt.to)}</span><span className="tabular text-sm font-extrabold">{shareMoney(debt.amount, group.currency)}</span></div>) : <div className="rounded-2xl bg-surface-2 px-3 py-3 text-sm font-semibold text-muted-foreground">Everyone is settled for this expense.</div>}</div></div>{labels.length ? <div className="result-section rounded-3xl border border-border bg-surface p-4"><p className="text-sm font-extrabold">Details</p><div className="mt-3 space-y-2">{labels.map((detail) => <div key={detail.key} className="rounded-2xl bg-surface-2 px-3 py-2.5 text-sm">{detail.text}</div>)}</div></div> : null}{historyCount && onHistory ? <button type="button" onClick={onHistory} className="press flex w-full items-center justify-center gap-2 rounded-2xl bg-surface-2 py-2.5 text-xs font-bold text-muted-foreground"><History size={14} /> View edit history ({historyCount})</button> : null}</div>;
 }
 
 function ExpenseResultSheet({ open, onClose, expense, group, data, onEdit }: { open: boolean; onClose: () => void; expense: Expense | null; group: Group; data: SplitData; onEdit: () => void }) {
@@ -366,18 +375,211 @@ function HistoryDialog({ open, onClose, expense, data }: { open: boolean; onClos
   return <SheetModal open={open} onClose={onClose} title="Edit history" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>{entries.length ? <div className="space-y-3">{entries.map((entry) => <div key={entry.id} className="rounded-2xl border border-border bg-surface-2 p-3"><p className="mb-2 text-[11px] font-bold text-muted-foreground">{new Date(entry.date).toLocaleString()}</p><div className="space-y-2">{entry.changes.map((change, index) => <div key={`${change.field}-${index}`} className="text-xs"><p className="font-bold">{change.field}</p><p className="mt-0.5 break-words text-muted-foreground">{change.from} → {change.to}</p></div>)}</div></div>)}</div> : <div className="rounded-3xl bg-surface-2 p-6 text-center"><div className="mx-auto grid size-12 place-items-center rounded-2xl bg-secondary text-primary"><History size={20} /></div><p className="mt-3 text-sm font-extrabold">No edits yet</p><p className="mt-1 text-xs text-muted-foreground">Changes to this expense will appear here.</p></div>}</SheetModal>;
 }
 
+
+function receiptAmount(raw: string) {
+  const clean = raw.replace(/[,\s]/g, '').replace(/[^0-9.-]/g, '');
+  const value = Number(clean);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function parseReceiptText(text: string): ParsedReceipt {
+  const rawLines = text.split(/\r?\n/).map((line) => line.replace(/[|]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const totalPattern = /\b(grand\s*total|net\s*total|total\s*amount|amount\s*(due|payable)|payable\s*amount|total)\b/i;
+  const subTotalPattern = /\b(sub\s*total|subtotal)\b/i;
+  const chargePattern = /\b(cgst|sgst|igst|gst|vat|tax|cess|service\s*(charge|fee)|tip|packing\s*(charge|fee)|delivery\s*(charge|fee))\b/i;
+  const discountPattern = /\b(discount|coupon|saving|savings|promo)\b/i;
+  const headerPattern = /\b(qty|quantity|rate|price|amount|description|item)\b/i;
+  const pricePattern = /(?:₹|rs\.?|inr)?\s*(-?\d{1,7}(?:,\d{3})*(?:\.\d{1,2})?)\s*$/i;
+  let detectedTotal: number | null = null;
+  const items: ReceiptItem[] = [];
+  const charges: AdditionalCharge[] = [];
+
+  const merchant = rawLines.find((line) => /[a-z]{3}/i.test(line) && !pricePattern.test(line) && line.length <= 70 && !/invoice|receipt|tax\s*invoice|phone|gstin|date|time/i.test(line))?.slice(0, 60) ?? 'Scanned bill';
+
+  rawLines.forEach((line) => {
+    const match = line.match(pricePattern);
+    if (!match || match.index == null) return;
+    const amount = receiptAmount(match[1] ?? '');
+    if (amount <= 0 || amount > 10000000) return;
+    const description = line.slice(0, match.index).replace(/[.:\-–—]+$/g, '').trim();
+    if (!description) return;
+    if (subTotalPattern.test(description)) return;
+    if (totalPattern.test(description)) { detectedTotal = amount; return; }
+    if (discountPattern.test(description)) return;
+    if (headerPattern.test(description) && description.split(' ').length <= 3) return;
+    if (chargePattern.test(description)) {
+      charges.push({ id: uid(), description, amount, distribution: 'equal' });
+      return;
+    }
+    items.push({ id: uid(), description, amount });
+  });
+
+  if (!items.length && detectedTotal && detectedTotal > 0) items.push({ id: uid(), description: 'Bill total', amount: detectedTotal });
+  return { merchant, detectedTotal, items, charges };
+}
+
+async function preprocessReceiptImage(file: File): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = 'async';
+    await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Could not read this image.')); image.src = url; });
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const targetWidth = Math.min(1800, Math.max(1200, sourceWidth));
+    const scale = targetWidth / sourceWidth;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return file;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (let index = 0; index < pixels.data.length; index += 4) {
+      const gray = pixels.data[index]! * 0.299 + pixels.data[index + 1]! * 0.587 + pixels.data[index + 2]! * 0.114;
+      const contrasted = Math.max(0, Math.min(255, (gray - 128) * 1.28 + 128));
+      pixels.data[index] = contrasted;
+      pixels.data[index + 1] = contrasted;
+      pixels.data[index + 2] = contrasted;
+    }
+    context.putImageData(pixels, 0, 0);
+    return await new Promise<Blob>((resolve) => canvas.toBlob((blob) => resolve(blob ?? file), 'image/jpeg', 0.94));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function ReceiptScanner({ open, onClose, data, onUse }: { open: boolean; onClose: () => void; data: SplitData; onUse: (seed: ScanExpenseSeed) => void }) {
+  const [groupId, setGroupId] = useState(data.groups[0]?.id ?? '');
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [status, setStatus] = useState<'idle' | 'scanning' | 'review' | 'error'>('idle');
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState('Preparing image…');
+  const [error, setError] = useState('');
+  const [merchant, setMerchant] = useState('Scanned bill');
+  const [detectedTotal, setDetectedTotal] = useState<number | null>(null);
+  const [items, setItems] = useState<ReceiptItem[]>([]);
+  const [charges, setCharges] = useState<AdditionalCharge[]>([]);
+  const [rawText, setRawText] = useState('');
+  const group = data.groups.find((entry) => entry.id === groupId) ?? data.groups[0];
+  const baseTotal = items.reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
+  const chargeTotal = charges.reduce((sum, charge) => sum + Math.max(0, Number(charge.amount) || 0), 0);
+  const reviewedTotal = baseTotal + chargeTotal;
+  const mismatch = detectedTotal != null && Math.abs(detectedTotal - reviewedTotal) > 0.05;
+
+  useEffect(() => {
+    if (open && !groupId && data.groups[0]) setGroupId(data.groups[0].id);
+  }, [open, groupId, data.groups]);
+
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+
+  const chooseFile = (next: File | null) => {
+    if (!next) return;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(next);
+    setPreviewUrl(URL.createObjectURL(next));
+    setStatus('idle');
+    setProgress(0);
+    setError('');
+    setRawText('');
+    setItems([]);
+    setCharges([]);
+    setDetectedTotal(null);
+    setMerchant('Scanned bill');
+  };
+
+  const reset = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(null); setPreviewUrl(''); setStatus('idle'); setProgress(0); setError(''); setRawText(''); setItems([]); setCharges([]); setDetectedTotal(null); setMerchant('Scanned bill');
+  };
+
+  const close = () => { reset(); onClose(); };
+
+  const scan = async () => {
+    if (!file) return;
+    setStatus('scanning'); setProgress(0.03); setError(''); setProgressLabel('Cleaning up the receipt…');
+    let worker: Awaited<ReturnType<(typeof import('tesseract.js'))['createWorker']>> | null = null;
+    try {
+      const processed = await preprocessReceiptImage(file);
+      setProgress(0.12); setProgressLabel('Loading on-device OCR…');
+      const { createWorker } = await import('tesseract.js');
+      worker = await createWorker('eng', 1, { logger: (message) => {
+        if (message.status === 'recognizing text') {
+          setProgress(Math.max(0.15, Math.min(0.98, 0.15 + (message.progress ?? 0) * 0.83)));
+          setProgressLabel(`Reading bill… ${Math.round((message.progress ?? 0) * 100)}%`);
+        }
+      } });
+      const result = await worker.recognize(processed);
+      const text = result.data.text ?? '';
+      const parsed = parseReceiptText(text);
+      setRawText(text);
+      setMerchant(parsed.merchant);
+      setDetectedTotal(parsed.detectedTotal);
+      setItems(parsed.items);
+      setCharges(parsed.charges);
+      setProgress(1);
+      setStatus('review');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not scan this bill. Try a clearer, straighter photo.');
+      setStatus('error');
+    } finally {
+      await worker?.terminate().catch(() => undefined);
+    }
+  };
+
+  const changeGroup = (nextId: string) => {
+    setGroupId(nextId);
+    setItems((current) => current.map((item) => ({ ...item, memberId: undefined })));
+  };
+
+  const useBill = () => {
+    if (!group || baseTotal <= 0) return;
+    const cleanItems = items.filter((item) => item.amount > 0).map((item) => ({ ...item, description: item.description.trim() || 'Bill item' }));
+    const receiptIds = new Set(cleanItems.map((item) => item.id));
+    const personalItems: PersonalItem[] = cleanItems.filter((item) => item.memberId).map((item) => ({ id: item.id, memberId: item.memberId!, description: item.description, amount: item.amount }));
+    const cleanCharges = charges.filter((charge) => charge.amount > 0).map((charge) => ({ ...charge, description: charge.description.trim() || 'Charge' }));
+    onUse({ groupId: group.id, description: merchant.trim() || 'Scanned bill', amount: cleanItems.reduce((sum, item) => sum + item.amount, 0), personalItems: personalItems.filter((item) => receiptIds.has(item.id)), additionalCharges: cleanCharges, receiptItems: cleanItems });
+    reset();
+  };
+
+  if (!open) return null;
+  return <SheetModal open={open} onClose={close} title="Scan a bill" footer={status === 'review' ? <div className="grid grid-cols-[.8fr_1.2fr] gap-2"><button type="button" onClick={reset} className="press rounded-2xl bg-surface-2 py-3.5 text-xs font-bold">Scan another</button><PrimaryButton onClick={useBill} disabled={!group || baseTotal <= 0}>Use this bill</PrimaryButton></div> : undefined}>
+    {!data.groups.length ? <div className="rounded-3xl bg-surface-2 p-6 text-center"><Camera size={24} className="mx-auto text-primary" /><p className="mt-3 font-extrabold">Create a group first</p><p className="mt-1 text-xs text-muted-foreground">A scanned bill needs a group so items can be shared or assigned.</p></div> : <>
+      <Field label="Group"><select value={group?.id ?? ''} onChange={(event) => changeGroup(event.target.value)} className={`${inputClass} py-2.5 text-sm`}>{data.groups.map((entry) => <option key={entry.id} value={entry.id}>{entry.emoji} {entry.name}</option>)}</select></Field>
+      {status !== 'review' ? <>
+        <div className="grid grid-cols-2 gap-2"><label className="press flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-primary px-3 py-3.5 text-xs font-bold text-primary-foreground"><Camera size={16} /> Camera<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { chooseFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label><label className="press flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-secondary px-3 py-3.5 text-xs font-bold text-primary"><ImagePlus size={16} /> Photo library<input type="file" accept="image/*" className="hidden" onChange={(event) => { chooseFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label></div>
+        {previewUrl ? <div className="mt-3 overflow-hidden rounded-3xl border border-border bg-surface-2"><img src={previewUrl} alt="Receipt preview" className="max-h-72 w-full object-contain" /></div> : <div className="mt-3 rounded-3xl border border-dashed border-border bg-surface-2 p-7 text-center"><div className="mx-auto grid size-14 place-items-center rounded-2xl bg-secondary text-primary"><Camera size={24} /></div><p className="mt-3 text-sm font-extrabold">Photograph the full receipt</p><p className="mx-auto mt-1 max-w-[290px] text-xs leading-5 text-muted-foreground">Keep it flat, well lit and readable. Splitzap processes the image on this device.</p></div>}
+        {status === 'scanning' ? <div className="mt-3 rounded-2xl bg-secondary p-3"><div className="flex items-center gap-2 text-xs font-bold text-primary"><Loader2 size={15} className="animate-spin" /> {progressLabel}</div><div className="mt-2 h-2 overflow-hidden rounded-full bg-surface"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(4, progress * 100)}%` }} /></div></div> : null}
+        {status === 'error' ? <div className="mt-3 rounded-2xl border border-negative/20 bg-negative/5 p-3 text-xs font-semibold text-negative">{error}</div> : null}
+        <button type="button" disabled={!file || status === 'scanning'} onClick={scan} className="press mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground disabled:opacity-40">{status === 'scanning' ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} {status === 'scanning' ? 'Scanning…' : 'Scan bill'}</button>
+      </> : <>
+        <div className="rounded-2xl bg-secondary p-3"><p className="text-xs font-extrabold text-primary">Review before adding</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">OCR can make mistakes. Edit anything that does not match the receipt.</p></div>
+        <Field label="Expense name"><input value={merchant} onChange={(event) => setMerchant(event.target.value)} placeholder="Restaurant, groceries…" className={inputClass} /></Field>
+        <div className="mb-1 grid grid-cols-[minmax(100px,1fr)_76px_108px_28px] gap-1.5 px-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span className="text-center">For</span><span /></div>
+        <div className="space-y-1.5">{items.map((item) => <div key={item.id} className="grid grid-cols-[minmax(100px,1fr)_76px_108px_28px] items-center gap-1.5"><input value={item.description} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, description: event.target.value } : entry))} placeholder="Item" className="min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-xs" /><input value={item.amount || ''} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : entry))} inputMode="decimal" placeholder="0" className="tabular min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-right text-xs font-bold" /><select value={item.memberId ?? ''} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, memberId: event.target.value || undefined } : entry))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-1 py-2.5 text-center text-[10px] font-semibold"><option value="">Shared</option>{group?.members.map((member) => <option key={member.id} value={member.id}>{displayName(group, data, member.id)}</option>)}</select><button type="button" onClick={() => setItems((current) => current.filter((entry) => entry.id !== item.id))} className="press grid size-7 place-items-center rounded-full bg-surface-2 text-negative"><X size={12} /></button></div>)}</div>
+        <button type="button" onClick={() => setItems((current) => [...current, { id: uid(), description: '', amount: 0 }])} className="press mt-2 w-full rounded-xl border border-dashed border-border bg-surface-2 py-2.5 text-xs font-bold text-primary">+ Add item</button>
+        {charges.length ? <div className="mt-4"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">Detected charges</p><div className="grid grid-cols-[minmax(100px,1fr)_82px_106px_28px] gap-1.5 px-1 pb-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span className="text-center">Split</span><span /></div><div className="space-y-1.5">{charges.map((charge) => <div key={charge.id} className="grid grid-cols-[minmax(100px,1fr)_82px_106px_28px] items-center gap-1.5"><input value={charge.description} onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, description: event.target.value } : entry))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-xs" /><input value={charge.amount || ''} onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : entry))} inputMode="decimal" className="tabular min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-right text-xs font-bold" /><select value={charge.distribution} onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, distribution: event.target.value === 'proportional' ? 'proportional' : 'equal' } : entry))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-1 py-2.5 text-center text-[10px] font-semibold"><option value="equal">Equal</option><option value="proportional">Proportional</option></select><button type="button" onClick={() => setCharges((current) => current.filter((entry) => entry.id !== charge.id))} className="press grid size-7 place-items-center rounded-full bg-surface-2 text-negative"><X size={12} /></button></div>)}</div></div> : null}
+        <div className={`mt-4 rounded-2xl p-3 ${mismatch ? 'border border-amber-300 bg-amber-50' : 'bg-secondary'}`}><div className="flex items-center justify-between text-xs"><span className="font-semibold text-muted-foreground">Reviewed total</span><span className="tabular text-base font-extrabold text-primary">{money(reviewedTotal, group?.currency)}</span></div>{detectedTotal != null ? <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground"><span>Receipt total detected</span><span className="tabular font-bold">{money(detectedTotal, group?.currency)}</span></div> : null}{mismatch ? <p className="mt-2 text-[10px] font-bold text-amber-700">Totals do not match. Review missing items, discounts or OCR mistakes before continuing.</p> : null}</div>
+        {rawText ? <details className="mt-3 rounded-2xl bg-surface-2 p-3"><summary className="cursor-pointer text-xs font-bold text-muted-foreground">View raw OCR text</summary><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-4 text-muted-foreground">{rawText}</pre></details> : null}
+      </>}
+    </>}
+  </SheetModal>;
+}
+
 function PersonalItemsDialog({ open, onClose, items, onChange, group, data }: { open: boolean; onClose: () => void; items: PersonalItem[]; onChange: (items: PersonalItem[]) => void; group: Group; data: SplitData }) {
   const [draft, setDraft] = useState<PersonalDraft | null>(null);
+  useEffect(() => { if (open && !items.length) setDraft((current) => current ?? { memberId: group.members[0]?.id ?? data.me, description: '', amount: '' }); }, [open, items.length, group.members, data.me]);
   const startAdd = () => { if (!draft) setDraft({ memberId: group.members[0]?.id ?? data.me, description: '', amount: '' }); };
   const saveDraft = () => { if (!draft) return; const amount = Number(draft.amount) || 0; if (!draft.memberId || amount <= 0) return; const saved: PersonalItem = { id: draft.id ?? uid(), memberId: draft.memberId, description: draft.description.trim() || 'Personal item', amount }; onChange(draft.id ? items.map((item) => item.id === draft.id ? saved : item) : [...items, saved]); setDraft(null); };
-  return <SheetModal open={open} onClose={onClose} title="Personal items" footer={<div className="grid grid-cols-2 gap-2"><button type="button" onClick={startAdd} className="press rounded-2xl bg-surface-2 py-3.5 text-sm font-bold text-primary">+ Add item</button><PrimaryButton onClick={onClose}>Done</PrimaryButton></div>}>{items.length ? <div className="space-y-2">{items.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-2xl border border-border bg-surface-2 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{item.description}</p><p className="text-[11px] text-muted-foreground">{displayName(group, data, item.memberId)}</p></div><p className="tabular text-sm font-extrabold">{money(item.amount, group.currency)}</p><button type="button" onClick={() => setDraft({ id: item.id, memberId: item.memberId, description: item.description, amount: String(item.amount) })} className="press grid size-8 place-items-center rounded-full bg-surface"><Pencil size={13} /></button><button type="button" onClick={() => onChange(items.filter((current) => current.id !== item.id))} className="press grid size-8 place-items-center rounded-full bg-surface text-negative"><Trash2 size={13} /></button></div>)}</div> : !draft ? <button type="button" onClick={startAdd} className="press flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 p-5 text-sm font-bold text-primary"><Plus size={16} /> Add your first personal item</button> : null}{draft ? <div className="mt-3 rounded-3xl border border-primary/20 bg-secondary p-3"><div className="grid gap-2"><select value={draft.memberId} onChange={(event) => setDraft({ ...draft, memberId: event.target.value })} className={`${inputClass} py-2.5 text-sm`}>{group.members.map((member) => <option key={member.id} value={member.id}>{displayName(group, data, member.id)}</option>)}</select><div className="grid grid-cols-[1.3fr_.7fr] gap-2"><input value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Beer, dessert…" className={`${inputClass} py-2.5 text-sm`} /><input value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" placeholder="0" className={`${inputClass} tabular py-2.5 text-right text-sm font-bold`} /></div><button type="button" disabled={!(Number(draft.amount) > 0)} onClick={saveDraft} className="press rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-40">Save item</button></div></div> : null}</SheetModal>;
+  return <SheetModal open={open} onClose={onClose} title="Personal items" footer={<div className="grid grid-cols-2 gap-2"><button type="button" onClick={startAdd} className="press rounded-2xl bg-surface-2 py-3.5 text-sm font-bold text-primary">+ Add item</button><PrimaryButton onClick={onClose}>Done</PrimaryButton></div>}>{items.length ? <div className="space-y-2">{items.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-2xl border border-border bg-surface-2 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{item.description}</p><p className="text-[11px] text-muted-foreground">{displayName(group, data, item.memberId)}</p></div><p className="tabular text-sm font-extrabold">{money(item.amount, group.currency)}</p><button type="button" onClick={() => setDraft({ id: item.id, memberId: item.memberId, description: item.description, amount: String(item.amount) })} className="press grid size-8 place-items-center rounded-full bg-surface"><Pencil size={13} /></button><button type="button" onClick={() => onChange(items.filter((current) => current.id !== item.id))} className="press grid size-8 place-items-center rounded-full bg-surface text-negative"><Trash2 size={13} /></button></div>)}</div> : !draft ? <button type="button" onClick={startAdd} className="press flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 p-5 text-sm font-bold text-primary"><Plus size={16} /> Add your first personal item</button> : null}{draft ? <div className="mt-3 rounded-3xl border border-primary/20 bg-secondary p-3"><div className="grid grid-cols-[92px_minmax(0,1fr)_76px] gap-1.5 px-1 pb-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Person</span><span>Item</span><span className="text-right">Amount</span></div><div className="grid grid-cols-[92px_minmax(0,1fr)_76px] gap-1.5"><select value={draft.memberId} onChange={(event) => setDraft({ ...draft, memberId: event.target.value })} className="min-w-0 rounded-xl border border-border bg-surface px-1.5 py-2.5 text-[10px] font-semibold">{group.members.map((member) => <option key={member.id} value={member.id}>{displayName(group, data, member.id)}</option>)}</select><input value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Beer, dessert…" className="min-w-0 rounded-xl border border-border bg-surface px-2 py-2.5 text-xs" /><input value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" placeholder="0" className="tabular min-w-0 rounded-xl border border-border bg-surface px-2 py-2.5 text-right text-xs font-bold" /></div><button type="button" disabled={!(Number(draft.amount) > 0)} onClick={saveDraft} className="press mt-2 w-full rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-40">Save item</button></div> : null}</SheetModal>;
 }
 
 
 function AdditionalChargesDialog({ open, onClose, charges, onChange, currency, expenseTotal }: { open: boolean; onClose: () => void; charges: AdditionalCharge[]; onChange: (charges: AdditionalCharge[]) => void; currency: string; expenseTotal: number }) {
   const total = charges.reduce((sum, charge) => sum + Math.max(0, Number(charge.amount) || 0), 0);
   const add = () => onChange([...charges, { id: uid(), description: '', amount: 0, distribution: 'equal' }]);
-  return <SheetModal open={open} onClose={onClose} title="Additional charges" footer={<div className="grid grid-cols-2 gap-2"><button type="button" onClick={add} className="press rounded-2xl bg-surface-2 py-3.5 text-xs font-bold text-primary">+ Add charge</button><PrimaryButton onClick={onClose}>Done</PrimaryButton></div>}><div className="grid grid-cols-[minmax(72px,1fr)_82px_106px_28px] gap-1.5 px-1 pb-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span>Split</span><span /></div>{charges.length ? <div className="space-y-1.5">{charges.map((charge) => <div key={charge.id} className="grid grid-cols-[minmax(72px,1fr)_82px_106px_28px] items-center gap-1.5"><input value={charge.description} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, description: event.target.value } : item))} placeholder="Tax, service…" className="min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-xs" /><input value={charge.amount || ''} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : item))} inputMode="decimal" placeholder="0" className="tabular min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-right text-xs font-bold" /><select value={charge.distribution} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, distribution: event.target.value === 'proportional' ? 'proportional' : 'equal' } : item))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-1.5 py-2.5 text-[10px] font-semibold"><option value="equal">Equal</option><option value="proportional">Proportional</option></select><button type="button" onClick={() => onChange(charges.filter((item) => item.id !== charge.id))} className="press grid size-7 place-items-center rounded-full bg-surface-2 text-negative"><X size={12} /></button></div>)}</div> : <button type="button" onClick={add} className="press mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 p-5 text-sm font-bold text-primary"><Plus size={15} /> Add tax, service charge or tip</button>}<div className="mt-3 flex items-center justify-between rounded-2xl bg-secondary px-3 py-2.5 text-xs"><span className="font-semibold text-muted-foreground">Charges {money(total, currency)}</span><span className="font-extrabold text-primary">Total {money(expenseTotal, currency)}</span></div></SheetModal>;
+  return <SheetModal open={open} onClose={onClose} title="Additional charges" footer={<div className="grid grid-cols-2 gap-2"><button type="button" onClick={add} className="press rounded-2xl bg-surface-2 py-3.5 text-xs font-bold text-primary">+ Add charge</button><PrimaryButton onClick={onClose}>Done</PrimaryButton></div>}><div className="grid grid-cols-[minmax(72px,1fr)_82px_106px_28px] gap-1.5 px-1 pb-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span className="text-center">Split</span><span /></div>{charges.length ? <div className="space-y-1.5">{charges.map((charge) => <div key={charge.id} className="grid grid-cols-[minmax(72px,1fr)_82px_106px_28px] items-center gap-1.5"><input value={charge.description} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, description: event.target.value } : item))} placeholder="Tax, service…" className="min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-xs" /><input value={charge.amount || ''} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : item))} inputMode="decimal" placeholder="0" className="tabular min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-right text-xs font-bold" /><select value={charge.distribution} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, distribution: event.target.value === 'proportional' ? 'proportional' : 'equal' } : item))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-1.5 py-2.5 text-center text-[10px] font-semibold"><option value="equal">Equal</option><option value="proportional">Proportional</option></select><button type="button" onClick={() => onChange(charges.filter((item) => item.id !== charge.id))} className="press grid size-7 place-items-center rounded-full bg-surface-2 text-negative"><X size={12} /></button></div>)}</div> : <button type="button" onClick={add} className="press mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 p-5 text-sm font-bold text-primary"><Plus size={15} /> Add tax, service charge or tip</button>}<div className="mt-3 flex items-center justify-between rounded-2xl bg-secondary px-3 py-2.5 text-xs"><span className="font-semibold text-muted-foreground">Charges {money(total, currency)}</span><span className="font-extrabold text-primary">Total {money(expenseTotal, currency)}</span></div></SheetModal>;
 }
 
 function MultiplePayersDialog({ open, onClose, group, data, total, primaryPayerId, payments, onChange, onUseSingle }: { open: boolean; onClose: () => void; group: Group; data: SplitData; total: number; primaryPayerId: string; payments: Record<string, number>; onChange: (value: Record<string, number>) => void; onUseSingle: () => void }) {
@@ -412,16 +614,17 @@ function makeHistoryChanges(before: Expense, after: Expense, group: Group, data:
   if (JSON.stringify(before.split) !== JSON.stringify(after.split)) add('Split allocation', 'Previous allocation', 'Updated allocation');
   if (JSON.stringify(before.personalItems ?? []) !== JSON.stringify(after.personalItems ?? [])) add('Personal items', 'Previous items', 'Updated items');
   if (JSON.stringify(before.additionalCharges ?? []) !== JSON.stringify(after.additionalCharges ?? [])) add('Additional charges', 'Previous charges', 'Updated charges');
+  if (JSON.stringify(before.receiptItems ?? []) !== JSON.stringify(after.receiptItems ?? [])) add('Scanned bill items', 'Previous items', 'Updated items');
   if (JSON.stringify(before.splitLabels ?? {}) !== JSON.stringify(after.splitLabels ?? {})) add('Labels', 'Previous labels', 'Updated labels');
   return changes;
 }
 
-function AddExpenseSheet({ open, onClose, data, update, defaultGroupId, editing }: { open: boolean; onClose: () => void; data: SplitData; update: (fn: (data: SplitData) => SplitData) => void; defaultGroupId?: string; editing?: Expense | null }) {
+function AddExpenseSheet({ open, onClose, data, update, defaultGroupId, editing, seed }: { open: boolean; onClose: () => void; data: SplitData; update: (fn: (data: SplitData) => SplitData) => void; defaultGroupId?: string; editing?: Expense | null; seed?: ScanExpenseSeed | null }) {
   const groups = data.groups;
   const initialPayments = editing ? paymentsOf(editing) : {};
-  const [groupId, setGroupId] = useState(editing?.groupId ?? defaultGroupId ?? groups[0]?.id ?? '');
-  const [description, setDescription] = useState(editing?.description ?? '');
-  const [amount, setAmount] = useState(editing ? String(baseAmountOf(editing)) : '');
+  const [groupId, setGroupId] = useState(editing?.groupId ?? seed?.groupId ?? defaultGroupId ?? groups[0]?.id ?? '');
+  const [description, setDescription] = useState(editing?.description ?? seed?.description ?? '');
+  const [amount, setAmount] = useState(editing ? String(baseAmountOf(editing)) : seed ? String(seed.amount) : '');
   const [category, setCategory] = useState(editing?.category ?? 'general');
   const [paidBy, setPaidBy] = useState(editing?.paidBy ?? data.me);
   const [multiPayer, setMultiPayer] = useState(Object.keys(initialPayments).filter((id) => (initialPayments[id] ?? 0) > 0).length > 1);
@@ -432,9 +635,10 @@ function AddExpenseSheet({ open, onClose, data, update, defaultGroupId, editing 
   const [splitLabels, setSplitLabels] = useState<Record<string, string>>(editing?.splitLabels ?? {});
   const [labelDrafts, setLabelDrafts] = useState<Record<string, string>>(editing?.splitLabels ?? {});
   const [labelOpen, setLabelOpen] = useState<Record<string, boolean>>({});
-  const [personalItems, setPersonalItems] = useState<PersonalItem[]>(editing?.personalItems ?? []);
+  const [personalItems, setPersonalItems] = useState<PersonalItem[]>(editing?.personalItems ?? seed?.personalItems ?? []);
   const [personalOpen, setPersonalOpen] = useState(false);
-  const [charges, setCharges] = useState<AdditionalCharge[]>(editing?.additionalCharges ?? []);
+  const [charges, setCharges] = useState<AdditionalCharge[]>(editing?.additionalCharges ?? seed?.additionalCharges ?? []);
+  const [receiptItems] = useState<ReceiptItem[]>(editing?.receiptItems ?? seed?.receiptItems ?? []);
   const [chargesOpen, setChargesOpen] = useState(false);
   const [savedExpense, setSavedExpense] = useState<Expense | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -502,7 +706,7 @@ function AddExpenseSheet({ open, onClose, data, update, defaultGroupId, editing 
     const payload: Expense = {
       id: editing?.id ?? uid(), groupId: group.id, description: description.trim(), amount: grandTotal, baseAmount: baseTotal, paidBy, payments: cleanPayments,
       split: hasSharedAmount ? Object.fromEntries(Object.entries(activeSplit).filter(([, value]) => Number(value) > 0)) : {}, splitLabels: mode === 'exact' ? Object.fromEntries(Object.entries(splitLabels).map(([id, value]) => [id, value.trim()]).filter(([, value]) => value)) : {}, mode, category,
-      date: editing?.date ?? new Date().toISOString(), personalItems, additionalCharges: charges.filter((charge) => charge.amount > 0).map((charge) => ({ ...charge, description: charge.description.trim() || 'Charge' })),
+      date: editing?.date ?? new Date().toISOString(), personalItems, additionalCharges: charges.filter((charge) => charge.amount > 0).map((charge) => ({ ...charge, description: charge.description.trim() || 'Charge' })), receiptItems,
     };
     update((current) => {
       const historyChanges = editing ? makeHistoryChanges(editing, payload, group, current) : [];
@@ -561,9 +765,12 @@ function buildExpenseShareMessage(expense: Expense, group: Group, data: SplitDat
   const settlementLines = debts.length ? debts.map((debt) => `• ${displayName(group, data, debt.from)} → ${displayName(group, data, debt.to)}: *${shareMoney(debt.amount, group.currency)}*`) : ['• Everyone is settled'];
   const detailLines = group.members.flatMap((member) => { const person = displayName(group, data, member.id); const label = expense.mode === 'exact' ? expense.splitLabels?.[member.id]?.trim() : ''; const items = (expense.personalItems ?? []).filter((item) => item.memberId === member.id); return [...(label ? [`• ${person}: ${label}`] : []), ...items.map((item) => `• ${person}: ${item.description} — ${shareMoney(item.amount, group.currency)}`)]; });
   const chargeLine = (expense.additionalCharges ?? []).filter((charge) => charge.amount > 0).map((charge) => `${charge.description} ${shareMoney(charge.amount, group.currency)}`).join(' · ');
+  const receiptLines = (expense.receiptItems ?? []).map((item) => `• ${item.description} — ${shareMoney(item.amount, group.currency)}${item.memberId ? ` · ${displayName(group, data, item.memberId)}` : ' · Shared'}`);
   const lines = ['*💸 Splitzap*', `*${expense.description} · ${shareMoney(expense.amount, group.currency)}*`];
   if (chargeLine) lines.push(`*Additional charges:* ${chargeLine}`);
-  lines.push(`Paid by: ${payerSummary(expense, group, data, true)}`, '', '*Settlement*', ...settlementLines);
+  lines.push(`Paid by: ${payerSummary(expense, group, data, true)}`);
+  if (receiptLines.length) lines.push('', '*Bill items*', ...receiptLines);
+  lines.push('', '*Settlement*', ...settlementLines);
   if (detailLines.length) lines.push('', '*Details*', ...detailLines);
   return lines.join('\n');
 }

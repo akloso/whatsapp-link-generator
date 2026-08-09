@@ -18,6 +18,14 @@ export type AdditionalCharge = {
   distribution: ChargeDistribution;
 };
 
+export type ReceiptItem = {
+  id: string;
+  description: string;
+  amount: number;
+  /** Empty/undefined means shared by the group; a member id means personal to that member. */
+  memberId?: string;
+};
+
 export type Expense = {
   id: string;
   groupId: string;
@@ -37,6 +45,7 @@ export type Expense = {
   note?: string;
   personalItems?: PersonalItem[];
   additionalCharges?: AdditionalCharge[];
+  receiptItems?: ReceiptItem[];
 };
 
 export type Settlement = {
@@ -156,6 +165,15 @@ function normalizeExpense(rawValue: unknown): Expense {
     amount: Math.max(0, Number(charge.amount) || 0),
     distribution: charge.distribution === 'proportional' ? 'proportional' : 'equal',
   }));
+  const receiptItems: ReceiptItem[] = (Array.isArray(raw.receiptItems) ? raw.receiptItems : [])
+    .map(recordOf)
+    .map((item) => ({
+      id: typeof item.id === 'string' && item.id ? item.id : uid(),
+      description: typeof item.description === 'string' && item.description.trim() ? item.description.trim() : 'Bill item',
+      amount: Math.max(0, Number(item.amount) || 0),
+      memberId: typeof item.memberId === 'string' && item.memberId ? item.memberId : undefined,
+    }))
+    .filter((item) => item.amount > 0);
   const chargeTotal = normalizedCharges.reduce((sum, charge) => sum + charge.amount, 0);
   const totalAmount = Math.max(0, Number(raw.amount) || 0);
   const fallbackBase = Math.max(0, totalAmount - chargeTotal);
@@ -185,6 +203,7 @@ function normalizeExpense(rawValue: unknown): Expense {
     note: typeof raw.note === 'string' ? raw.note : undefined,
     personalItems,
     additionalCharges: normalizedCharges,
+    receiptItems,
   };
 }
 
