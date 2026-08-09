@@ -1,0 +1,151 @@
+from pathlib import Path
+import re
+
+path = Path('src/features/splitzap/SplitzapAppV4.tsx')
+text = path.read_text()
+
+
+def must_replace(old: str, new: str, label: str) -> None:
+    global text
+    if old not in text:
+        raise SystemExit(f'Marker not found: {label}')
+    text = text.replace(old, new, 1)
+
+
+must_replace(
+    "  const [charges, setCharges] = useState<AdditionalCharge[]>(editing?.additionalCharges ?? []);\n  const [savedExpense, setSavedExpense] = useState<Expense | null>(null);",
+    "  const [charges, setCharges] = useState<AdditionalCharge[]>(editing?.additionalCharges ?? []);\n  const [chargesOpen, setChargesOpen] = useState(false);\n  const [savedExpense, setSavedExpense] = useState<Expense | null>(null);",
+    'charges dialog state',
+)
+
+text = text.replace("  const assignedBase = mode === 'exact' ? personalTotal + exactAssigned : personalTotal + (hasSharedPeople ? sharedTotal : 0);\n", "")
+text = text.replace("  const progress = baseTotal > 0 ? Math.min(100, assignedBase / baseTotal * 100) : 0;\n", "")
+text = text.replace("  const addCharge = () => setCharges([...charges, { id: uid(), description: 'Tax', amount: 0, distribution: 'equal' }]);\n\n", "")
+text = text.replace("  Sparkles,\n", "")
+
+old_category = '''<Field label="Category"><div className="category-scroll flex gap-2 overflow-x-auto pb-1">{CATEGORIES.map((item) => <button key={item.id} type="button" onClick={() => setCategory(item.id)} className={`press shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${category === item.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-surface-2 text-muted-foreground'}`}>{item.emoji} {item.label}</button>)}</div></Field>'''
+new_category = '''<Field label="Category"><select value={category} onChange={(event) => setCategory(event.target.value)} className={`${inputClass} py-2.5 text-sm`}>{CATEGORIES.map((item) => <option key={item.id} value={item.id}>{item.emoji} {item.label}</option>)}</select></Field>'''
+must_replace(old_category, new_category, 'category picker')
+
+personal_pattern = re.compile(r'''\{group \? <div className="personal-items-card[\s\S]*?</div></div> : null\}<Field label=\{`Split shared amount''')
+if not personal_pattern.search(text):
+    raise SystemExit('Marker not found: personal card')
+text = personal_pattern.sub("<Field label={`Split shared amount", text, count=1)
+
+assignment_pattern = re.compile(r'''<div className=\{`assignment-card[\s\S]*?</SheetModal>''')
+if not assignment_pattern.search(text):
+    raise SystemExit('Marker not found: assignment card')
+compact_tail = '''<div className={`mb-3 flex items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-bold ${splitValid && personalOver <= 0.009 && payerValid ? 'bg-secondary text-primary' : 'bg-surface-2 text-negative'}`}><span className={`grid size-6 place-items-center rounded-full ${splitValid && personalOver <= 0.009 && payerValid ? 'bg-primary text-primary-foreground' : 'bg-surface text-negative'}`}>{splitValid && personalOver <= 0.009 && payerValid ? <Check size={13} /> : '!'}</span><span>{personalOver > 0.009 ? `Personal items exceed the expense by ${money(personalOver, group?.currency)}` : !payerValid ? 'Check payer amounts' : splitValid ? 'Fully assigned' : mode === 'percentage' ? `${Math.abs(percentageRemaining).toFixed(2)}% left to fix` : `${money(Math.abs(exactRemaining), group?.currency)} left to fix`}</span></div><div className="mb-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setPersonalOpen(true)} className={`press rounded-2xl border px-3 py-3 text-left ${personalItems.length ? 'border-primary/20 bg-secondary' : 'border-border bg-surface-2'}`}><p className="text-xs font-extrabold text-foreground">👤 {personalItems.length ? `Personal items · ${personalItems.length}` : 'Personal item'}</p><p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">{personalItems.length ? `${money(personalTotal, group?.currency)} · Edit` : 'Optional · Add'}</p></button><button type="button" onClick={() => setChargesOpen(true)} className={`press rounded-2xl border px-3 py-3 text-left ${charges.length ? 'border-primary/20 bg-secondary' : 'border-border bg-surface-2'}`}><p className="text-xs font-extrabold text-foreground">🧾 {charges.length ? `Additional charges · ${charges.length}` : 'Additional charge'}</p><p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">{charges.length ? `${money(chargeTotal, group?.currency)} · Edit` : 'Tax, service, tip · Add'}</p></button></div>{chargeTotal > 0 ? <p className="pb-2 text-right text-[11px] font-bold text-muted-foreground">Expense total with charges: {money(grandTotal, group?.currency)}</p> : null}</SheetModal>'''
+text = assignment_pattern.sub(compact_tail, text, count=1)
+
+personal_dialog_pattern = re.compile(r'''\{group \? <PersonalItemsDialog open=\{personalOpen\}[\s\S]*?/> : null\}''')
+match = personal_dialog_pattern.search(text)
+if not match:
+    raise SystemExit('Marker not found: personal items dialog invocation')
+dialog_call = match.group(0) + '''{group ? <AdditionalChargesDialog open={chargesOpen} onClose={() => setChargesOpen(false)} charges={charges} onChange={setCharges} currency={group.currency} expenseTotal={grandTotal} /> : null}'''
+text = text[:match.start()] + dialog_call + text[match.end():]
+
+marker = 'function MultiplePayersDialog('
+if marker not in text:
+    raise SystemExit('Marker not found: MultiplePayersDialog')
+additional_dialog = r'''
+function AdditionalChargesDialog({ open, onClose, charges, onChange, currency, expenseTotal }: { open: boolean; onClose: () => void; charges: AdditionalCharge[]; onChange: (charges: AdditionalCharge[]) => void; currency: string; expenseTotal: number }) {
+  const total = charges.reduce((sum, charge) => sum + Math.max(0, Number(charge.amount) || 0), 0);
+  const add = () => onChange([...charges, { id: uid(), description: 'Tax', amount: 0, distribution: 'equal' }]);
+  return <SheetModal open={open} onClose={onClose} title="Additional charges" footer={<div className="grid grid-cols-2 gap-2"><button type="button" onClick={add} className="press rounded-2xl bg-surface-2 py-3.5 text-xs font-bold text-primary">+ Add charge</button><PrimaryButton onClick={onClose}>Done</PrimaryButton></div>}><div className="grid grid-cols-[minmax(72px,1fr)_82px_106px_28px] gap-1.5 px-1 pb-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span>Split</span><span /></div>{charges.length ? <div className="space-y-1.5">{charges.map((charge) => <div key={charge.id} className="grid grid-cols-[minmax(72px,1fr)_82px_106px_28px] items-center gap-1.5"><input value={charge.description} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, description: event.target.value } : item))} placeholder="GST" className="min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-xs" /><input value={charge.amount || ''} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : item))} inputMode="decimal" placeholder="0" className="tabular min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-right text-xs font-bold" /><select value={charge.distribution} onChange={(event) => onChange(charges.map((item) => item.id === charge.id ? { ...item, distribution: event.target.value === 'proportional' ? 'proportional' : 'equal' } : item))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-1.5 py-2.5 text-[10px] font-semibold"><option value="equal">Equal</option><option value="proportional">Proportional</option></select><button type="button" onClick={() => onChange(charges.filter((item) => item.id !== charge.id))} className="press grid size-7 place-items-center rounded-full bg-surface-2 text-negative"><X size={12} /></button></div>)}</div> : <button type="button" onClick={add} className="press mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 p-5 text-sm font-bold text-primary"><Plus size={15} /> Add tax, service charge or tip</button>}<div className="mt-3 flex items-center justify-between rounded-2xl bg-secondary px-3 py-2.5 text-xs"><span className="font-semibold text-muted-foreground">Charges {money(total, currency)}</span><span className="font-extrabold text-primary">Total {money(expenseTotal, currency)}</span></div></SheetModal>;
+}
+
+'''
+text = text.replace(marker, additional_dialog + marker, 1)
+
+result_pattern = re.compile(r'''function ExpenseBreakdown\([\s\S]*?\n\}\n\nfunction ExpenseResultSheet''')
+if not result_pattern.search(text):
+    raise SystemExit('Marker not found: ExpenseBreakdown')
+new_result = r'''function ExpenseBreakdown({ expense, group, data, onHistory }: { expense: Expense; group: Group; data: SplitData; onHistory?: () => void }) {
+  const debts = expenseSettlement(expense, group);
+  const labels = group.members.flatMap((member) => {
+    const name = displayName(group, data, member.id);
+    const label = expense.mode === 'exact' ? expense.splitLabels?.[member.id]?.trim() : '';
+    const personalItems = (expense.personalItems ?? []).filter((item) => item.memberId === member.id);
+    return [...(label ? [{ key: `label-${member.id}`, text: `${name}: ${label}` }] : []), ...personalItems.map((item) => ({ key: item.id, text: `${name}: ${item.description} · ${shareMoney(item.amount, group.currency)}` }))];
+  });
+  const chargeLine = (expense.additionalCharges ?? []).filter((charge) => charge.amount > 0).map((charge) => `${charge.description} ${shareMoney(charge.amount, group.currency)}`).join(' · ');
+  const historyCount = (data.history ?? []).filter((entry) => entry.expenseId === expense.id).length;
+  return <div className="space-y-3"><div className="result-total rounded-3xl bg-surface-2 p-4"><p className="text-sm font-extrabold">💸 Splitzap</p><p className="mt-2 text-xl font-extrabold">{expense.description} · {shareMoney(expense.amount, group.currency)}</p>{chargeLine ? <p className="mt-1.5 rounded-xl bg-secondary px-2.5 py-2 text-xs font-bold text-secondary-foreground">Additional charges: {chargeLine}</p> : null}<p className="mt-1.5 text-sm text-muted-foreground">Paid by: {payerSummary(expense, group, data, true)}</p></div><div className="result-section rounded-3xl border border-border bg-surface p-4"><p className="text-sm font-extrabold">Settlement</p><div className="mt-3 space-y-2">{debts.length ? debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-3"><span className="min-w-0 flex-1 truncate text-sm font-semibold">{displayName(group, data, debt.from)} → {displayName(group, data, debt.to)}</span><span className="tabular text-sm font-extrabold">{shareMoney(debt.amount, group.currency)}</span></div>) : <div className="rounded-2xl bg-surface-2 px-3 py-3 text-sm font-semibold text-muted-foreground">Everyone is settled for this expense.</div>}</div></div>{labels.length ? <div className="result-section rounded-3xl border border-border bg-surface p-4"><p className="text-sm font-extrabold">Details</p><div className="mt-3 space-y-2">{labels.map((detail) => <div key={detail.key} className="rounded-2xl bg-surface-2 px-3 py-2.5 text-sm">{detail.text}</div>)}</div></div> : null}{historyCount && onHistory ? <button type="button" onClick={onHistory} className="press flex w-full items-center justify-center gap-2 rounded-2xl bg-surface-2 py-2.5 text-xs font-bold text-muted-foreground"><History size={14} /> View edit history ({historyCount})</button> : null}</div>;
+}
+
+function ExpenseResultSheet'''
+text = result_pattern.sub(new_result, text, count=1)
+
+settle_pattern = re.compile(r'''function SettleSheet\([\s\S]*?\n\}\n\nfunction buildExpenseShareMessage''')
+if not settle_pattern.search(text):
+    raise SystemExit('Marker not found: SettleSheet')
+new_settle = r'''function SettleSheet({ open, onClose, group, balances, data, update }: { open: boolean; onClose: () => void; group: Group; balances: Record<string, number>; data: SplitData; update: (fn: (data: SplitData) => SplitData) => void }) {
+  const debts = simplify(balances);
+  const nameOf = (id: string) => displayName(group, data, id);
+  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+  const [paymentMode, setPaymentMode] = useState<'full' | 'partial'>('full');
+  const [partialAmount, setPartialAmount] = useState('');
+  useEffect(() => { if (selectedDebt) { setPaymentMode('full'); setPartialAmount(''); } }, [selectedDebt?.from, selectedDebt?.to, selectedDebt?.amount]);
+  const partialValue = selectedDebt ? Math.min(selectedDebt.amount, Math.max(0, Number(partialAmount) || 0)) : 0;
+  const savePayment = () => {
+    if (!selectedDebt) return;
+    const amount = paymentMode === 'full' ? selectedDebt.amount : partialValue;
+    if (amount <= 0) return;
+    update((current) => ({ ...current, settlements: [{ id: uid(), groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, amount, date: new Date().toISOString() }, ...current.settlements] }));
+    setSelectedDebt(null);
+  };
+  return <><SheetModal open={open} onClose={onClose} title="Settle up" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>{debts.length === 0 ? <div className="celebration relative overflow-hidden rounded-3xl bg-secondary p-7 text-center"><div className="success-check mx-auto grid size-16 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={30} strokeWidth={3} /></div><p className="mt-3 text-xl font-extrabold">Everyone is settled up</p></div> : <div className="space-y-2">{debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="settle-row flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"><Avatar name={nameOf(debt.from)} size={32} /><ArrowRight size={16} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={32} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{nameOf(debt.from)} → {nameOf(debt.to)}</p><p className="tabular text-sm font-bold text-primary">{money(debt.amount, group.currency)}</p></div><button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Mark paid</button></div>)}</div>}</SheetModal><CompactDialog open={!!selectedDebt} onClose={() => setSelectedDebt(null)} title="Record payment" footer={<PrimaryButton onClick={savePayment} disabled={!selectedDebt || (paymentMode === 'partial' && partialValue <= 0)}>Save payment</PrimaryButton>}>{selectedDebt ? <><div className="rounded-2xl bg-surface-2 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Amount due</p><p className="mt-1 text-2xl font-extrabold">{money(selectedDebt.amount, group.currency)}</p><p className="mt-1 text-xs text-muted-foreground">{nameOf(selectedDebt.from)} → {nameOf(selectedDebt.to)}</p></div><div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-surface-2 p-1"><button type="button" onClick={() => setPaymentMode('full')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'full' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Full payment</button><button type="button" onClick={() => setPaymentMode('partial')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'partial' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Partial payment</button></div>{paymentMode === 'partial' ? <div className="mt-3"><Field label="Amount paid" compact><input value={partialAmount} onChange={(event) => { const raw = event.target.value.replace(/[^0-9.]/g, ''); const next = Math.min(selectedDebt.amount, Math.max(0, Number(raw) || 0)); setPartialAmount(raw === '' ? '' : String(next)); }} inputMode="decimal" placeholder="0" className={`${inputClass} tabular text-right font-bold`} /></Field><div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs"><span className="font-semibold text-muted-foreground">Remaining after payment</span><span className="font-extrabold text-primary">{money(Math.max(0, selectedDebt.amount - partialValue), group.currency)}</span></div></div> : <p className="mt-3 text-xs text-muted-foreground">This records the full outstanding amount as paid.</p>}</> : null}</CompactDialog></>;
+}
+
+function buildExpenseShareMessage'''
+text = settle_pattern.sub(new_settle, text, count=1)
+
+share_pattern = re.compile(r'''function buildExpenseShareMessage\([\s\S]*?\n\}\n\nfunction buildGroupShareMessage''')
+if not share_pattern.search(text):
+    raise SystemExit('Marker not found: expense share formatter')
+new_share = r'''function buildExpenseShareMessage(expense: Expense, group: Group, data: SplitData) {
+  const debts = expenseSettlement(expense, group);
+  const settlementLines = debts.length ? debts.map((debt) => `• ${displayName(group, data, debt.from)} → ${displayName(group, data, debt.to)}: *${shareMoney(debt.amount, group.currency)}*`) : ['• Everyone is settled'];
+  const detailLines = group.members.flatMap((member) => { const person = displayName(group, data, member.id); const label = expense.mode === 'exact' ? expense.splitLabels?.[member.id]?.trim() : ''; const items = (expense.personalItems ?? []).filter((item) => item.memberId === member.id); return [...(label ? [`• ${person}: ${label}`] : []), ...items.map((item) => `• ${person}: ${item.description} — ${shareMoney(item.amount, group.currency)}`)]; });
+  const chargeLine = (expense.additionalCharges ?? []).filter((charge) => charge.amount > 0).map((charge) => `${charge.description} ${shareMoney(charge.amount, group.currency)}`).join(' · ');
+  const lines = ['*💸 Splitzap*', `*${expense.description} · ${shareMoney(expense.amount, group.currency)}*'];
+  if (chargeLine) lines.push(`*Additional charges:* ${chargeLine}`);
+  lines.push(`Paid by: ${payerSummary(expense, group, data, true)}`, '', '*Settlement*', ...settlementLines);
+  if (detailLines.length) lines.push('', '*Details*', ...detailLines);
+  return lines.join('\n');
+}
+
+function buildGroupShareMessage'''
+text = share_pattern.sub(new_share, text, count=1)
+
+insights_pattern = re.compile(r'''function InsightsTab\([\s\S]*?\nfunction EditGroupSheet''')
+if not insights_pattern.search(text):
+    raise SystemExit('Marker not found: InsightsTab')
+new_insights = r'''const INSIGHT_COLORS = ['#256f66', '#e07a5f', '#6c8ebf', '#9b5de5', '#f2b134', '#d95d8f', '#00a6a6', '#7aa95c'];
+
+function InsightsTab({ group, data, expenses }: { group: Group; data: SplitData; expenses: Expense[] }) {
+  const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const average = group.members.length ? total / group.members.length : 0;
+  const categoryTotals = CATEGORIES.map((category) => ({ key: category.id, label: `${category.emoji} ${category.label}`, value: expenses.filter((expense) => expense.category === category.id).reduce((sum, expense) => sum + expense.amount, 0) })).filter((item) => item.value > 0).sort((a, b) => b.value - a.value);
+  const memberRows = group.members.map((member) => ({ key: member.id, label: displayName(group, data, member.id), paid: expenses.reduce((sum, expense) => sum + (paymentsOf(expense)[member.id] ?? 0), 0), share: expenses.reduce((sum, expense) => sum + shareOf(expense, member.id, group.members.map((m) => m.id)), 0) }));
+  const largest = [...expenses].sort((a, b) => b.amount - a.amount)[0];
+  const personal = expenses.reduce((sum, expense) => sum + personalTotalOf(expense), 0);
+  return <section className="space-y-3 px-5 pt-2"><div className="grid grid-cols-2 gap-2"><div className="overflow-hidden rounded-3xl p-4 text-white shadow-sm" style={{ background: 'linear-gradient(135deg,#256f66,#3d9488)' }}><p className="text-[10px] font-bold uppercase tracking-wider opacity-75">Total spent</p><p className="mt-1 text-2xl font-extrabold">{money(total, group.currency)}</p><p className="mt-3 text-[10px] font-semibold opacity-75">Across {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'}</p></div><div className="overflow-hidden rounded-3xl p-4 text-white shadow-sm" style={{ background: 'linear-gradient(135deg,#e07a5f,#ef9a7f)' }}><p className="text-[10px] font-bold uppercase tracking-wider opacity-75">Average/person</p><p className="mt-1 text-2xl font-extrabold">{money(average, group.currency)}</p><p className="mt-3 text-[10px] font-semibold opacity-75">{group.members.length} people</p></div></div><InsightDonut rows={categoryTotals} total={total} currency={group.currency} /><PaidShareChart rows={memberRows} currency={group.currency} /><div className="card-soft grid grid-cols-3 gap-2 p-3 text-center"><div className="rounded-2xl p-3" style={{ backgroundColor: '#eef7f5' }}><p className="text-[9px] font-extrabold uppercase text-muted-foreground">Expenses</p><p className="mt-1 text-lg font-extrabold">{expenses.length}</p></div><div className="rounded-2xl p-3" style={{ backgroundColor: '#fff2ed' }}><p className="text-[9px] font-extrabold uppercase text-muted-foreground">Largest</p><p className="mt-1 truncate text-sm font-extrabold">{largest ? money(largest.amount, group.currency) : '—'}</p></div><div className="rounded-2xl p-3" style={{ backgroundColor: '#f3efff' }}><p className="text-[9px] font-extrabold uppercase text-muted-foreground">Personal</p><p className="mt-1 truncate text-sm font-extrabold">{money(personal, group.currency)}</p></div>{largest ? <p className="col-span-3 truncate px-2 text-[10px] text-muted-foreground">Largest expense: {largest.description}</p> : null}</div></section>;
+}
+
+function InsightDonut({ rows, total, currency }: { rows: Array<{ key: string; label: string; value: number }>; total: number; currency: string }) {
+  const circumference = 2 * Math.PI * 42;
+  let cumulative = 0;
+  return <div className="card-soft p-4"><div className="mb-3 flex items-center gap-2"><BarChart3 size={15} className="text-primary" /><h3 className="text-sm font-extrabold">Spending by category</h3></div>{rows.length ? <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-3"><div className="relative mx-auto size-[132px]"><svg viewBox="0 0 120 120" className="size-full"><circle cx="60" cy="60" r="42" fill="none" stroke="#edf0ee" strokeWidth="16" />{rows.map((row, index) => { const fraction = total > 0 ? row.value / total : 0; const dashOffset = -cumulative * circumference; cumulative += fraction; return <circle key={row.key} cx="60" cy="60" r="42" fill="none" stroke={INSIGHT_COLORS[index % INSIGHT_COLORS.length]} strokeWidth="16" strokeLinecap="butt" strokeDasharray={`${fraction * circumference} ${circumference}`} strokeDashoffset={dashOffset} transform="rotate(-90 60 60)" />; })}</svg><div className="absolute inset-0 grid place-items-center text-center"><div><p className="text-[9px] font-bold uppercase text-muted-foreground">Total</p><p className="text-sm font-extrabold">{money(total, currency)}</p></div></div></div><div className="min-w-0 space-y-2">{rows.slice(0, 6).map((row, index) => <div key={row.key} className="flex items-center gap-2 text-[11px]"><span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: INSIGHT_COLORS[index % INSIGHT_COLORS.length] }} /><span className="min-w-0 flex-1 truncate font-semibold">{row.label}</span><span className="tabular shrink-0 font-extrabold">{Math.round(row.value / total * 100)}%</span></div>)}</div></div> : <p className="text-xs text-muted-foreground">No category data yet.</p>}</div>;
+}
+
+function PaidShareChart({ rows, currency }: { rows: Array<{ key: string; label: string; paid: number; share: number }>; currency: string }) {
+  const max = Math.max(1, ...rows.flatMap((row) => [row.paid, row.share]));
+  return <div className="card-soft p-4"><div className="mb-1 flex items-center justify-between"><h3 className="text-sm font-extrabold">Paid vs actual share</h3><div className="flex gap-2 text-[9px] font-bold text-muted-foreground"><span className="flex items-center gap-1"><i className="size-2 rounded-full" style={{ backgroundColor: '#256f66' }} />Paid</span><span className="flex items-center gap-1"><i className="size-2 rounded-full" style={{ backgroundColor: '#e07a5f' }} />Share</span></div></div><p className="mb-4 text-[10px] text-muted-foreground">See who fronted the money versus what they actually consumed.</p><div className="space-y-4">{rows.map((row) => <div key={row.key}><div className="mb-1.5 flex items-center justify-between gap-2"><span className="truncate text-xs font-bold">{row.label}</span><span className="tabular shrink-0 text-[10px] font-semibold text-muted-foreground">{money(row.paid, currency)} / {money(row.share, currency)}</span></div><div className="space-y-1"><div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.max(2, row.paid / max * 100)}%`, backgroundColor: '#256f66' }} /></div><div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.max(2, row.share / max * 100)}%`, backgroundColor: '#e07a5f' }} /></div></div></div>)}</div></div>;
+}
+
+function EditGroupSheet'''
+text = insights_pattern.sub(new_insights, text, count=1)
+
+path.write_text(text)
