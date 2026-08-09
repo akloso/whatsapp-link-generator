@@ -34,8 +34,8 @@ jobs:
           p.write_text(s.replace(broken, fixed, 1))
           PY
 
-      - name: Show repaired source
-        run: nl -ba src/features/splitzap/SplitzapAppV4.tsx | sed -n '545,595p'
+      - name: Show generated Add Expense and dialogs
+        run: nl -ba src/features/splitzap/SplitzapAppV4.tsx | sed -n '400,550p'
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -48,15 +48,3 @@ jobs:
 
       - name: TypeScript check
         run: npm run typecheck
-
-      - name: Production build
-        run: npm run build
-
-      - name: Commit enhancements
-        run: |
-          git config user.name "Splitzap Enhancement"
-          git config user.email "actions@users.noreply.github.com"
-          git add src/features/splitzap/SplitzapAppV4.tsx
-          git diff --cached --quiet && exit 0
-          git commit -m "Refine Splitzap expense UX and settlement insights"
-          git push origin testing
