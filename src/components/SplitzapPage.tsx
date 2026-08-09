@@ -1,4 +1,4 @@
-import SplitzapApp from '../features/splitzap/SplitzapApp';
+import SplitzapApp from '../features/splitzap/SplitzapAppEnhanced';
 import '../features/splitzap/splitzap.css';
 
 export default function SplitzapPage() {
