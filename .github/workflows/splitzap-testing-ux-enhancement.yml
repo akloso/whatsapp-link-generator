@@ -27,9 +27,15 @@ jobs:
           from pathlib import Path
           p = Path('src/features/splitzap/SplitzapAppV4.tsx')
           s = p.read_text()
-          s = s.replace("return lines.join('\n');", "return lines.join('\\\\n');")
-          p.write_text(s)
+          broken = "return lines.join('" + "\n" + "');"
+          fixed = "return lines.join('\\n');"
+          if broken not in s:
+              raise SystemExit('broken newline marker not found')
+          p.write_text(s.replace(broken, fixed, 1))
           PY
+
+      - name: Show repaired source
+        run: nl -ba src/features/splitzap/SplitzapAppV4.tsx | sed -n '545,595p'
 
       - name: Set up Node
         uses: actions/setup-node@v4
