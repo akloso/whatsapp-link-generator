@@ -1,0 +1,24 @@
+{
+  "name": "Splitzap — Split bills, not bonds",
+  "short_name": "Splitzap",
+  "description": "Split shared expenses, personal items and settlements without an account.",
+  "start_url": "/splitzap",
+  "scope": "/splitzap",
+  "display": "standalone",
+  "background_color": "#faf9f5",
+  "theme_color": "#256f66",
+  "icons": [
+    {
+      "src": "/splitzap-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/splitzap-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
