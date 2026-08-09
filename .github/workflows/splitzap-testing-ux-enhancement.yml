@@ -21,8 +21,15 @@ jobs:
       - name: Apply UX patch
         run: python3 .github/splitzap_ux_patch.py
 
-      - name: Show generated problem area
-        run: nl -ba src/features/splitzap/SplitzapAppV4.tsx | sed -n '550,595p'
+      - name: Repair share newline escape
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/features/splitzap/SplitzapAppV4.tsx')
+          s = p.read_text()
+          s = s.replace("return lines.join('\n');", "return lines.join('\\\\n');")
+          p.write_text(s)
+          PY
 
       - name: Set up Node
         uses: actions/setup-node@v4
