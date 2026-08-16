@@ -692,3 +692,87 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Splitzap UI calm-density pass */
+.splitzap-root .rounded-xl { border-radius: 0.9rem; }
+.splitzap-root .rounded-2xl { border-radius: 1.1rem; }
+.splitzap-root .rounded-3xl { border-radius: 1.4rem; }
+.splitzap-root .rounded-lg { border-radius: 0.75rem; }
+
+.splitzap-root .group-card,
+.splitzap-root .expense-card {
+  border: 0;
+  border-bottom: 1px solid oklch(var(--border) / 0.72);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.splitzap-root .group-card:last-child,
+.splitzap-root .expense-card:last-child,
+.splitzap-root .activity-row:last-child {
+  border-bottom-color: transparent;
+}
+
+.splitzap-root .activity-row {
+  background: transparent;
+}
+
+.splitzap-root .payment-row {
+  border: 0;
+  border-bottom: 1px solid oklch(var(--border) / 0.72);
+  border-radius: 0;
+  background: transparent;
+}
+
+.splitzap-root .result-section {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.splitzap-root .result-document {
+  box-shadow: 0 8px 28px -24px oklch(0.3 0.04 165 / 0.25);
+}
+
+.splitzap-ambient {
+  opacity: 0.5;
+  animation: none;
+}
+
+.splitzap-fab {
+  animation: none;
+}
+
+.splitzap-fab::after {
+  display: none;
+  animation: none;
+}
+
+.success-check::after {
+  animation-iteration-count: 1;
+}
+
+.splitzap-root .text-\[9px\] { font-size: 0.6875rem; }
+.splitzap-root .text-\[10px\] { font-size: 0.75rem; }
+
+.splitzap-root button.size-7,
+.splitzap-root button.size-8 {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+}
+
+.splitzap-root .splitzap-input {
+  border-radius: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splitzap-root *,
+  .splitzap-root *::before,
+  .splitzap-root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
