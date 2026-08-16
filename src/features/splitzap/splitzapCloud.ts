@@ -1,7 +1,8 @@
-import { createClient, type Session } from '@supabase/supabase-js';
+import { createClient, type AuthChangeEvent, type Session } from '@supabase/supabase-js';
 import type { SplitData } from './splitStoreV4';
 
 export type SplitzapSession = Session;
+export type SplitzapAuthEvent = AuthChangeEvent;
 
 const SUPABASE_URL = 'https://cnbisaamlcisksacpozr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_pvyXUidHeZbyTDaXwuS4Xg_eMrqjnzg';
@@ -19,25 +20,61 @@ export type SplitzapCloudRow = {
   updated_at: string;
 };
 
+const splitzapRedirectUrl = () => `${window.location.origin}/splitzap`;
+
 export async function getSplitzapSession(): Promise<Session | null> {
   const { data, error } = await splitzapSupabase.auth.getSession();
   if (error) throw error;
   return data.session;
 }
 
-export function onSplitzapAuthChange(callback: (session: Session | null) => void) {
-  const { data } = splitzapSupabase.auth.onAuthStateChange((_event, session) => callback(session));
+export function onSplitzapAuthChange(callback: (session: Session | null, event: AuthChangeEvent) => void) {
+  const { data } = splitzapSupabase.auth.onAuthStateChange((event, session) => callback(session, event));
   return () => data.subscription.unsubscribe();
 }
 
-export async function sendSplitzapMagicLink(email: string) {
-  const { error } = await splitzapSupabase.auth.signInWithOtp({
-    email: email.trim(),
+export async function signInSplitzapWithGoogle() {
+  const { data, error } = await splitzapSupabase.auth.signInWithOAuth({
+    provider: 'google',
     options: {
-      emailRedirectTo: `${window.location.origin}/splitzap`,
+      redirectTo: splitzapRedirectUrl(),
+      queryParams: { prompt: 'select_account' },
     },
   });
   if (error) throw error;
+  return data;
+}
+
+export async function signInSplitzapWithPassword(email: string, password: string) {
+  const { data, error } = await splitzapSupabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function signUpSplitzapWithPassword(email: string, password: string) {
+  const { data, error } = await splitzapSupabase.auth.signUp({
+    email: email.trim(),
+    password,
+    options: { emailRedirectTo: splitzapRedirectUrl() },
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function sendSplitzapPasswordReset(email: string) {
+  const { error } = await splitzapSupabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: splitzapRedirectUrl(),
+  });
+  if (error) throw error;
+}
+
+export async function updateSplitzapPassword(password: string) {
+  const { data, error } = await splitzapSupabase.auth.updateUser({ password });
+  if (error) throw error;
+  return data;
 }
 
 export async function signOutSplitzap() {
