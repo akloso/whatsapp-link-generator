@@ -1,0 +1,50 @@
+name: Splitzap Readiness
+
+on:
+  push:
+    branches: [testing]
+    paths:
+      - 'src/features/splitzap/**'
+      - 'src/components/SplitzapPage.tsx'
+      - 'src/App.tsx'
+      - 'public/splitzap*'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/splitzap-readiness.yml'
+  pull_request:
+    paths:
+      - 'src/features/splitzap/**'
+      - 'src/components/SplitzapPage.tsx'
+      - 'src/App.tsx'
+      - 'public/splitzap*'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Splitzap calculation tests
+        run: npm run test:splitzap
+      - name: Production build
+        run: npm run build
+      - name: Production dependency security gate
+        run: npm audit --omit=dev --audit-level=high
+      - name: PWA asset assertions
+        shell: bash
+        run: |
+          grep -q '"id": "/splitzap"' public/splitzap.webmanifest
+          grep -q "splitzap-v2" public/splitzap-sw.js
+          test -f public/splitzap-icon-192.png
+          test -f public/splitzap-icon-512.png

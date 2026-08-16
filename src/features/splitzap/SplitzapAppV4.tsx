@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BarChart3,
@@ -6,6 +7,8 @@ import {
   Check,
   ChevronRight,
   Copy,
+  Download,
+  HardDrive,
   History,
   Home,
   ImagePlus,
@@ -18,16 +21,18 @@ import {
   Scale,
   Share2,
   Trash2,
+  Upload,
   UserPlus,
   Users,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   CATEGORIES,
   CURRENCIES,
   baseAmountOf,
   categoryOf,
+  createSplitBackup,
   expenseBalances,
   groupBalances,
   money,
@@ -36,8 +41,10 @@ import {
   selectiveItemShare,
   shareOf,
   simplify,
+  restoreSplitBackup,
   uid,
   useSplitData,
+  useSplitStorageStatus,
   type AdditionalCharge,
   type Debt,
   type Expense,
@@ -122,6 +129,8 @@ function useSplitzapPwa() {
 export default function SplitzapAppV4() {
   useSplitzapPwa();
   const [view, setView] = useState<View>(() => parseView());
+  const [dataToolsOpen, setDataToolsOpen] = useState(false);
+  const { storageError, clearStorageError } = useSplitStorageStatus();
 
   useEffect(() => {
     const onPop = () => setView(parseView());
@@ -146,10 +155,22 @@ export default function SplitzapAppV4() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const afterRestore = () => {
+    window.history.replaceState({}, '', '/splitzap');
+    setView({ name: 'home' });
+    clearStorageError();
+  };
+
   return (
     <div className="splitzap-root min-h-[100dvh] bg-background text-foreground">
       <div className="splitzap-ambient" aria-hidden="true" />
-      {view.name === 'home' ? <HomeScreen navigate={navigate} /> : view.name === 'activity' ? <ActivityScreen navigate={navigate} /> : <GroupScreen groupId={view.groupId} navigate={navigate} />}
+      {view.name === 'home'
+        ? <HomeScreen navigate={navigate} onDataBackup={() => setDataToolsOpen(true)} />
+        : view.name === 'activity'
+          ? <ActivityScreen navigate={navigate} />
+          : <GroupScreen groupId={view.groupId} navigate={navigate} />}
+      {storageError ? <div role="alert" className="fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex w-[calc(100%-1.5rem)] max-w-[496px] -translate-x-1/2 items-start gap-2 rounded-2xl border border-negative/20 bg-surface px-3 py-3 shadow-xl"><AlertTriangle size={18} className="mt-0.5 shrink-0 text-negative" /><p className="min-w-0 flex-1 text-[11px] font-semibold leading-4 text-foreground">{storageError}</p><button type="button" onClick={() => setDataToolsOpen(true)} className="press shrink-0 rounded-lg bg-secondary px-2.5 py-2 text-[11px] font-bold text-primary">Backup</button><button type="button" aria-label="Dismiss storage warning" onClick={clearStorageError} className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div> : null}
+      <DataBackupDialog open={dataToolsOpen} onClose={() => setDataToolsOpen(false)} onRestored={afterRestore} />
     </div>
   );
 }
@@ -188,7 +209,7 @@ function Header({ title, subtitle, right, back, onTitleClick }: { title: string;
 }
 
 function Field({ label, children, compact = false }: { label: string; children: ReactNode; compact?: boolean }) {
-  return <div className={compact ? 'mb-2' : 'mb-4'}><div className="mb-1.5 text-[12px] font-semibold text-muted-foreground">{label}</div>{children}</div>;
+  return <fieldset className={`${compact ? 'mb-2' : 'mb-4'} m-0 min-w-0 border-0 p-0`}><legend className="mb-1.5 block p-0 text-[12px] font-semibold text-muted-foreground">{label}</legend>{children}</fieldset>;
 }
 
 const inputClass = 'splitzap-input w-full rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-[15px] outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/25';
@@ -197,29 +218,113 @@ function PrimaryButton({ children, onClick, disabled }: { children: ReactNode; o
   return <button type="button" onClick={onClick} disabled={disabled} className="splitzap-primary-button press w-full rounded-2xl bg-primary py-3.5 text-[15px] font-bold text-primary-foreground disabled:opacity-40">{children}</button>;
 }
 
-function SheetModal({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
+function useDialogAccessibility(open: boolean, onClose: () => void) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
+    const panel = panelRef.current;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = 'hidden';
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', onKey); };
-  }, [open, onClose]);
+    const focusableSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+    const focusFirst = window.setTimeout(() => {
+      const first = panel?.querySelector<HTMLElement>(focusableSelector);
+      (first ?? panel)?.focus();
+    }, 0);
+    const onKey = (event: KeyboardEvent) => {
+      if (!panel || !panel.contains(document.activeElement)) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...panel.querySelectorAll<HTMLElement>(focusableSelector)].filter((item) => !item.hasAttribute('hidden'));
+      if (!focusable.length) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      window.clearTimeout(focusFirst);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKey);
+      previousFocus?.focus();
+    };
+  }, [open]);
+
+  return panelRef;
+}
+
+function SheetModal({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
+  const titleId = useId();
+  const panelRef = useDialogAccessibility(open, onClose);
   if (!open) return null;
-  return <div className="sheet-wrap fixed inset-0 z-50 flex items-end justify-center"><button type="button" aria-label="Close" onClick={onClose} className="sheet-backdrop absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div className="sheet-panel relative flex max-h-[94dvh] w-full max-w-[520px] flex-col rounded-t-[28px] bg-surface"><div className="sheet-handle mx-auto mt-2 h-1 w-10 rounded-full bg-border" /><div className="flex items-center justify-between px-5 pb-2 pt-3"><h2 className="text-lg font-extrabold">{title}</h2><button type="button" onClick={onClose} aria-label="Close" className="press grid size-8 place-items-center rounded-full bg-muted text-muted-foreground"><X size={16} /></button></div><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">{children}</div>{footer ? <div className="sheet-footer border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{footer}</div> : null}</div></div>;
+  return <div className="sheet-wrap fixed inset-0 z-50 flex items-end justify-center"><button type="button" aria-label="Close dialog" onClick={onClose} className="sheet-backdrop absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="sheet-panel relative flex max-h-[94dvh] w-full max-w-[520px] flex-col rounded-t-[28px] bg-surface outline-none"><div className="sheet-handle mx-auto mt-2 h-1 w-10 rounded-full bg-border" /><div className="flex items-center justify-between px-5 pb-2 pt-3"><h2 id={titleId} className="text-lg font-extrabold">{title}</h2><button type="button" onClick={onClose} aria-label="Close" className="press grid size-10 place-items-center rounded-full bg-muted text-muted-foreground"><X size={16} /></button></div><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">{children}</div>{footer ? <div className="sheet-footer border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{footer}</div> : null}</div></div>;
 }
 
 function CompactDialog({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
+  const titleId = useId();
+  const panelRef = useDialogAccessibility(open, onClose);
   if (!open) return null;
-  return <div className="fixed inset-0 z-[90] grid place-items-center px-5"><button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div className="relative w-full max-w-[400px] rounded-3xl bg-surface p-4 shadow-2xl"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-extrabold">{title}</h2><button type="button" onClick={onClose} className="press grid size-8 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div>{children}{footer ? <div className="mt-4">{footer}</div> : null}</div></div>;
+  return <div className="fixed inset-0 z-[90] grid place-items-center px-5"><button type="button" aria-label="Close dialog" onClick={onClose} className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative w-full max-w-[400px] rounded-3xl bg-surface p-4 shadow-2xl outline-none"><div className="mb-3 flex items-center justify-between"><h2 id={titleId} className="text-base font-extrabold">{title}</h2><button type="button" aria-label="Close" onClick={onClose} className="press grid size-10 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div>{children}{footer ? <div className="mt-4">{footer}</div> : null}</div></div>;
+}
+
+function DataBackupDialog({ open, onClose, onRestored }: { open: boolean; onClose: () => void; onRestored: () => void }) {
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  useEffect(() => { if (open) setFeedback(null); }, [open]);
+
+  const downloadBackup = () => {
+    try {
+      const blob = new Blob([createSplitBackup()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `splitzap-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      setFeedback({ kind: 'success', text: 'Backup downloaded. Keep the file somewhere safe.' });
+    } catch {
+      setFeedback({ kind: 'error', text: 'Could not create the backup file on this device.' });
+    }
+  };
+
+  const restoreFile = async (file: File | null) => {
+    if (!file) return;
+    if (!window.confirm('Restore this backup? Current Splitzap groups, expenses and payments on this device will be replaced.')) return;
+    try {
+      const restored = restoreSplitBackup(await file.text());
+      setFeedback({ kind: 'success', text: `Restored ${restored.groups.length} ${restored.groups.length === 1 ? 'group' : 'groups'} successfully.` });
+      onRestored();
+    } catch (cause) {
+      setFeedback({ kind: 'error', text: cause instanceof Error ? cause.message : 'Could not restore this backup.' });
+    }
+  };
+
+  return <CompactDialog open={open} onClose={onClose} title="Backup & restore"><div className="space-y-3"><div className="rounded-2xl bg-secondary p-3"><div className="flex items-start gap-2"><HardDrive size={18} className="mt-0.5 shrink-0 text-primary" /><div><p className="text-sm font-extrabold">Your Splitzap data lives on this device</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">Export a backup before clearing browser data, changing phones or reinstalling the app.</p></div></div></div><button type="button" onClick={downloadBackup} className="press flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 text-left"><span className="grid size-9 place-items-center rounded-xl bg-surface text-primary"><Download size={17} /></span><span className="min-w-0 flex-1"><b className="block text-sm">Export backup</b><span className="text-[11px] text-muted-foreground">Download all groups, expenses and payments</span></span></button><label className="press flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 text-left"><span className="grid size-9 place-items-center rounded-xl bg-surface text-primary"><Upload size={17} /></span><span className="min-w-0 flex-1"><b className="block text-sm">Restore backup</b><span className="text-[11px] text-muted-foreground">Replace this device's data from a Splitzap JSON backup</span></span><input type="file" accept="application/json,.json" className="hidden" onChange={(event) => { void restoreFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label>{feedback ? <p role="status" className={`rounded-xl px-3 py-2.5 text-[11px] font-bold ${feedback.kind === 'success' ? 'bg-secondary text-primary' : 'bg-negative/5 text-negative'}`}>{feedback.text}</p> : null}</div></CompactDialog>;
 }
 
 function IntroPanel({ hasGroups, onPrimary, onNewGroup, onInstall }: { hasGroups: boolean; onPrimary: () => void; onNewGroup: () => void; onInstall?: () => void }) {
   return <section className="px-5 pt-2"><div className="splitzap-welcome card-soft overflow-hidden p-6 text-center"><div className="welcome-orbit mx-auto mb-5" aria-hidden="true"><span>🍜</span><span>🚕</span><span>🏠</span><span>🎉</span><strong>₹</strong></div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Splitzap</p><h2 className="mt-2 text-3xl font-extrabold">Split bills, not bonds.</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep shared spending clear, personal items separate, and every balance easy to settle.</p><button type="button" onClick={onPrimary} className="splitzap-primary-cta press mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-sm font-bold text-primary-foreground">{hasGroups ? <Home size={18} /> : <Plus size={18} />}{hasGroups ? 'Back to your groups' : 'Create your first group'}</button>{hasGroups ? <button type="button" onClick={onNewGroup} className="press mt-3 block w-full text-sm font-bold text-primary">+ Create another group</button> : null}{onInstall ? <button type="button" onClick={onInstall} className="press mt-2 block w-full text-xs font-bold text-muted-foreground">Install Splitzap on this device</button> : null}<div className="mt-6 grid grid-cols-3 gap-2 text-left">{[['⚡', 'Fast', 'Add in seconds'], ['🧮', 'Clear', 'Automatic math'], ['🔒', 'Private', 'Saved on device']].map(([emoji, title, copy]) => <div key={title} className="welcome-feature rounded-2xl bg-surface-2 p-3"><span className="text-lg">{emoji}</span><p className="mt-1 text-xs font-bold">{title}</p><p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">{copy}</p></div>)}</div></div></section>;
 }
 
-function HomeScreen({ navigate }: { navigate: (view: View) => void }) {
+function HomeScreen({ navigate, onDataBackup }: { navigate: (view: View) => void; onDataBackup: () => void }) {
   const { data, update, hydrated } = useSplitData();
   const [addOpen, setAddOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
@@ -251,7 +356,7 @@ function HomeScreen({ navigate }: { navigate: (view: View) => void }) {
   const overall = totalOwed - totalOwe;
   const introVisible = hydrated && (data.groups.length === 0 || showIntro);
 
-  return <AppShell onAdd={() => data.groups.length ? setAddOpen(true) : setGroupOpen(true)} view={{ name: 'home' }} navigate={navigate}><Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5"><button type="button" onClick={() => data.groups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan a bill" title="Scan bill" className="press grid size-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="press flex items-center gap-1 rounded-full bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"><Plus size={14} /> Group</button></div>} />{!hydrated ? <section className="space-y-3 px-5 pt-2"><div className="splitzap-skeleton h-44 rounded-3xl" /><div className="splitzap-skeleton h-20 rounded-3xl" /></section> : introVisible ? <IntroPanel hasGroups={data.groups.length > 0} onPrimary={() => data.groups.length ? setShowIntro(false) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onInstall={installPrompt ? install : undefined} /> : <><section className="px-5"><div className="hero-surface splitzap-hero rounded-3xl p-5 text-primary-foreground" style={{ boxShadow: 'var(--shadow-float)' }}><div className="hero-glow" aria-hidden="true" /><p className="text-xs font-semibold uppercase tracking-widest opacity-70">Your overall balance</p><p className="tabular mt-1 text-4xl font-extrabold"><AnimatedMoney value={overall} /><span className="ml-2 text-sm font-semibold opacity-80">{overall >= 0 ? "you're owed" : 'you owe'}</span></p><div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold opacity-85"><span>Owed <b className="tabular text-primary-foreground">{money(totalOwed)}</b></span><span className="opacity-40">•</span><span>Owe <b className="tabular text-primary-foreground">{money(totalOwe)}</b></span></div></div></section><section className="px-5 pt-6"><div className="mb-2"><p className="text-sm font-extrabold">Groups</p><p className="mt-0.5 text-[11px] text-muted-foreground">{data.groups.length} active {data.groups.length === 1 ? 'group' : 'groups'}</p></div><div className="space-y-2.5">{summaries.map(({ group, mine, spent }, index) => <button type="button" key={group.id} onClick={() => navigate({ name: 'group', groupId: group.id })} className="card-soft group-card list-enter press flex w-full items-center gap-3 p-3.5 text-left" style={{ animationDelay: `${index * 55}ms` }}><span className="group-emoji grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-2 text-2xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate font-bold">{group.name}</p><p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Users size={12} /> {group.members.length} people · {money(spent, group.currency)} spent</p></div><div className="text-right"><p className="text-[11px] font-semibold text-muted-foreground">{Math.abs(mine) < 0.01 ? 'settled' : mine > 0 ? 'you get' : 'you owe'}</p><p className={`tabular font-bold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? '—' : money(mine, group.currency)}</p></div><ChevronRight size={16} className="shrink-0 text-muted-foreground" /></button>)}</div></section></>}{data.groups.length ? <AddExpenseSheet open={addOpen} onClose={() => { setAddOpen(false); setScanSeed(null); }} data={data} update={update} seed={scanSeed} /> : null}<ReceiptScanner open={scannerOpen} onClose={() => setScannerOpen(false)} data={data} onUse={(seed) => { setScanSeed(seed); setScannerOpen(false); setAddOpen(true); }} /><NewGroupSheet open={groupOpen} onClose={() => setGroupOpen(false)} data={data} update={update} onCreated={(groupId) => navigate({ name: 'group', groupId })} /></AppShell>;
+  return <AppShell onAdd={() => data.groups.length ? setAddOpen(true) : setGroupOpen(true)} view={{ name: 'home' }} navigate={navigate}><Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5"><button type="button" onClick={() => data.groups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan a bill" title="Scan bill" className="press grid size-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="press flex items-center gap-1 rounded-full bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"><Plus size={14} /> Group</button></div>} />{!hydrated ? <section className="space-y-3 px-5 pt-2"><div className="splitzap-skeleton h-44 rounded-3xl" /><div className="splitzap-skeleton h-20 rounded-3xl" /></section> : introVisible ? <IntroPanel hasGroups={data.groups.length > 0} onPrimary={() => data.groups.length ? setShowIntro(false) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onInstall={installPrompt ? install : undefined} /> : <><section className="px-5"><div className="hero-surface splitzap-hero rounded-3xl p-5 text-primary-foreground" style={{ boxShadow: 'var(--shadow-float)' }}><div className="hero-glow" aria-hidden="true" /><p className="text-xs font-semibold uppercase tracking-widest opacity-70">Your overall balance</p><p className="tabular mt-1 text-4xl font-extrabold"><AnimatedMoney value={overall} /><span className="ml-2 text-sm font-semibold opacity-80">{overall >= 0 ? "you're owed" : 'you owe'}</span></p><div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold opacity-85"><span>Owed <b className="tabular text-primary-foreground">{money(totalOwed)}</b></span><span className="opacity-40">•</span><span>Owe <b className="tabular text-primary-foreground">{money(totalOwe)}</b></span></div></div></section><section className="px-5 pt-6"><div className="mb-2"><p className="text-sm font-extrabold">Groups</p><p className="mt-0.5 text-[11px] text-muted-foreground">{data.groups.length} active {data.groups.length === 1 ? 'group' : 'groups'}</p></div><div className="space-y-2.5">{summaries.map(({ group, mine, spent }, index) => <button type="button" key={group.id} onClick={() => navigate({ name: 'group', groupId: group.id })} className="card-soft group-card list-enter press flex w-full items-center gap-3 p-3.5 text-left" style={{ animationDelay: `${index * 55}ms` }}><span className="group-emoji grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-2 text-2xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate font-bold">{group.name}</p><p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Users size={12} /> {group.members.length} people · {money(spent, group.currency)} spent</p></div><div className="text-right"><p className="text-[11px] font-semibold text-muted-foreground">{Math.abs(mine) < 0.01 ? 'settled' : mine > 0 ? 'you get' : 'you owe'}</p><p className={`tabular font-bold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? '—' : money(mine, group.currency)}</p></div><ChevronRight size={16} className="shrink-0 text-muted-foreground" /></button>)}</div></section><section className="px-5 pt-4"><button type="button" onClick={onDataBackup} className="press flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-left text-muted-foreground"><HardDrive size={16} className="shrink-0" /><span className="min-w-0 flex-1 text-[11px] font-semibold">Backup & restore</span><ChevronRight size={14} /></button></section></>}{data.groups.length ? <AddExpenseSheet open={addOpen} onClose={() => { setAddOpen(false); setScanSeed(null); }} data={data} update={update} seed={scanSeed} /> : null}<ReceiptScanner open={scannerOpen} onClose={() => setScannerOpen(false)} data={data} onUse={(seed) => { setScanSeed(seed); setScannerOpen(false); setAddOpen(true); }} /><NewGroupSheet open={groupOpen} onClose={() => setGroupOpen(false)} data={data} update={update} onCreated={(groupId) => navigate({ name: 'group', groupId })} /></AppShell>;
 }
 
 function ActivityScreen({ navigate }: { navigate: (view: View) => void }) {

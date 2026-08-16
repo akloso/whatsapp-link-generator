@@ -1,5 +1,5 @@
 {
-  "name": "Splitzap — Split bills, not bonds",
+  "name": "Splitzap \u2014 Split bills, not bonds",
   "short_name": "Splitzap",
   "description": "Split shared expenses, personal items and settlements without an account.",
   "start_url": "/splitzap",
@@ -20,5 +20,10 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "id": "/splitzap",
+  "categories": [
+    "finance",
+    "utilities"
   ]
 }
