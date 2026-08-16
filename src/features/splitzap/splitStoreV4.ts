@@ -11,11 +11,28 @@ export type PersonalItem = {
   amount: number;
 };
 
+export type SelectiveItem = {
+  id: string;
+  description: string;
+  amount: number;
+  memberIds: string[];
+  mode: SplitMode;
+  split: Record<string, number>;
+};
+
 export type AdditionalCharge = {
   id: string;
   description: string;
   amount: number;
   distribution: ChargeDistribution;
+};
+
+export type ReceiptItem = {
+  id: string;
+  description: string;
+  amount: number;
+  /** Empty/undefined means shared by the group; a member id means personal to that member. */
+  memberId?: string;
 };
 
 export type Expense = {
@@ -36,7 +53,9 @@ export type Expense = {
   date: string;
   note?: string;
   personalItems?: PersonalItem[];
+  selectiveItems?: SelectiveItem[];
   additionalCharges?: AdditionalCharge[];
+  receiptItems?: ReceiptItem[];
 };
 
 export type Settlement = {
@@ -156,6 +175,15 @@ function normalizeExpense(rawValue: unknown): Expense {
     amount: Math.max(0, Number(charge.amount) || 0),
     distribution: charge.distribution === 'proportional' ? 'proportional' : 'equal',
   }));
+  const receiptItems: ReceiptItem[] = (Array.isArray(raw.receiptItems) ? raw.receiptItems : [])
+    .map(recordOf)
+    .map((item) => ({
+      id: typeof item.id === 'string' && item.id ? item.id : uid(),
+      description: typeof item.description === 'string' && item.description.trim() ? item.description.trim() : 'Bill item',
+      amount: Math.max(0, Number(item.amount) || 0),
+      memberId: typeof item.memberId === 'string' && item.memberId ? item.memberId : undefined,
+    }))
+    .filter((item) => item.amount > 0);
   const chargeTotal = normalizedCharges.reduce((sum, charge) => sum + charge.amount, 0);
   const totalAmount = Math.max(0, Number(raw.amount) || 0);
   const fallbackBase = Math.max(0, totalAmount - chargeTotal);
@@ -168,6 +196,23 @@ function normalizeExpense(rawValue: unknown): Expense {
       amount: Math.max(0, Number(item.amount) || 0),
     }))
     .filter((item) => item.memberId && item.amount > 0);
+  const selectiveItems: SelectiveItem[] = (Array.isArray(raw.selectiveItems) ? raw.selectiveItems : [])
+    .map(recordOf)
+    .map((item) => {
+      const itemMode: SplitMode = item.mode === 'exact' ? 'exact' : item.mode === 'percentage' ? 'percentage' : 'equal';
+      const split = numberRecord(item.split);
+      const memberIds = (Array.isArray(item.memberIds) ? item.memberIds : Object.keys(split))
+        .filter((id): id is string => typeof id === 'string' && Boolean(id));
+      return {
+        id: typeof item.id === 'string' && item.id ? item.id : uid(),
+        description: typeof item.description === 'string' && item.description.trim() ? item.description.trim() : 'Selective item',
+        amount: Math.max(0, Number(item.amount) || 0),
+        memberIds: [...new Set(memberIds)],
+        mode: itemMode,
+        split,
+      };
+    })
+    .filter((item) => item.amount > 0 && item.memberIds.length > 0);
 
   return {
     id: typeof raw.id === 'string' && raw.id ? raw.id : uid(),
@@ -184,7 +229,9 @@ function normalizeExpense(rawValue: unknown): Expense {
     date: typeof raw.date === 'string' ? raw.date : new Date().toISOString(),
     note: typeof raw.note === 'string' ? raw.note : undefined,
     personalItems,
+    selectiveItems,
     additionalCharges: normalizedCharges,
+    receiptItems,
   };
 }
 
@@ -289,8 +336,24 @@ export function personalTotalOf(expense: Expense) {
   return (expense.personalItems ?? []).reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
 }
 
+export function selectiveItemsTotal(expense: Expense) {
+  return (expense.selectiveItems ?? []).reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
+}
+
+export function selectiveItemShare(item: SelectiveItem, memberId: string) {
+  if (!item.memberIds.includes(memberId) || !item.memberIds.length) return 0;
+  const amount = Math.max(0, Number(item.amount) || 0);
+  if (item.mode === 'exact') return Math.max(0, Number(item.split[memberId]) || 0);
+  if (item.mode === 'percentage') return amount * Math.max(0, Number(item.split[memberId]) || 0) / 100;
+  return amount / item.memberIds.length;
+}
+
+export function selectiveShareOf(expense: Expense, memberId: string) {
+  return (expense.selectiveItems ?? []).reduce((sum, item) => sum + selectiveItemShare(item, memberId), 0);
+}
+
 export function sharedAmountOf(expense: Expense) {
-  return Math.max(0, baseAmountOf(expense) - personalTotalOf(expense));
+  return Math.max(0, baseAmountOf(expense) - personalTotalOf(expense) - selectiveItemsTotal(expense));
 }
 
 export function personalShareOf(expense: Expense, memberId: string) {
@@ -310,7 +373,7 @@ export function sharedShareOf(expense: Expense, memberId: string): number {
 }
 
 export function baseShareOf(expense: Expense, memberId: string) {
-  return sharedShareOf(expense, memberId) + personalShareOf(expense, memberId);
+  return sharedShareOf(expense, memberId) + personalShareOf(expense, memberId) + selectiveShareOf(expense, memberId);
 }
 
 export function additionalChargeShareOf(expense: Expense, memberId: string, memberIds?: string[]) {
