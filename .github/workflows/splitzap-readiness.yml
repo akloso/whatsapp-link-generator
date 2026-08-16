@@ -48,3 +48,12 @@ jobs:
           grep -q "splitzap-v2" public/splitzap-sw.js
           test -f public/splitzap-icon-192.png
           test -f public/splitzap-icon-512.png
+      - name: Level 2 collaboration assertions
+        shell: bash
+        run: |
+          test -f src/features/splitzap/splitzapShared.ts
+          grep -q "splitzap_create_shared_group" src/features/splitzap/splitzapShared.ts
+          grep -q "splitzap_join_shared_group" src/features/splitzap/splitzapShared.ts
+          grep -q "splitzap_update_shared_group" src/features/splitzap/splitzapShared.ts
+          grep -q "memberIdFor" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Delete shared group" src/features/splitzap/SplitzapAppV4.tsx

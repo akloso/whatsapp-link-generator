@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   groupBalances,
+  memberIdFor,
   shareOf,
   simplify,
   type Expense,
@@ -46,6 +47,12 @@ const shares = (item: Expense) => group.members.map((member) => shareOf(item, me
 const expectMoney = (actual: number, expected: number) => expect(actual).toBeCloseTo(expected, 8);
 
 describe('Splitzap calculation regression suite', () => {
+  it('maps a signed-in account to its canonical member inside a shared group', () => {
+    const sharedGroup: Group = { ...group, sharedId: 'shared-1', sharedRole: 'member', myMemberId: 'c' };
+    expect(memberIdFor(sharedGroup, { me: 'device-user-id' })).toBe('c');
+    expect(memberIdFor(group, { me: 'a' })).toBe('a');
+  });
+
   it('splits an equal expense across all participants', () => {
     shares(expense()).forEach((value) => expectMoney(value, 125));
   });
