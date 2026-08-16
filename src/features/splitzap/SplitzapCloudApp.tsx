@@ -1,7 +1,7 @@
-import { Cloud, CloudOff, Eye, EyeOff, KeyRound, Loader2, LogOut, Mail, ShieldCheck, UserRound, X } from 'lucide-react';
+import { Cloud, CloudOff, Copy, Eye, EyeOff, KeyRound, Link2, Loader2, LogOut, Mail, Share2, ShieldCheck, UserPlus, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import SplitzapAppV4 from './SplitzapAppV4';
-import { useSplitData, type SplitData } from './splitStoreV4';
+import { memberIdFor, useSplitData, type Group, type SplitData } from './splitStoreV4';
 import {
   fetchSplitzapCloudState,
   getSplitzapSession,
@@ -15,6 +15,23 @@ import {
   updateSplitzapPassword,
   type SplitzapSession,
 } from './splitzapCloud';
+import {
+  buildSharedGroupSnapshot,
+  createSharedGroup,
+  deleteSharedGroup,
+  fetchSharedGroup,
+  joinSharedGroup,
+  leaveSharedGroup,
+  loadSharedGroupsForUser,
+  mergeSharedRowsIntoLocal,
+  previewSharedGroupJoin,
+  removeGroupFromLocal,
+  sharedSnapshotHash,
+  subscribeToSharedGroupChanges,
+  updateSharedGroup,
+  type JoinPreview,
+  type SharedGroupRow,
+} from './splitzapShared';
 
 type SyncStatus = 'local' | 'connecting' | 'syncing' | 'synced' | 'offline' | 'error';
 type Conflict = { cloud: SplitData; local: SplitData } | null;
@@ -22,6 +39,7 @@ type EmailMode = 'signin' | 'signup';
 
 const LAST_SYNC_HASH_KEY = 'splitzap.cloud.lastSyncHash';
 const LAST_SYNC_AT_KEY = 'splitzap.cloud.lastSyncAt';
+const PENDING_JOIN_KEY = 'splitzap.shared.pendingJoin';
 
 const dataHash = (data: SplitData) => JSON.stringify(data);
 const hasMeaningfulData = (data: SplitData) => data.groups.length > 0 || data.expenses.length > 0 || data.settlements.length > 0;
@@ -55,10 +73,16 @@ export default function SplitzapCloudApp() {
   const [migrationOpen, setMigrationOpen] = useState(false);
   const [conflict, setConflict] = useState<Conflict>(null);
   const [recoveryMode, setRecoveryMode] = useState(false);
+  const [shareGroupId, setShareGroupId] = useState<string | null>(null);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinRequested, setJoinRequested] = useState(false);
   const [status, setStatus] = useState<SyncStatus>('local');
   const [statusMessage, setStatusMessage] = useState('Saved on this device');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() => typeof window === 'undefined' ? null : safeGet(LAST_SYNC_AT_KEY));
   const initializedUser = useRef<string | null>(null);
+  const sharedInitializedUser = useRef<string | null>(null);
+  const sharedHashes = useRef(new Map<string, string>());
   const syncing = useRef(false);
   const latestData = useRef(data);
   latestData.current = data;
@@ -72,6 +96,8 @@ export default function SplitzapCloudApp() {
       if (!active) return;
       setSession(next);
       initializedUser.current = null;
+      sharedInitializedUser.current = null;
+      sharedHashes.current.clear();
       if (event === 'PASSWORD_RECOVERY') {
         setRecoveryMode(true);
         setAccountOpen(true);
@@ -155,6 +181,102 @@ export default function SplitzapCloudApp() {
 
     return () => { active = false; };
   }, [authReady, hydrated, session, update]);
+
+  useEffect(() => {
+    if (!hydrated || !session || initializedUser.current !== session.user.id || migrationOpen || conflict || status !== 'synced' || sharedInitializedUser.current === session.user.id) return;
+    let active = true;
+    sharedInitializedUser.current = session.user.id;
+    void loadSharedGroupsForUser(session.user.id)
+      .then((rows) => {
+        if (!active) return;
+        sharedHashes.current.clear();
+        rows.forEach((row) => sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)));
+        update((current) => mergeSharedRowsIntoLocal(current, rows, true));
+      })
+      .catch((cause) => {
+        if (!active) return;
+        sharedInitializedUser.current = null;
+        setStatus('error');
+        setStatusMessage(cause instanceof Error ? cause.message : 'Could not load shared groups');
+      });
+    return () => { active = false; };
+  }, [conflict, hydrated, migrationOpen, session, status, update]);
+
+  useEffect(() => {
+    if (!session || sharedInitializedUser.current !== session.user.id) return;
+    return subscribeToSharedGroupChanges(session.user.id, (payload) => {
+      const fresh = payload.new as Record<string, unknown>;
+      const old = payload.old as Record<string, unknown>;
+      const sharedId = String(fresh?.id ?? old?.id ?? '');
+      if (!sharedId) return;
+      if (payload.eventType === 'DELETE') {
+        sharedHashes.current.delete(sharedId);
+        update((current) => {
+          const group = current.groups.find((item) => item.sharedId === sharedId);
+          return group ? removeGroupFromLocal(current, group.id) : current;
+        });
+        return;
+      }
+      void fetchSharedGroup(sharedId, session.user.id).then((row) => {
+        if (!row) return;
+        sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot));
+        update((current) => mergeSharedRowsIntoLocal(current, [row], false));
+      }).catch(() => undefined);
+    });
+  }, [session, update]);
+
+  useEffect(() => {
+    if (!session || sharedInitializedUser.current !== session.user.id || migrationOpen || conflict || !navigator.onLine) return;
+    const changed = data.groups
+      .filter((group) => group.sharedId)
+      .map((group) => ({ group, snapshot: buildSharedGroupSnapshot(data, group.id) }))
+      .filter(({ group, snapshot }) => sharedSnapshotHash(snapshot) !== sharedHashes.current.get(group.sharedId!));
+    if (!changed.length) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setStatus('syncing');
+        setStatusMessage('Syncing shared group…');
+        try {
+          for (const item of changed) {
+            const sharedId = item.group.sharedId!;
+            const result = await updateSharedGroup(sharedId, item.snapshot);
+            sharedHashes.current.set(sharedId, sharedSnapshotHash(item.snapshot));
+            update((current) => ({ ...current, groups: current.groups.map((group) => group.id === item.group.id ? { ...group, sharedRevision: result.revision } : group) }));
+          }
+          setStatus('synced');
+          setStatusMessage('Synced');
+        } catch (cause) {
+          setStatus(navigator.onLine ? 'error' : 'offline');
+          setStatusMessage(cause instanceof Error ? cause.message : 'Shared group sync failed');
+        }
+      })();
+    }, 850);
+    return () => window.clearTimeout(timer);
+  }, [conflict, data, migrationOpen, session, status, update]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    const urlCode = new URLSearchParams(window.location.search).get('join')?.trim().toUpperCase() || '';
+    const pending = urlCode || safeGet(PENDING_JOIN_KEY) || '';
+    if (!pending) return;
+    setJoinCode(pending);
+    try { window.localStorage.setItem(PENDING_JOIN_KEY, pending); } catch { /* best effort */ }
+    if (session) {
+      setAccountOpen(false);
+      setJoinOpen(true);
+    } else {
+      setAccountOpen(true);
+    }
+  }, [authReady, session]);
+
+  useEffect(() => {
+    if (!session) return;
+    if (shareGroupId) setAccountOpen(false);
+    if (joinRequested) {
+      setAccountOpen(false);
+      setJoinOpen(true);
+    }
+  }, [joinRequested, session, shareGroupId]);
 
   useEffect(() => {
     if (!hydrated || !session || initializedUser.current !== session.user.id || migrationOpen || conflict || syncing.current) return;
@@ -247,6 +369,54 @@ export default function SplitzapCloudApp() {
     setStatusMessage('Cloud copy loaded');
   };
 
+  const enableSharing = async (groupId: string) => {
+    if (!session) throw new Error('Sign in to share this group.');
+    const current = latestData.current;
+    const group = current.groups.find((item) => item.id === groupId);
+    if (!group) throw new Error('Group not found.');
+    if (group.sharedId) return;
+    const snapshot = buildSharedGroupSnapshot(current, groupId);
+    const row = await createSharedGroup(snapshot, memberIdFor(group, current));
+    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot));
+    update((value) => mergeSharedRowsIntoLocal(value, [row], false));
+  };
+
+  const completeJoin = (row: SharedGroupRow) => {
+    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot));
+    update((current) => mergeSharedRowsIntoLocal(current, [row], false));
+    try { window.localStorage.removeItem(PENDING_JOIN_KEY); } catch { /* best effort */ }
+    setJoinOpen(false);
+    setJoinRequested(false);
+    setJoinCode('');
+    const groupId = row.snapshot.group.id;
+    window.history.replaceState({}, '', `/splitzap#group=${encodeURIComponent(groupId)}`);
+    window.dispatchEvent(new Event('popstate'));
+  };
+
+  const removeGroup = async (group: Group) => {
+    if (group.sharedId) {
+      if (!session) throw new Error('Sign in before changing a shared group.');
+      if (group.sharedRole === 'owner') await deleteSharedGroup(group.sharedId);
+      else await leaveSharedGroup(group.sharedId);
+      sharedHashes.current.delete(group.sharedId);
+    }
+    update((current) => removeGroupFromLocal(current, group.id));
+  };
+
+  const collaboration = {
+    signedIn: Boolean(session),
+    onInviteGroup: (groupId: string) => {
+      setShareGroupId(groupId);
+      if (!session) setAccountOpen(true);
+    },
+    onJoinGroup: () => {
+      setJoinRequested(true);
+      if (session) setJoinOpen(true);
+      else setAccountOpen(true);
+    },
+    onDeleteGroup: removeGroup,
+  };
+
   const indicatorClass = status === 'synced' ? 'bg-emerald-500' : status === 'syncing' || status === 'connecting' ? 'bg-amber-400' : status === 'error' ? 'bg-red-500' : 'bg-slate-400';
   const accountInitial = (data.myName?.trim()?.[0] || session?.user.email?.[0] || '').toUpperCase();
   const accountAction = (
@@ -268,7 +438,19 @@ export default function SplitzapCloudApp() {
 
   return (
     <>
-      <SplitzapAppV4 accountAction={accountAction} />
+      <SplitzapAppV4 accountAction={accountAction} collaboration={collaboration} />
+      <SharedGroupInviteSheet
+        open={Boolean(shareGroupId && session)}
+        group={shareGroupId ? data.groups.find((item) => item.id === shareGroupId) ?? null : null}
+        onClose={() => setShareGroupId(null)}
+        onEnable={enableSharing}
+      />
+      <JoinSharedGroupSheet
+        open={joinOpen && Boolean(session)}
+        initialCode={joinCode}
+        onClose={() => { setJoinOpen(false); setJoinRequested(false); }}
+        onJoined={completeJoin}
+      />
       <AccountSheet
         open={accountOpen}
         onClose={() => setAccountOpen(false)}
@@ -299,6 +481,111 @@ export default function SplitzapCloudApp() {
       ) : null}
     </>
   );
+}
+
+function SharedGroupInviteSheet({ open, group, onClose, onEnable }: {
+  open: boolean;
+  group: Group | null;
+  onClose: () => void;
+  onEnable: (groupId: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  useEffect(() => { if (open) setFeedback(''); }, [open, group?.id]);
+  if (!open || !group) return null;
+  const inviteLink = group.sharedJoinCode ? `${window.location.origin}/splitzap?join=${encodeURIComponent(group.sharedJoinCode)}` : '';
+  const enable = async () => {
+    setBusy(true); setFeedback('');
+    try { await onEnable(group.id); setFeedback('Shared group is ready. Send the invite to your friends.'); }
+    catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not enable sharing.'); }
+    finally { setBusy(false); }
+  };
+  const copyInvite = async () => {
+    if (!inviteLink) return;
+    try { await navigator.clipboard.writeText(inviteLink); setFeedback('Invite link copied.'); }
+    catch { setFeedback('Could not copy automatically. Select and copy the link below.'); }
+  };
+  const shareInvite = async () => {
+    if (!inviteLink) return;
+    const message = `Join ${group.name} on Splitzap: ${inviteLink}`;
+    try {
+      if (navigator.share) await navigator.share({ title: `Join ${group.name}`, text: message, url: inviteLink });
+      else { await navigator.clipboard.writeText(message); setFeedback('Invite copied.'); }
+    } catch { /* user may cancel native share */ }
+  };
+  return <SimpleModal title={group.sharedId ? 'Invite people' : 'Share this group live'} onClose={onClose}>
+    {!group.sharedId ? <>
+      <div className="rounded-2xl bg-[#eef6f3] p-4"><div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-xl">{group.emoji}</span><div><p className="text-sm font-extrabold text-slate-900">{group.name}</p><p className="mt-1 text-xs leading-5 text-slate-600">Turn on sharing so signed-in members can join this same group and see updates across devices.</p></div></div></div>
+      <button type="button" disabled={busy} onClick={() => void enable()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />} Turn on sharing</button>
+    </> : <>
+      <div className="rounded-2xl bg-[#eef6f3] p-4"><div className="flex items-center gap-2 text-sm font-extrabold text-[#256f66]"><Cloud size={16} /> Live shared group</div><p className="mt-1 text-xs leading-5 text-slate-600">Friends sign in, choose who they are in the group, and then everyone sees the same expenses and payments.</p></div>
+      <label className="mt-4 block text-xs font-bold text-slate-600">Invite code</label>
+      <div className="mt-1 flex items-center gap-2"><div className="min-w-0 flex-1 rounded-xl bg-slate-100 px-3 py-3 font-mono text-sm font-extrabold tracking-[0.16em] text-slate-800">{group.sharedJoinCode}</div><button type="button" onClick={() => void copyInvite()} aria-label="Copy invite link" className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-[#256f66]"><Copy size={17} /></button></div>
+      <div className="mt-3 break-all rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[11px] leading-5 text-slate-500">{inviteLink}</div>
+      <button type="button" onClick={() => void shareInvite()} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white"><Share2 size={16} /> Share invite</button>
+    </>}
+    {feedback ? <p role="status" className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">{feedback}</p> : null}
+  </SimpleModal>;
+}
+
+function JoinSharedGroupSheet({ open, initialCode, onClose, onJoined }: {
+  open: boolean;
+  initialCode: string;
+  onClose: () => void;
+  onJoined: (row: SharedGroupRow) => void;
+}) {
+  const [code, setCode] = useState(initialCode);
+  const [preview, setPreview] = useState<JoinPreview | null>(null);
+  const [choice, setChoice] = useState('');
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const load = async (value = code) => {
+    const clean = value.trim().toUpperCase();
+    if (!clean) return;
+    setBusy(true); setError(''); setPreview(null); setChoice('');
+    try { const result = await previewSharedGroupJoin(clean); setPreview(result); setCode(clean); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not find this shared group.'); }
+    finally { setBusy(false); }
+  };
+  useEffect(() => {
+    if (!open) return;
+    setCode(initialCode);
+    setPreview(null); setChoice(''); setNewName(''); setError('');
+    if (initialCode) void load(initialCode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialCode]);
+  if (!open) return null;
+  const claimed = new Set(preview?.claimed_member_ids ?? []);
+  const available = preview?.members.filter((member) => !claimed.has(member.id)) ?? [];
+  const join = async () => {
+    if (!preview) return;
+    if (!preview.already_joined && !choice) return;
+    if (choice === '__new__' && !newName.trim()) return;
+    setBusy(true); setError('');
+    try {
+      const row = await joinSharedGroup(code, preview.already_joined ? undefined : choice === '__new__' ? undefined : choice, choice === '__new__' ? newName : undefined);
+      onJoined(row);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not join this group.'); }
+    finally { setBusy(false); }
+  };
+  return <SimpleModal title="Join a shared group" onClose={onClose}>
+    {!preview ? <>
+      <p className="text-sm leading-6 text-slate-600">Paste the invite code a friend sent you.</p>
+      <label className="mt-4 block text-xs font-bold text-slate-600">Invite code</label>
+      <div className="mt-1 flex gap-2"><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="AB12CD34EF" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 font-mono text-sm font-bold uppercase tracking-wider outline-none focus:border-[#256f66]" /><button type="button" disabled={busy || !code.trim()} onClick={() => void load()} className="rounded-xl bg-[#256f66] px-4 text-sm font-bold text-white disabled:opacity-40">{busy ? 'Finding…' : 'Find'}</button></div>
+    </> : <>
+      <div className="rounded-2xl bg-[#eef6f3] p-4"><p className="text-lg font-extrabold text-slate-900">{preview.emoji} {preview.group_name}</p><p className="mt-1 text-xs text-slate-600">{preview.members.length} people in this group</p></div>
+      {preview.already_joined ? <p className="mt-4 rounded-xl bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700">You already belong to this group.</p> : <>
+        <p className="mt-4 text-xs font-bold text-slate-600">Who are you?</p>
+        <div className="mt-2 space-y-2">{available.map((member) => <button key={member.id} type="button" onClick={() => setChoice(member.id)} className={`flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 text-left text-sm font-bold ${choice === member.id ? 'border-[#256f66] bg-[#eef6f3] text-[#256f66]' : 'border-slate-200 bg-white text-slate-700'}`}><span className="grid size-7 place-items-center rounded-full bg-slate-100 text-xs">{member.name.trim().charAt(0).toUpperCase() || '?'}</span>{member.name}{choice === member.id ? <span className="ml-auto">✓</span> : null}</button>)}</div>
+        <button type="button" onClick={() => setChoice('__new__')} className={`mt-2 flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 text-left text-sm font-bold ${choice === '__new__' ? 'border-[#256f66] bg-[#eef6f3] text-[#256f66]' : 'border-slate-200 bg-white text-slate-700'}`}><UserPlus size={16} /> I'm not listed</button>
+        {choice === '__new__' ? <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Your name" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-[#256f66]" /> : null}
+      </>}
+      <button type="button" disabled={busy || (!preview.already_joined && (!choice || (choice === '__new__' && !newName.trim())))} onClick={() => void join()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-40">{busy ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />} {preview.already_joined ? 'Open group' : 'Join group'}</button>
+    </>}
+    {error ? <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-xs font-semibold leading-5 text-red-700">{error}</p> : null}
+  </SimpleModal>;
 }
 
 function AccountSheet({ open, onClose, session, status, statusMessage, lastSyncedAt, recoveryMode, onRecoveryComplete }: {

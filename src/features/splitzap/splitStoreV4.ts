@@ -74,6 +74,12 @@ export type Group = {
   currency: string;
   members: Member[];
   createdAt: string;
+  /** Level 2 collaboration metadata. These fields are local/account metadata, not bill math. */
+  sharedId?: string;
+  sharedRole?: 'owner' | 'member';
+  myMemberId?: string;
+  sharedRevision?: number;
+  sharedJoinCode?: string;
 };
 
 export type HistoryChange = {
@@ -98,6 +104,9 @@ export type SplitData = {
   settlements: Settlement[];
   history?: ExpenseHistoryEntry[];
 };
+
+/** A shared group can map this account to a canonical member id that differs from data.me. */
+export const memberIdFor = (group: Group, data: Pick<SplitData, 'me'>) => group.myMemberId || data.me;
 
 export type SplitzapBackup = {
   app: 'Splitzap';
