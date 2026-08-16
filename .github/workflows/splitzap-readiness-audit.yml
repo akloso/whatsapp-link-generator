@@ -1,0 +1,42 @@
+name: Splitzap Readiness Audit
+
+on:
+  push:
+    branches: [testing]
+    paths:
+      - '.github/workflows/splitzap-readiness-audit.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: testing
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Full dependency audit
+        shell: bash
+        run: |
+          npm audit --json > /tmp/audit-full.json || true
+          node - <<'NODE'
+          const a=require('/tmp/audit-full.json');
+          console.log('FULL_AUDIT_COUNTS', JSON.stringify(a.metadata?.vulnerabilities || {}));
+          for (const [name,v] of Object.entries(a.vulnerabilities||{})) {
+            if (['high','critical'].includes(v.severity)) console.log('FULL_HIGH', name, v.severity, 'direct='+v.isDirect, 'fix=', JSON.stringify(v.fixAvailable));
+          }
+          NODE
+      - name: Production dependency audit
+        shell: bash
+        run: |
+          npm audit --omit=dev --json > /tmp/audit-prod.json || true
+          node - <<'NODE'
+          const a=require('/tmp/audit-prod.json');
+          console.log('PROD_AUDIT_COUNTS', JSON.stringify(a.metadata?.vulnerabilities || {}));
+          for (const [name,v] of Object.entries(a.vulnerabilities||{})) {
+            if (['high','critical'].includes(v.severity)) console.log('PROD_HIGH', name, v.severity, 'direct='+v.isDirect, 'fix=', JSON.stringify(v.fixAvailable));
+          }
+          NODE
