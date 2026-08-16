@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { lazy, Suspense, type ReactNode, useEffect, useState } from 'react';
 import { Mail, MessageCircle, Scale, ShieldCheck } from 'lucide-react';
 import Hero from './components/Hero';
 import Generator from './components/Generator';
@@ -13,10 +13,11 @@ import SeoContent from './components/SeoContent';
 import BlogListPage from './components/BlogListPage';
 import BlogPostPage from './components/BlogPostPage';
 import WhatsAppButtonMaker from './components/WhatsAppButtonMaker';
-import SplitzapPage from './components/SplitzapPage';
 import { QR_EDITOR_STORAGE_KEY } from './components/qrEditorConstants';
 import { blogPostsBySlug } from './data/blogPosts';
 import { IcrTrendsDashboardRoute } from './features/icr-trends-dashboard/IcrTrendsDashboardRoute';
+
+const SplitzapPage = lazy(() => import('./components/SplitzapPage'));
 
 type PageKey = 'home' | 'privacy' | 'terms' | 'contact' | 'qrCodeEditor' | 'blog' | 'blogPost' | 'whatsappButtonMaker' | 'bulkWhatsappGenerator' | 'icrTrendsDashboard' | 'splitzap';
 
@@ -351,7 +352,7 @@ function App() {
   } else if (currentPage === 'icrTrendsDashboard') {
     pageContent = <IcrTrendsDashboardRoute />;
   } else if (currentPage === 'splitzap') {
-    pageContent = <SplitzapPage />;
+    pageContent = <Suspense fallback={<main className="fixed inset-0 z-[100] grid place-items-center bg-[#faf9f5]"><div className="h-8 w-8 animate-spin rounded-full border-4 border-[#dbe8e3] border-t-[#256f66]" aria-label="Loading Splitzap" /></main>}><SplitzapPage /></Suspense>;
   } else if (currentPage === 'blog') {
     pageContent = <BlogListPage onOpenPost={(slug) => navigateTo('blog', slug)} />;
   } else if (currentPage === 'blogPost') {

@@ -99,8 +99,16 @@ export type SplitData = {
   history?: ExpenseHistoryEntry[];
 };
 
+export type SplitzapBackup = {
+  app: 'Splitzap';
+  version: 2;
+  exportedAt: string;
+  data: SplitData;
+};
+
 const KEY = 'splitzap.v2';
 const LEGACY_KEY = 'splitzap.v1';
+const RECOVERY_KEY = 'splitzap.v2.recovery';
 
 export const CATEGORIES = [
   { id: 'general', label: 'General', emoji: '🧾' },
@@ -277,34 +285,135 @@ function stripLegacyDemo(data: SplitData): SplitData {
 }
 
 let listeners: Array<() => void> = [];
+let storageListeners: Array<() => void> = [];
 let cache: SplitData | null = null;
+let storageError: string | null = null;
+
+function setStorageError(message: string | null) {
+  storageError = message;
+  storageListeners.forEach((listener) => listener());
+}
+
+export function useSplitStorageStatus() {
+  const [error, setError] = useState<string | null>(storageError);
+  useEffect(() => {
+    const listener = () => setError(storageError);
+    storageListeners.push(listener);
+    return () => { storageListeners = storageListeners.filter((item) => item !== listener); };
+  }, []);
+  return { storageError: error, clearStorageError: () => setStorageError(null) };
+}
+
+function parsedData(raw: string): SplitData {
+  return normalize(JSON.parse(raw) as SplitData);
+}
 
 function read(): SplitData {
   if (cache) return cache;
   if (typeof window === 'undefined') return EMPTY;
+
+  let current: string | null = null;
   try {
-    const current = window.localStorage.getItem(KEY);
-    if (current) {
-      cache = normalize(JSON.parse(current) as SplitData);
+    current = window.localStorage.getItem(KEY);
+  } catch {
+    setStorageError('Browser storage is unavailable. Changes can work for this session but may not survive a refresh.');
+    cache = emptyData();
+    return cache;
+  }
+
+  if (current) {
+    try {
+      cache = parsedData(current);
+      return cache;
+    } catch {
+      try {
+        const recovery = window.localStorage.getItem(RECOVERY_KEY);
+        if (recovery) {
+          cache = parsedData(recovery);
+          try { window.localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* keep recovered data in memory */ }
+          setStorageError('Splitzap recovered your data from its local safety copy. Export a backup before continuing.');
+          return cache;
+        }
+      } catch { /* recovery unavailable */ }
+      setStorageError('Stored Splitzap data could not be read. Restore a backup before adding new expenses.');
+      cache = emptyData();
       return cache;
     }
+  }
+
+  try {
     const legacy = window.localStorage.getItem(LEGACY_KEY);
     if (legacy) {
-      cache = stripLegacyDemo(normalize(JSON.parse(legacy) as SplitData));
-      window.localStorage.setItem(KEY, JSON.stringify(cache));
+      cache = stripLegacyDemo(parsedData(legacy));
+      try { window.localStorage.setItem(KEY, JSON.stringify(cache)); } catch {
+        setStorageError('Your old Splitzap data was loaded, but the upgraded copy could not be saved. Export a backup now.');
+      }
       return cache;
     }
-    cache = emptyData();
   } catch {
-    cache = emptyData();
+    setStorageError('Browser storage is unavailable. Changes can work for this session but may not survive a refresh.');
   }
+
+  cache = emptyData();
   return cache;
 }
 
-function write(next: SplitData) {
+function write(next: SplitData): boolean {
   cache = normalize(next);
-  if (typeof window !== 'undefined') window.localStorage.setItem(KEY, JSON.stringify(cache));
+  let saved = true;
+  if (typeof window !== 'undefined') {
+    try {
+      const previous = window.localStorage.getItem(KEY);
+      if (previous) {
+        try { window.localStorage.setItem(RECOVERY_KEY, previous); } catch { /* recovery copy is best-effort */ }
+      }
+      window.localStorage.setItem(KEY, JSON.stringify(cache));
+      setStorageError(null);
+    } catch {
+      saved = false;
+      setStorageError('Splitzap could not save this change to your device. Storage may be full or blocked. Export a backup before closing the app.');
+    }
+  }
   listeners.forEach((listener) => listener());
+  return saved;
+}
+
+function validateBackupCandidate(value: unknown): value is SplitData {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<SplitData>;
+  if (typeof candidate.me !== 'string' || !Array.isArray(candidate.groups) || !Array.isArray(candidate.expenses) || !Array.isArray(candidate.settlements)) return false;
+  return candidate.groups.every((group) => Boolean(group)
+    && typeof group.id === 'string'
+    && typeof group.name === 'string'
+    && typeof group.emoji === 'string'
+    && typeof group.currency === 'string'
+    && Array.isArray(group.members)
+    && group.members.every((member) => Boolean(member) && typeof member.id === 'string' && typeof member.name === 'string'));
+}
+
+export function createSplitBackup(): string {
+  const payload: SplitzapBackup = {
+    app: 'Splitzap',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    data: read(),
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+export function restoreSplitBackup(raw: string): SplitData {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('This is not a valid Splitzap backup file.');
+  }
+  const envelope = parsed && typeof parsed === 'object' ? parsed as Partial<SplitzapBackup> : null;
+  const candidate = envelope?.app === 'Splitzap' && envelope.data ? envelope.data : parsed;
+  if (!validateBackupCandidate(candidate)) throw new Error('This backup does not contain valid Splitzap data.');
+  const next = normalize(candidate);
+  if (!write(next)) throw new Error('The backup was read, but your browser could not save the restored data.');
+  return next;
 }
 
 export function useSplitData() {
@@ -312,7 +421,9 @@ export function useSplitData() {
   const [data, setData] = useState<SplitData>(EMPTY);
   useEffect(() => {
     const initial = read();
-    if (!window.localStorage.getItem(KEY)) write(initial);
+    try {
+      if (!window.localStorage.getItem(KEY) && !storageError) write(initial);
+    } catch { /* read() already exposes the storage problem */ }
     setData(initial);
     setHydrated(true);
     const listener = () => setData({ ...read() });
