@@ -1,4 +1,4 @@
-import SplitzapApp from '../features/splitzap/SplitzapAppV4';
+import SplitzapApp from '../features/splitzap/SplitzapCloudApp';
 import '../features/splitzap/splitzap.css';
 import '../features/splitzap/splitzap-enhanced.css';
 
