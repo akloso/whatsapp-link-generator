@@ -59,8 +59,19 @@ export function buildSharedGroupSnapshot(data: SplitData, groupId: string): Shar
   };
 }
 
+function canonicalizeForHash(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeForHash);
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(record).sort().map((key) => [key, canonicalizeForHash(record[key])]),
+    );
+  }
+  return value;
+}
+
 export function sharedSnapshotHash(snapshot: SharedGroupSnapshot) {
-  return JSON.stringify(snapshot);
+  return JSON.stringify(canonicalizeForHash(snapshot));
 }
 
 function applySharedRow(current: SplitData, row: SharedGroupRow): SplitData {
