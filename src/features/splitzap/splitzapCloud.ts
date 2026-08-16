@@ -1,6 +1,8 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 import type { SplitData } from './splitStoreV4';
 
+export type SplitzapSession = Session;
+
 const SUPABASE_URL = 'https://cnbisaamlcisksacpozr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_pvyXUidHeZbyTDaXwuS4Xg_eMrqjnzg';
 
