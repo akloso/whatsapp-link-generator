@@ -63,7 +63,7 @@ jobs:
       - name: Commit hardened app
         shell: bash
         run: |
-          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/splitStoreV4.ts src/features/splitzap/splitStoreV4.test.ts src/App.tsx public/splitzap-sw.js public/splitzap.webmanifest package.json package-lock.json .github/workflows/splitzap-readiness.yml
+          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/splitStoreV4.ts src/features/splitzap/splitStoreV4.test.ts src/App.tsx public/splitzap-sw.js public/splitzap.webmanifest package.json package-lock.json
           if git diff --cached --quiet; then
             echo "No readiness changes to commit"
           else
