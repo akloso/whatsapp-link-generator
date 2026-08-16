@@ -1,0 +1,71 @@
+name: Splitzap Testing Readiness Hardening
+
+on:
+  push:
+    branches: [testing]
+    paths:
+      - '.github/workflows/splitzap-testing-readiness-hardening.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: testing
+          fetch-depth: 0
+      - name: Reconcile main into testing
+        shell: bash
+        run: |
+          git config user.name "Splitzap Readiness"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+      - name: Apply readiness patch
+        run: python .github/splitzap_readiness_patch.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Add permanent test runner
+        run: npm install --save-dev vitest@latest --package-lock-only
+      - name: Apply non-breaking dependency security fixes
+        run: npm audit fix --package-lock-only
+      - name: Install verified lockfile
+        run: npm ci
+      - name: TypeScript check
+        run: npm run typecheck
+      - name: Splitzap calculation regression tests
+        run: npm run test:splitzap
+      - name: Production build
+        run: npm run build
+      - name: Production dependency security gate
+        run: npm audit --omit=dev --audit-level=high
+      - name: Full audit summary
+        shell: bash
+        run: |
+          npm audit --json > /tmp/audit.json || true
+          node - <<'NODE'
+          const a=require('/tmp/audit.json');
+          console.log('FULL_AUDIT_COUNTS', JSON.stringify(a.metadata?.vulnerabilities || {}));
+          for (const [name,v] of Object.entries(a.vulnerabilities||{})) {
+            if (['high','critical'].includes(v.severity)) console.log('REMAINING_HIGH', name, v.severity, 'direct='+v.isDirect, 'fix=', JSON.stringify(v.fixAvailable));
+          }
+          NODE
+      - name: Bundle summary
+        shell: bash
+        run: |
+          find dist/assets -maxdepth 1 -type f -name '*.js' -printf '%f %s bytes\n' | sort -k2 -n
+      - name: Commit hardened app
+        shell: bash
+        run: |
+          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/splitStoreV4.ts src/features/splitzap/splitStoreV4.test.ts src/App.tsx public/splitzap-sw.js public/splitzap.webmanifest package.json package-lock.json .github/workflows/splitzap-readiness.yml
+          if git diff --cached --quiet; then
+            echo "No readiness changes to commit"
+          else
+            git commit -m "Harden Splitzap for app readiness"
+          fi
+          git push origin HEAD:testing
