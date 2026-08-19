@@ -5,6 +5,8 @@ on:
     branches: [testing]
     paths:
       - scripts/splitzap-production-upgrade.mjs
+      - scripts/splitzap-production-ui.mjs
+      - scripts/splitzap-fragments/**
       - .github/workflows/splitzap-production-upgrade.yml
   workflow_dispatch:
 
@@ -34,8 +36,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Apply guarded Splitzap patch
+      - name: Apply guarded Splitzap data patch
         run: node scripts/splitzap-production-upgrade.mjs
+
+      - name: Apply guarded Splitzap product patch
+        run: node scripts/splitzap-production-ui.mjs
 
       - name: TypeScript
         run: npm run typecheck
@@ -57,6 +62,6 @@ jobs:
           fi
           git config user.name "splitzap-upgrade-bot"
           git config user.email "splitzap-upgrade-bot@users.noreply.github.com"
-          git add src package.json package-lock.json
-          git commit -m "Implement Splitzap production hardening phase"
+          git add src .github/workflows/splitzap-readiness.yml package.json package-lock.json
+          git commit -m "Implement Splitzap production collaboration and UX"
           git push origin HEAD:testing
