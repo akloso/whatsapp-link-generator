@@ -36,32 +36,68 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Apply guarded Splitzap data patch
-        run: node scripts/splitzap-production-upgrade.mjs
-
-      - name: Apply guarded Splitzap product patch
-        run: node scripts/splitzap-production-ui.mjs
-
-      - name: TypeScript
-        run: npm run typecheck
-
-      - name: Splitzap regression tests
-        run: npm run test:splitzap
-
-      - name: Production build
-        run: npm run build
-
-      - name: Production dependency audit
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Commit validated changes
+      - name: Apply and validate with diagnostics
+        shell: bash
         run: |
-          if git diff --quiet; then
-            echo "No source changes to commit."
-            exit 0
+          set +e
+          LOG=/tmp/splitzap-upgrade-diagnostic.log
+          : > "$LOG"
+
+          echo "== data patch ==" | tee -a "$LOG"
+          node scripts/splitzap-production-upgrade.mjs 2>&1 | tee -a "$LOG"
+          DATA=${PIPESTATUS[0]}
+
+          echo "== product patch ==" | tee -a "$LOG"
+          if [ "$DATA" -eq 0 ]; then
+            node scripts/splitzap-production-ui.mjs 2>&1 | tee -a "$LOG"
+            UI=${PIPESTATUS[0]}
+          else
+            UI=99
+            echo "Skipped because data patch failed." | tee -a "$LOG"
           fi
+
+          echo "== typecheck ==" | tee -a "$LOG"
+          if [ "$DATA" -eq 0 ] && [ "$UI" -eq 0 ]; then
+            npm run typecheck 2>&1 | tee -a "$LOG"
+            TYPECHECK=${PIPESTATUS[0]}
+          else TYPECHECK=99; echo "Skipped because patch failed." | tee -a "$LOG"; fi
+
+          echo "== splitzap tests ==" | tee -a "$LOG"
+          if [ "$TYPECHECK" -eq 0 ]; then
+            npm run test:splitzap 2>&1 | tee -a "$LOG"
+            TESTS=${PIPESTATUS[0]}
+          else TESTS=99; echo "Skipped because typecheck failed." | tee -a "$LOG"; fi
+
+          echo "== production build ==" | tee -a "$LOG"
+          if [ "$TESTS" -eq 0 ]; then
+            npm run build 2>&1 | tee -a "$LOG"
+            BUILD=${PIPESTATUS[0]}
+          else BUILD=99; echo "Skipped because tests failed." | tee -a "$LOG"; fi
+
+          echo "== production dependency audit ==" | tee -a "$LOG"
+          if [ "$BUILD" -eq 0 ]; then
+            npm audit --omit=dev --audit-level=high 2>&1 | tee -a "$LOG"
+            AUDIT=${PIPESTATUS[0]}
+          else AUDIT=99; echo "Skipped because build failed." | tee -a "$LOG"; fi
+
+          echo "RESULT data=$DATA ui=$UI typecheck=$TYPECHECK tests=$TESTS build=$BUILD audit=$AUDIT" | tee -a "$LOG"
+
           git config user.name "splitzap-upgrade-bot"
           git config user.email "splitzap-upgrade-bot@users.noreply.github.com"
-          git add src .github/workflows/splitzap-readiness.yml package.json package-lock.json
-          git commit -m "Implement Splitzap production collaboration and UX"
+
+          if [ "$DATA" -eq 0 ] && [ "$UI" -eq 0 ] && [ "$TYPECHECK" -eq 0 ] && [ "$TESTS" -eq 0 ] && [ "$BUILD" -eq 0 ] && [ "$AUDIT" -eq 0 ]; then
+            rm -f scripts/splitzap-upgrade-diagnostic.log
+            git add src .github/workflows/splitzap-readiness.yml package.json package-lock.json
+            if ! git diff --cached --quiet; then
+              git commit -m "Implement Splitzap production collaboration and UX"
+              git push origin HEAD:testing
+            fi
+            exit 0
+          fi
+
+          git reset --hard HEAD
+          cp "$LOG" scripts/splitzap-upgrade-diagnostic.log
+          git add scripts/splitzap-upgrade-diagnostic.log
+          git commit -m "Capture Splitzap upgrade validation failure"
           git push origin HEAD:testing
+          exit 1
