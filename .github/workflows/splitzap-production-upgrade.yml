@@ -5,6 +5,7 @@ on:
     branches: [testing]
     paths:
       - scripts/splitzap-production-upgrade.mjs
+      - .github/workflows/splitzap-production-upgrade.yml
   workflow_dispatch:
 
 permissions:
