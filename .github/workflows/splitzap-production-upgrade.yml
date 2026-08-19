@@ -10,6 +10,16 @@ on:
       - scripts/validate-splitzap-production.mjs
       - scripts/splitzap-fragments/**
       - .github/workflows/splitzap-production-upgrade.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/splitzap-production-upgrade.mjs
+      - scripts/splitzap-production-ui.mjs
+      - scripts/run-splitzap-production-ui.mjs
+      - scripts/validate-splitzap-production.mjs
+      - scripts/splitzap-fragments/**
+      - src/features/splitzap/**
+      - .github/workflows/splitzap-production-upgrade.yml
   workflow_dispatch:
 
 permissions:
