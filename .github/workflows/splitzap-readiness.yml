@@ -19,6 +19,7 @@ on:
       - 'public/splitzap*'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/splitzap-readiness.yml'
 
 permissions:
   contents: read
@@ -45,15 +46,34 @@ jobs:
         shell: bash
         run: |
           grep -q '"id": "/splitzap"' public/splitzap.webmanifest
-          grep -q "splitzap-v2" public/splitzap-sw.js
+          grep -q "splitzap-v3" public/splitzap-sw.js
           test -f public/splitzap-icon-192.png
           test -f public/splitzap-icon-512.png
-      - name: Level 2 collaboration assertions
+      - name: Production collaboration and data-safety assertions
         shell: bash
         run: |
           test -f src/features/splitzap/splitzapShared.ts
-          grep -q "splitzap_create_shared_group" src/features/splitzap/splitzapShared.ts
-          grep -q "splitzap_join_shared_group" src/features/splitzap/splitzapShared.ts
+          test -f src/features/splitzap/splitzapProduction.ts
+          grep -q "SPLITZAP_SCHEMA_VERSION = 2" src/features/splitzap/splitStoreV4.ts
           grep -q "splitzap_update_shared_group" src/features/splitzap/splitzapShared.ts
-          grep -q "memberIdFor" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Delete shared group" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "splitzap_create_invite" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_join_v2" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_resolve_join_request" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_soft_delete_shared_group" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_restore_shared_group" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_transfer_ownership" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_update_profile_name" src/features/splitzap/splitzapProduction.ts
+          grep -q "importSplitBackupSafely" src/features/splitzap/SplitzapCloudApp.tsx
+      - name: Production UX assertions
+        shell: bash
+        run: |
+          grep -q "My Profile" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Create invite link" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Wrong signed-in email" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Any already joined group member" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q 'type="date"' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Original breakdown" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Simplified settlement" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "expense_restored" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "More options" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "expense-confetti" src/features/splitzap/splitzap.css
