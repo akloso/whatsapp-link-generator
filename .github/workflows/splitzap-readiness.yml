@@ -76,4 +76,6 @@ jobs:
           grep -q "Simplified settlement" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "expense_restored" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "More options" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "availableGroups = data.groups.filter" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "onEdit={isArchived ? undefined" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "expense-confetti" src/features/splitzap/splitzap.css
