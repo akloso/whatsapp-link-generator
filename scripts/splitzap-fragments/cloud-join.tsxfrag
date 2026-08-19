@@ -1,0 +1,72 @@
+function JoinSharedGroupSheet({ open, initialCode, onClose, onJoined, onPending }: {
+  open: boolean;
+  initialCode: string;
+  onClose: () => void;
+  onJoined: (row: SharedGroupRow) => void;
+  onPending: () => void;
+}) {
+  const [code, setCode] = useState(initialCode);
+  const [preview, setPreview] = useState<InvitePreviewV2 | null>(null);
+  const [choice, setChoice] = useState('');
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState(false);
+
+  const load = async (value = code) => {
+    const clean = value.trim().toUpperCase();
+    if (!clean) return;
+    setBusy(true); setError(''); setPreview(null); setChoice(''); setPending(false);
+    try {
+      const result = await previewSharedInviteV2(clean);
+      setPreview(result);
+      setCode(clean);
+      if (result.member_id) setChoice(result.member_id);
+      else if (result.intended_name) { setChoice('__new__'); setNewName(result.intended_name); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not find this shared group.'); }
+    finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    setCode(initialCode);
+    setPreview(null); setChoice(''); setNewName(''); setError(''); setPending(false);
+    if (initialCode) void load(initialCode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialCode]);
+
+  if (!open) return null;
+  const claimed = new Set(preview?.claimed_member_ids ?? []);
+  const available = preview?.members.filter((member) => !claimed.has(member.id)) ?? [];
+  const fixedIdentity = Boolean(preview?.member_id || preview?.intended_name);
+  const identityName = preview?.member_id ? preview.members.find((member) => member.id === preview.member_id)?.name : preview?.intended_name;
+
+  const join = async () => {
+    if (!preview) return;
+    if (!preview.email_match) return;
+    const memberId = preview.member_id ?? (choice && choice !== '__new__' ? choice : null);
+    const displayName = preview.intended_name ?? (choice === '__new__' ? newName.trim() : null);
+    if (!preview.already_joined && !memberId && !displayName) return;
+    setBusy(true); setError('');
+    try {
+      const result = await requestSharedJoinV2(code, memberId, displayName);
+      if (result.result_status === 'pending') {
+        setPending(true);
+        onPending();
+        return;
+      }
+      onJoined(sharedRowFromJoin(result, code));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not join this group.'); }
+    finally { setBusy(false); }
+  };
+
+  return <SimpleModal title="Join a shared group" onClose={onClose}>
+    {pending ? <div className="py-4 text-center"><div className="mx-auto grid size-14 place-items-center rounded-full bg-amber-50 text-2xl">⏳</div><h3 className="mt-3 text-base font-extrabold text-slate-900">Request sent</h3><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-600">Any already joined group member can review your name and signed-in email, then approve or deny the request.</p><button type="button" onClick={onClose} className="mt-4 rounded-xl bg-[#256f66] px-5 py-3 text-sm font-bold text-white">Done</button></div> : !preview ? <><p className="text-sm leading-6 text-slate-600">Open an invite link or paste the invite code here.</p><label className="mt-4 block text-xs font-bold text-slate-600">Invite code</label><div className="mt-1 flex gap-2"><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))} placeholder="AB12CD34EF56" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 font-mono text-sm font-bold uppercase tracking-wider outline-none focus:border-[#256f66]" /><button type="button" disabled={busy || !code.trim()} onClick={() => void load()} className="rounded-xl bg-[#256f66] px-4 text-sm font-bold text-white disabled:opacity-40">{busy ? 'Finding…' : 'Find'}</button></div></> : <>
+      <div className="rounded-2xl bg-[#eef6f3] p-4"><p className="text-lg font-extrabold text-slate-900">{preview.emoji} {preview.group_name}</p><p className="mt-1 text-xs text-slate-600">{preview.members.length} people · secure account-based sharing</p></div>
+      {preview.already_joined ? <p className="mt-4 rounded-xl bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700">You already belong to this group.</p> : !preview.email_match ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4"><p className="text-sm font-extrabold text-red-800">Wrong signed-in email</p><p className="mt-1 text-xs leading-5 text-red-700">This invitation was created for {preview.intended_email_hint || 'another email address'}. Sign out and use the invited email. Group members cannot override this check.</p></div> : fixedIdentity ? <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Joining as</p><p className="mt-1 text-lg font-extrabold text-slate-900">{identityName}</p><p className="mt-1 text-[11px] text-slate-500">{preview.requires_approval ? 'Your signed-in email and this identity will be sent to the group for approval.' : `Verified for ${preview.intended_email_hint || 'your invited email'}.`}</p></div> : <><p className="mt-4 text-xs font-bold text-slate-600">Who are you?</p><div className="mt-2 space-y-2">{available.map((member) => <button key={member.id} type="button" onClick={() => setChoice(member.id)} className={`flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 text-left text-sm font-bold ${choice === member.id ? 'border-[#256f66] bg-[#eef6f3] text-[#256f66]' : 'border-slate-200 bg-white text-slate-700'}`}><span className="grid size-7 place-items-center rounded-full bg-slate-100 text-xs">{member.name.trim().charAt(0).toUpperCase() || '?'}</span>{member.name}{choice === member.id ? <span className="ml-auto">✓</span> : null}</button>)}</div><button type="button" onClick={() => setChoice('__new__')} className={`mt-2 flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 text-left text-sm font-bold ${choice === '__new__' ? 'border-[#256f66] bg-[#eef6f3] text-[#256f66]' : 'border-slate-200 bg-white text-slate-700'}`}><UserPlus size={16} /> I'm not listed</button>{choice === '__new__' ? <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Your name" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-[#256f66]" /> : null}<div className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">Your signed-in email and selected name will be shown to the group. Any joined member can approve or deny.</div></>}
+      <button type="button" disabled={busy || !preview.email_match || (!preview.already_joined && !fixedIdentity && (!choice || (choice === '__new__' && !newName.trim())))} onClick={() => void join()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-40">{busy ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />} {preview.already_joined ? 'Open group' : preview.requires_approval ? 'Request to join' : 'Join group'}</button>
+    </>}
+    {error ? <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-xs font-semibold leading-5 text-red-700">{error}</p> : null}
+  </SimpleModal>;
+}
+
