@@ -11,6 +11,7 @@ import { splitzapSupabase } from './splitzapCloud';
 export type SharedRole = 'owner' | 'member';
 
 export type SharedGroupSnapshot = {
+  schemaVersion: number;
   group: Group;
   expenses: Expense[];
   settlements: Settlement[];
@@ -25,6 +26,10 @@ export type SharedGroupRow = {
   updated_at: string;
   member_id: string;
   role: SharedRole;
+  status: 'active' | 'archived' | 'deleted';
+  schema_version: number;
+  archived_at?: string | null;
+  deleted_at?: string | null;
 };
 
 export type JoinPreview = {
@@ -43,6 +48,9 @@ const cleanGroupForSnapshot = (group: Group): Group => {
     myMemberId: _myMemberId,
     sharedRevision: _sharedRevision,
     sharedJoinCode: _sharedJoinCode,
+    sharedStatus: _sharedStatus,
+    sharedSchemaVersion: _sharedSchemaVersion,
+    archivedAt: _archivedAt,
     ...clean
   } = group;
   return clean;
@@ -52,6 +60,7 @@ export function buildSharedGroupSnapshot(data: SplitData, groupId: string): Shar
   const group = data.groups.find((item) => item.id === groupId);
   if (!group) throw new Error('Group not found.');
   return {
+    schemaVersion: 2,
     group: cleanGroupForSnapshot(group),
     expenses: data.expenses.filter((expense) => expense.groupId === groupId),
     settlements: data.settlements.filter((settlement) => settlement.groupId === groupId),
@@ -76,6 +85,10 @@ export function sharedSnapshotHash(snapshot: SharedGroupSnapshot) {
 
 function applySharedRow(current: SplitData, row: SharedGroupRow): SplitData {
   const snapshot = row.snapshot;
+  if (row.status === 'deleted') {
+    const local = current.groups.find((item) => item.sharedId === row.id || item.id === snapshot.group.id);
+    return local ? removeGroupFromLocal(current, local.id) : current;
+  }
   const canonicalGroup = snapshot.group;
   const group: Group = {
     ...canonicalGroup,
@@ -84,6 +97,9 @@ function applySharedRow(current: SplitData, row: SharedGroupRow): SplitData {
     myMemberId: row.member_id,
     sharedRevision: row.revision,
     sharedJoinCode: row.join_code,
+    sharedStatus: row.status === 'archived' ? 'archived' : 'active',
+    sharedSchemaVersion: row.schema_version || snapshot.schemaVersion || 1,
+    archivedAt: row.status === 'archived' ? row.archived_at ?? undefined : undefined,
   };
   const existingIds = new Set(
     current.groups
@@ -131,6 +147,7 @@ export function removeGroupFromLocal(current: SplitData, groupId: string): Split
     expenses: current.expenses.filter((expense) => expense.groupId !== groupId),
     settlements: current.settlements.filter((settlement) => settlement.groupId !== groupId),
     history: (current.history ?? []).filter((entry) => entry.groupId !== groupId),
+    activity: (current.activity ?? []).filter((entry) => entry.groupId !== groupId),
   };
 }
 
@@ -149,6 +166,8 @@ export async function createSharedGroup(snapshot: SharedGroupSnapshot, memberId:
     snapshot: row.snapshot as SharedGroupSnapshot,
     member_id: row.member_id,
     role: row.role as SharedRole,
+    status: 'active',
+    schema_version: Number((row.snapshot as SharedGroupSnapshot).schemaVersion) || 1,
     updated_at: new Date().toISOString(),
   };
 }
@@ -163,8 +182,9 @@ export async function loadSharedGroupsForUser(userId: string): Promise<SharedGro
   const ids = memberships.map((item) => item.group_id);
   const { data: groups, error } = await splitzapSupabase
     .from('splitzap_shared_groups')
-    .select('id, join_code, snapshot, revision, updated_at')
-    .in('id', ids);
+    .select('id, join_code, snapshot, revision, updated_at, status, schema_version, archived_at, deleted_at')
+    .in('id', ids)
+    .neq('status', 'deleted');
   if (error) throw error;
   const membershipByGroup = new Map(memberships.map((item) => [item.group_id, item]));
   return (groups ?? []).map((group) => {
@@ -177,6 +197,10 @@ export async function loadSharedGroupsForUser(userId: string): Promise<SharedGro
       updated_at: group.updated_at,
       member_id: membership.member_id,
       role: membership.role as SharedRole,
+      status: (group.status ?? 'active') as SharedGroupRow['status'],
+      schema_version: Number(group.schema_version) || Number((group.snapshot as SharedGroupSnapshot).schemaVersion) || 1,
+      archived_at: group.archived_at,
+      deleted_at: group.deleted_at,
     };
   });
 }
@@ -192,7 +216,7 @@ export async function fetchSharedGroup(sharedId: string, userId: string): Promis
   if (!membership) return null;
   const { data, error } = await splitzapSupabase
     .from('splitzap_shared_groups')
-    .select('id, join_code, snapshot, revision, updated_at')
+    .select('id, join_code, snapshot, revision, updated_at, status, schema_version, archived_at, deleted_at')
     .eq('id', sharedId)
     .maybeSingle();
   if (error) throw error;
@@ -205,6 +229,10 @@ export async function fetchSharedGroup(sharedId: string, userId: string): Promis
     updated_at: data.updated_at,
     member_id: membership.member_id,
     role: membership.role as SharedRole,
+    status: (data.status ?? 'active') as SharedGroupRow['status'],
+    schema_version: Number(data.schema_version) || Number((data.snapshot as SharedGroupSnapshot).schemaVersion) || 1,
+    archived_at: data.archived_at,
+    deleted_at: data.deleted_at,
   };
 }
 
@@ -246,6 +274,8 @@ export async function joinSharedGroup(code: string, memberId?: string, displayNa
     updated_at: group.updated_at,
     member_id: row.member_id,
     role: row.role as SharedRole,
+    status: 'active',
+    schema_version: Number((row.snapshot as SharedGroupSnapshot).schemaVersion) || 1,
   };
 }
 

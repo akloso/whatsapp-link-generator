@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+export const SPLITZAP_SCHEMA_VERSION = 2;
+
 export type Member = { id: string; name: string };
 export type SplitMode = 'equal' | 'exact' | 'percentage';
 export type ChargeDistribution = 'equal' | 'proportional';
@@ -80,6 +82,10 @@ export type Group = {
   myMemberId?: string;
   sharedRevision?: number;
   sharedJoinCode?: string;
+  /** Local metadata returned by Level 2. Never used for bill math. */
+  sharedStatus?: 'active' | 'archived';
+  sharedSchemaVersion?: number;
+  archivedAt?: string;
 };
 
 export type HistoryChange = {
@@ -96,13 +102,26 @@ export type ExpenseHistoryEntry = {
   changes: HistoryChange[];
 };
 
+export type LocalActivityEvent = {
+  id: string;
+  groupId: string;
+  actorName: string;
+  eventType: string;
+  entityType: 'expense' | 'payment' | 'member' | 'group';
+  entityId?: string;
+  date: string;
+  data?: Record<string, unknown>;
+};
+
 export type SplitData = {
+  schemaVersion?: number;
   me: string;
   myName?: string;
   groups: Group[];
   expenses: Expense[];
   settlements: Settlement[];
   history?: ExpenseHistoryEntry[];
+  activity?: LocalActivityEvent[];
 };
 
 /** A shared group can map this account to a canonical member id that differs from data.me. */
@@ -110,7 +129,7 @@ export const memberIdFor = (group: Group, data: Pick<SplitData, 'me'>) => group.
 
 export type SplitzapBackup = {
   app: 'Splitzap';
-  version: 2;
+  version: 2 | 3;
   exportedAt: string;
   data: SplitData;
 };
@@ -134,21 +153,25 @@ export const CURRENCIES = ['₹', '$', '€', '£', '¥'];
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
 const emptyData = (me = uid()): SplitData => ({
+  schemaVersion: SPLITZAP_SCHEMA_VERSION,
   me,
   myName: '',
   groups: [],
   expenses: [],
   settlements: [],
   history: [],
+  activity: [],
 });
 
 const EMPTY: SplitData = {
+  schemaVersion: SPLITZAP_SCHEMA_VERSION,
   me: 'me',
   myName: '',
   groups: [],
   expenses: [],
   settlements: [],
   history: [],
+  activity: [],
 };
 
 function normalizeSplit(rawMode: unknown, rawSplit: unknown) {
@@ -261,12 +284,14 @@ function normalize(data: SplitData): SplitData {
     ?.name.trim() || '';
 
   return {
+    schemaVersion: SPLITZAP_SCHEMA_VERSION,
     me: data.me || uid(),
     myName: inferredName,
     groups,
     expenses: Array.isArray(data.expenses) ? data.expenses.map((expense) => normalizeExpense(expense)) : [],
     settlements: Array.isArray(data.settlements) ? data.settlements : [],
     history: Array.isArray(data.history) ? data.history : [],
+    activity: Array.isArray(data.activity) ? data.activity : [],
   };
 }
 
@@ -290,6 +315,7 @@ function stripLegacyDemo(data: SplitData): SplitData {
     expenses: data.expenses.filter((expense) => !demoGroupIds.has(expense.groupId)),
     settlements: data.settlements.filter((settlement) => !demoGroupIds.has(settlement.groupId)),
     history: (data.history ?? []).filter((entry) => !demoGroupIds.has(entry.groupId)),
+    activity: (data.activity ?? []).filter((entry) => !demoGroupIds.has(entry.groupId)),
   };
 }
 
@@ -403,7 +429,7 @@ function validateBackupCandidate(value: unknown): value is SplitData {
 export function createSplitBackup(): string {
   const payload: SplitzapBackup = {
     app: 'Splitzap',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     data: read(),
   };
@@ -423,6 +449,11 @@ export function restoreSplitBackup(raw: string): SplitData {
   const next = normalize(candidate);
   if (!write(next)) throw new Error('The backup was read, but your browser could not save the restored data.');
   return next;
+}
+
+export function withLocalActivity(data: SplitData, event: Omit<LocalActivityEvent, 'id' | 'date'> & { id?: string; date?: string }): SplitData {
+  const next: LocalActivityEvent = { ...event, id: event.id ?? uid(), date: event.date ?? new Date().toISOString() };
+  return { ...data, activity: [next, ...(data.activity ?? [])].slice(0, 2000) };
 }
 
 export function useSplitData() {
