@@ -107,6 +107,49 @@ describe('Splitzap calculation regression suite', () => {
     expect(simplify(balances)).toEqual([{ from: 'c', to: 'a', amount: 200 }]);
   });
 
+  it('nets chained original obligations into the current simplified settlement', () => {
+    const chainGroup: Group = {
+      ...group,
+      members: [
+        { id: 'adarsh', name: 'Adarsh' },
+        { id: 'madhav', name: 'Madhav' },
+        { id: 'aryan', name: 'Aryan' },
+      ],
+    };
+    const lunchDown: Expense = {
+      ...expense(),
+      id: 'lunch-down',
+      groupId: chainGroup.id,
+      description: 'Lunch down',
+      amount: 90,
+      baseAmount: 90,
+      paidBy: 'madhav',
+      payments: { madhav: 90 },
+      mode: 'exact',
+      split: { adarsh: 90 },
+    };
+    const lunchGg: Expense = {
+      ...expense(),
+      id: 'lunch-gg',
+      groupId: chainGroup.id,
+      description: 'Lunch gg',
+      amount: 250,
+      baseAmount: 250,
+      paidBy: 'aryan',
+      payments: { aryan: 250 },
+      mode: 'equal',
+      split: { madhav: 1, aryan: 1 },
+    };
+    const balances = groupBalances(chainGroup, [lunchDown, lunchGg], []);
+    expectMoney(balances.adarsh, -90);
+    expectMoney(balances.madhav, -35);
+    expectMoney(balances.aryan, 125);
+    expect(simplify(balances)).toEqual([
+      { from: 'adarsh', to: 'aryan', amount: 90 },
+      { from: 'madhav', to: 'aryan', amount: 35 },
+    ]);
+  });
+
   it('reduces balances after a partial settlement without changing the expense', () => {
     const item = expense({ amount: 600, baseAmount: 600, payments: { a: 400, b: 200 }, split: { a: 1, b: 1, c: 1 } });
     const settlements: Settlement[] = [{ id: 'pay1', groupId: group.id, from: 'c', to: 'a', amount: 50, date: '2026-08-16T01:00:00.000Z' }];
