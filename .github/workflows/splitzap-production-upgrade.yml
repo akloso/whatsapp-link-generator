@@ -43,6 +43,15 @@ jobs:
           LOG=/tmp/splitzap-upgrade-diagnostic.log
           : > "$LOG"
 
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/splitzap-production-ui.mjs')
+          s = p.read_text()
+          s = s.replace("return <span className={`expense-confetti ${strong ? 'is-strong' : ''}`} aria-hidden=\"true\">{Array.from({ length: 8 }, (_, index) => <i key={index} />)}</span>;", "return <span className={'expense-confetti ' + (strong ? 'is-strong' : '')} aria-hidden=\"true\">{Array.from({ length: 8 }, (_, index) => <i key={index} />)}</span>;")
+          s = s.replace("new Date(`${value}T12:00:00`)", "new Date(value + 'T12:00:00')")
+          p.write_text(s)
+          PY
+
           echo "== data patch ==" | tee -a "$LOG"
           node scripts/splitzap-production-upgrade.mjs 2>&1 | tee -a "$LOG"
           DATA=${PIPESTATUS[0]}
