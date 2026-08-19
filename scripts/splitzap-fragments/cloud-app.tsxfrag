@@ -1,0 +1,289 @@
+export default function SplitzapCloudApp() {
+  const { data, update, hydrated } = useSplitData();
+  const [session, setSession] = useState<SplitzapSession | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<SplitzapProfile | null>(null);
+  const [migrationOpen, setMigrationOpen] = useState(false);
+  const [conflict, setConflict] = useState<Conflict>(null);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [shareGroupId, setShareGroupId] = useState<string | null>(null);
+  const [inviteMemberId, setInviteMemberId] = useState<string | null>(null);
+  const [manageGroupId, setManageGroupId] = useState<string | null>(null);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinRequested, setJoinRequested] = useState(false);
+  const [sharedActivity, setSharedActivity] = useState<SharedActivityEvent[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<SharedJoinRequest[]>([]);
+  const [memberships, setMemberships] = useState<SharedMembership[]>([]);
+  const [productionTick, setProductionTick] = useState(0);
+  const [status, setStatus] = useState<SyncStatus>('local');
+  const [statusMessage, setStatusMessage] = useState('Saved on this device');
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() => typeof window === 'undefined' ? null : safeGet(LAST_SYNC_AT_KEY));
+  const initializedUser = useRef<string | null>(null);
+  const sharedInitializedUser = useRef<string | null>(null);
+  const sharedHashes = useRef(new Map<string, string>());
+  const syncing = useRef(false);
+  const latestData = useRef(data);
+  latestData.current = data;
+
+  useEffect(() => {
+    let active = true;
+    getSplitzapSession().then((next) => { if (active) { setSession(next); setAuthReady(true); } }).catch(() => { if (active) { setAuthReady(true); setStatus('error'); setStatusMessage('Could not check cloud account'); } });
+    const unsubscribe = onSplitzapAuthChange((next, event) => {
+      if (!active) return;
+      setSession(next);
+      initializedUser.current = null;
+      sharedInitializedUser.current = null;
+      sharedHashes.current.clear();
+      setProfile(null);
+      setSharedActivity([]); setPendingRequests([]); setMemberships([]);
+      if (event === 'PASSWORD_RECOVERY') { setRecoveryMode(true); setAccountOpen(true); }
+      if (!next) { setStatus('local'); setStatusMessage('Saved on this device'); setProfileOpen(false); }
+    });
+    return () => { active = false; unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    void getSplitzapProfile().then((next) => {
+      if (!active) return;
+      const withLocalFallback: SplitzapProfile = { ...next, display_name: next.display_name || latestData.current.myName || '' };
+      setProfile(withLocalFallback);
+      update((current) => ({ ...current, preferences: { defaultCurrency: withLocalFallback.default_currency, theme: withLocalFallback.theme, reducedMotion: withLocalFallback.reduced_motion } }));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [session, update]);
+
+  useEffect(() => {
+    const theme = profile?.theme ?? data.preferences?.theme ?? 'system';
+    const reduced = profile?.reduced_motion ?? data.preferences?.reducedMotion ?? false;
+    document.documentElement.dataset.splitzapTheme = theme;
+    document.documentElement.dataset.splitzapReducedMotion = reduced ? 'true' : 'false';
+    return () => { delete document.documentElement.dataset.splitzapTheme; delete document.documentElement.dataset.splitzapReducedMotion; };
+  }, [data.preferences?.reducedMotion, data.preferences?.theme, profile?.reduced_motion, profile?.theme]);
+
+  useEffect(() => {
+    if (!hydrated || !authReady || !session || initializedUser.current === session.user.id) return;
+    let active = true;
+    initializedUser.current = session.user.id;
+    setStatus('connecting'); setStatusMessage('Checking cloud copy…');
+    void (async () => {
+      try {
+        const row = await fetchSplitzapCloudState(session.user.id);
+        if (!active) return;
+        const local = latestData.current;
+        const localHash = dataHash(local);
+        const lastHash = safeGet(LAST_SYNC_HASH_KEY);
+        if (!row) {
+          if (hasMeaningfulData(local)) { setMigrationOpen(true); setStatus('local'); setStatusMessage('Device data ready to move online'); return; }
+          const updatedAt = await saveSplitzapCloudState(session.user.id, local);
+          if (!active) return;
+          saveSyncMarker(local, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); return;
+        }
+        const cloudHash = dataHash(row.data);
+        if (localHash === cloudHash) { saveSyncMarker(row.data, row.updated_at); setLastSyncedAt(row.updated_at); setStatus('synced'); setStatusMessage('Synced'); return; }
+        if (lastHash && localHash !== lastHash) {
+          const updatedAt = await saveSplitzapCloudState(session.user.id, local);
+          if (!active) return;
+          saveSyncMarker(local, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Offline changes synced'); return;
+        }
+        if (!lastHash && hasMeaningfulData(local) && hasMeaningfulData(row.data)) { setConflict({ cloud: row.data, local }); setStatus('error'); setStatusMessage('Choose which copy to keep'); return; }
+        update(() => row.data); saveSyncMarker(row.data, row.updated_at); setLastSyncedAt(row.updated_at); setStatus('synced'); setStatusMessage('Cloud data loaded');
+      } catch (cause) {
+        if (!active) return;
+        setStatus(navigator.onLine ? 'error' : 'offline'); setStatusMessage(navigator.onLine ? (cause instanceof Error ? cause.message : 'Cloud sync failed') : 'Offline · changes stay on this device');
+      }
+    })();
+    return () => { active = false; };
+  }, [authReady, hydrated, session, update]);
+
+  useEffect(() => {
+    if (!hydrated || !session || initializedUser.current !== session.user.id || migrationOpen || conflict || status !== 'synced' || sharedInitializedUser.current === session.user.id) return;
+    let active = true;
+    sharedInitializedUser.current = session.user.id;
+    void loadSharedGroupsForUser(session.user.id).then((rows) => {
+      if (!active) return;
+      sharedHashes.current.clear(); rows.forEach((row) => sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)));
+      update((current) => mergeSharedRowsIntoLocal(current, rows, true));
+      setProductionTick((value) => value + 1);
+    }).catch((cause) => { if (!active) return; sharedInitializedUser.current = null; setStatus('error'); setStatusMessage(cause instanceof Error ? cause.message : 'Could not load shared groups'); });
+    return () => { active = false; };
+  }, [conflict, hydrated, migrationOpen, session, status, update]);
+
+  useEffect(() => {
+    if (!session || sharedInitializedUser.current !== session.user.id) return;
+    return subscribeToSharedGroupChanges(session.user.id, (payload) => {
+      const fresh = payload.new as Record<string, unknown>; const old = payload.old as Record<string, unknown>;
+      const sharedId = String(fresh?.id ?? old?.id ?? '');
+      if (!sharedId) return;
+      if (payload.eventType === 'DELETE' || fresh?.status === 'deleted') {
+        sharedHashes.current.delete(sharedId);
+        update((current) => { const group = current.groups.find((item) => item.sharedId === sharedId); return group ? removeGroupFromLocal(current, group.id) : current; });
+        setProductionTick((value) => value + 1);
+        return;
+      }
+      void fetchSharedGroup(sharedId, session.user.id).then((row) => {
+        if (!row || row.status === 'deleted') { sharedHashes.current.delete(sharedId); update((current) => { const group = current.groups.find((item) => item.sharedId === sharedId); return group ? removeGroupFromLocal(current, group.id) : current; }); return; }
+        sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); update((current) => mergeSharedRowsIntoLocal(current, [row], false)); setProductionTick((value) => value + 1);
+      }).catch(() => undefined);
+    });
+  }, [session, update]);
+
+  useEffect(() => {
+    if (!session) return;
+    return subscribeToProductionChanges(session.user.id, () => setProductionTick((value) => value + 1));
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || initializedUser.current !== session.user.id || migrationOpen || conflict || status === 'local' || status === 'connecting') return;
+    let active = true;
+    void (async () => {
+      try {
+        const rows = await loadSharedGroupsForUser(session.user.id);
+        if (!active) return;
+        rows.forEach((row) => sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)));
+        update((current) => mergeSharedRowsIntoLocal(current, rows, true));
+        const ids = rows.map((row) => row.id);
+        const [activity, requests, memberRows] = await Promise.all([loadSharedActivity(ids), listPendingJoinRequests(ids), listSharedMemberships(ids)]);
+        if (!active) return;
+        setSharedActivity(activity); setPendingRequests(requests); setMemberships(memberRows);
+      } catch { /* core sync status handles material failures; collaboration metadata retries on next event */ }
+    })();
+    return () => { active = false; };
+  }, [conflict, migrationOpen, productionTick, session, status, update]);
+
+  useEffect(() => {
+    if (!session || sharedInitializedUser.current !== session.user.id || migrationOpen || conflict || !navigator.onLine) return;
+    const changed = data.groups.filter((group) => group.sharedId && (group.status ?? group.sharedStatus ?? 'active') === 'active').map((group) => ({ group, snapshot: buildSharedGroupSnapshot(data, group.id) })).filter(({ group, snapshot }) => sharedSnapshotHash(snapshot) !== sharedHashes.current.get(group.sharedId!));
+    if (!changed.length) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setStatus('syncing'); setStatusMessage('Syncing shared group…');
+        try {
+          for (const item of changed) {
+            const sharedId = item.group.sharedId!;
+            const result = await updateSharedGroup(sharedId, item.snapshot, item.group.sharedRevision);
+            sharedHashes.current.set(sharedId, sharedSnapshotHash(item.snapshot));
+            update((current) => ({ ...current, groups: current.groups.map((group) => group.id === item.group.id ? { ...group, sharedRevision: result.revision } : group) }));
+          }
+          setStatus('synced'); setStatusMessage('Synced'); setProductionTick((value) => value + 1);
+        } catch (cause) { setStatus(navigator.onLine ? 'error' : 'offline'); setStatusMessage(cause instanceof Error ? cause.message : 'Shared group sync failed'); }
+      })();
+    }, 850);
+    return () => window.clearTimeout(timer);
+  }, [conflict, data, migrationOpen, session, status, update]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    const urlCode = new URLSearchParams(window.location.search).get('join')?.trim().toUpperCase() || '';
+    const pending = urlCode || safeGet(PENDING_JOIN_KEY) || '';
+    if (!pending) return;
+    setJoinCode(pending);
+    try { window.localStorage.setItem(PENDING_JOIN_KEY, pending); } catch { /* best effort */ }
+    if (session) { setAccountOpen(false); setProfileOpen(false); setJoinOpen(true); } else setAccountOpen(true);
+  }, [authReady, session]);
+
+  useEffect(() => {
+    if (!hydrated || !session || initializedUser.current !== session.user.id || migrationOpen || conflict || syncing.current) return;
+    const currentHash = dataHash(data);
+    if (currentHash === safeGet(LAST_SYNC_HASH_KEY)) return;
+    if (!navigator.onLine) { setStatus('offline'); setStatusMessage('Offline · changes will sync later'); return; }
+    const timer = window.setTimeout(() => {
+      syncing.current = true; setStatus('syncing'); setStatusMessage('Syncing…');
+      void saveSplitzapCloudState(session.user.id, latestData.current).then((updatedAt) => { saveSyncMarker(latestData.current, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); }).catch((cause) => { setStatus(navigator.onLine ? 'error' : 'offline'); setStatusMessage(navigator.onLine ? (cause instanceof Error ? cause.message : 'Cloud sync failed') : 'Offline · changes will sync later'); }).finally(() => { syncing.current = false; });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [conflict, data, hydrated, migrationOpen, session]);
+
+  useEffect(() => {
+    const onOffline = () => { if (session) { setStatus('offline'); setStatusMessage('Offline · changes will sync later'); } };
+    const onOnline = () => {
+      if (!session) return;
+      const current = latestData.current;
+      if (dataHash(current) !== safeGet(LAST_SYNC_HASH_KEY)) { setStatus('syncing'); setStatusMessage('Back online · syncing…'); void saveSplitzapCloudState(session.user.id, current).then((updatedAt) => { saveSyncMarker(current, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); }).catch(() => { setStatus('error'); setStatusMessage('Cloud sync failed'); }); }
+      else { setStatus('synced'); setStatusMessage('Synced'); }
+    };
+    window.addEventListener('offline', onOffline); window.addEventListener('online', onOnline);
+    return () => { window.removeEventListener('offline', onOffline); window.removeEventListener('online', onOnline); };
+  }, [session]);
+
+  const migrate = async () => {
+    if (!session) return;
+    setStatus('syncing'); setStatusMessage('Saving device data online…');
+    try { const current = latestData.current; const updatedAt = await saveSplitzapCloudState(session.user.id, current); saveSyncMarker(current, updatedAt); setLastSyncedAt(updatedAt); setMigrationOpen(false); setStatus('synced'); setStatusMessage('Synced'); }
+    catch (cause) { setStatus('error'); setStatusMessage(cause instanceof Error ? cause.message : 'Could not move data online'); }
+  };
+  const keepLocalConflict = async () => { if (!session || !conflict) return; const updatedAt = await saveSplitzapCloudState(session.user.id, conflict.local); saveSyncMarker(conflict.local, updatedAt); setLastSyncedAt(updatedAt); setConflict(null); setStatus('synced'); setStatusMessage('Device copy saved online'); };
+  const keepCloudConflict = () => { if (!conflict) return; update(() => conflict.cloud); saveSyncMarker(conflict.cloud); setConflict(null); setStatus('synced'); setStatusMessage('Cloud copy loaded'); };
+
+  const enableSharing = async (groupId: string) => {
+    if (!session) throw new Error('Sign in to share this group.');
+    const current = latestData.current; const group = current.groups.find((item) => item.id === groupId);
+    if (!group) throw new Error('Group not found.'); if (group.sharedId) return;
+    const row = await createSharedGroup(buildSharedGroupSnapshot(current, groupId), memberIdFor(group, current));
+    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); update((value) => mergeSharedRowsIntoLocal(value, [row], false)); setProductionTick((value) => value + 1);
+  };
+
+  const completeJoin = (row: SharedGroupRow) => {
+    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); update((current) => mergeSharedRowsIntoLocal(current, [row], false));
+    try { window.localStorage.removeItem(PENDING_JOIN_KEY); } catch { /* best effort */ }
+    setJoinOpen(false); setJoinRequested(false); setJoinCode(''); setProductionTick((value) => value + 1);
+    window.history.replaceState({}, '', `/splitzap#group=${encodeURIComponent(row.snapshot.group.id)}`); window.dispatchEvent(new Event('popstate'));
+  };
+
+  const removeGroup = async (group: Group, mode: 'self' | 'everyone', transferMemberId?: string) => {
+    if (group.sharedId) {
+      if (!session) throw new Error('Sign in before changing a shared group.');
+      if (mode === 'everyone') {
+        if (group.sharedRole !== 'owner') throw new Error('Only the owner can delete this group for everyone.');
+        await softDeleteSharedGroup(group.sharedId);
+      } else {
+        if (group.sharedRole === 'owner') {
+          if (!transferMemberId) throw new Error('Choose a new owner before leaving.');
+          await transferSharedGroupOwnership(group.sharedId, transferMemberId);
+        }
+        await leaveSharedGroupV2(group.sharedId);
+      }
+      sharedHashes.current.delete(group.sharedId); setProductionTick((value) => value + 1);
+    }
+    update((current) => removeGroupFromLocal(current, group.id));
+  };
+
+  const archiveGroup = async (group: Group, archive: boolean) => {
+    if (group.sharedId) { await archiveSharedGroup(group.sharedId, archive); setProductionTick((value) => value + 1); }
+    update((current) => ({ ...current, groups: current.groups.map((item) => item.id === group.id ? { ...item, status: archive ? 'archived' : 'active', sharedStatus: archive ? 'archived' : 'active', archivedAt: archive ? new Date().toISOString() : undefined } : item) }));
+  };
+
+  const resolveJoin = async (id: string, approve: boolean) => { await resolveSharedJoinRequest(id, approve); setProductionTick((value) => value + 1); };
+  const refreshProfile = async () => { if (!session) return; try { setProfile(await getSplitzapProfile()); } catch { /* retry when reopened */ } };
+
+  const collaboration = {
+    signedIn: Boolean(session), activity: sharedActivity, pendingRequests, memberships,
+    onInviteGroup: (groupId: string, memberId?: string) => { setInviteMemberId(memberId ?? null); setShareGroupId(groupId); if (!session) setAccountOpen(true); },
+    onManageMembers: (groupId: string) => { if (!session) setAccountOpen(true); else setManageGroupId(groupId); },
+    onJoinGroup: () => { setJoinRequested(true); if (session) setJoinOpen(true); else setAccountOpen(true); },
+    onDeleteGroup: removeGroup,
+    onArchiveGroup: archiveGroup,
+    onResolveJoinRequest: resolveJoin,
+  };
+
+  const indicatorClass = status === 'synced' ? 'bg-emerald-500' : status === 'syncing' || status === 'connecting' ? 'bg-amber-400' : status === 'error' ? 'bg-red-500' : 'bg-slate-400';
+  const accountInitial = (profile?.display_name?.trim()?.[0] || data.myName?.trim()?.[0] || session?.user.email?.[0] || '').toUpperCase();
+  const accountAction = <button type="button" onClick={() => session ? setProfileOpen(true) : setAccountOpen(true)} aria-label={session ? 'My Profile' : 'Sign in to sync'} title={session ? (status === 'error' || status === 'offline' ? statusMessage : 'My Profile') : 'Sign in to sync'} className="press relative grid size-9 place-items-center rounded-full border border-border bg-surface text-primary shadow-sm">{status === 'syncing' || status === 'connecting' ? <Loader2 size={15} className="animate-spin" /> : session && accountInitial ? <span className="text-xs font-extrabold">{accountInitial}</span> : <UserRound size={16} />}{status === 'error' || status === 'offline' ? <span aria-hidden="true" className={`absolute right-0 top-0 size-2.5 rounded-full border-2 border-surface ${indicatorClass}`} /> : null}</button>;
+  const managedGroup = manageGroupId ? data.groups.find((item) => item.id === manageGroupId) ?? null : null;
+
+  return <>
+    <SplitzapAppV4 accountAction={accountAction} collaboration={collaboration} />
+    <SharedGroupInviteSheet open={Boolean(shareGroupId && session)} group={shareGroupId ? data.groups.find((item) => item.id === shareGroupId) ?? null : null} memberships={memberships} presetMemberId={inviteMemberId} onClose={() => { setShareGroupId(null); setInviteMemberId(null); }} onEnable={enableSharing} onChanged={() => setProductionTick((value) => value + 1)} />
+    <JoinSharedGroupSheet open={joinOpen && Boolean(session)} initialCode={joinCode} onClose={() => { setJoinOpen(false); setJoinRequested(false); }} onJoined={completeJoin} onPending={() => setProductionTick((value) => value + 1)} />
+    {session ? <ProfileScreen open={profileOpen} onClose={() => setProfileOpen(false)} session={session} data={data} update={update} status={status} statusMessage={statusMessage} lastSyncedAt={lastSyncedAt} profile={profile} onProfileChanged={setProfile} onOpenSecurity={() => { setProfileOpen(false); setAccountOpen(true); }} onRestored={() => { setProductionTick((value) => value + 1); void refreshProfile(); }} /> : null}
+    <ManageMembersSheet open={Boolean(manageGroupId && session)} group={managedGroup} memberships={memberships} requests={pendingRequests} onClose={() => setManageGroupId(null)} onInvite={(memberId) => { if (!managedGroup) return; setManageGroupId(null); setInviteMemberId(memberId || null); setShareGroupId(managedGroup.id); }} onResolve={resolveJoin} onRename={async (memberId, name) => { if (!managedGroup?.sharedId) return; await renameSharedMember(managedGroup.sharedId, memberId, name); setProductionTick((value) => value + 1); }} onUnlink={async (memberId) => { if (!managedGroup?.sharedId) return; await unlinkSharedMember(managedGroup.sharedId, memberId); setProductionTick((value) => value + 1); }} onTransfer={async (memberId) => { if (!managedGroup?.sharedId) return; await transferSharedGroupOwnership(managedGroup.sharedId, memberId); setProductionTick((value) => value + 1); }} />
+    <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} session={session} status={status} statusMessage={statusMessage} lastSyncedAt={lastSyncedAt} recoveryMode={recoveryMode} onRecoveryComplete={() => setRecoveryMode(false)} />
+    {migrationOpen ? <SimpleModal title="Move this device's Splitzap data online" onClose={() => setMigrationOpen(false)}><p className="text-sm leading-6 text-slate-600">We found {data.groups.length} {data.groups.length === 1 ? 'group' : 'groups'} on this device. Save them to your account so they can follow you to other devices.</p><button type="button" onClick={() => void migrate()} className="mt-4 w-full rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white">Save device data online</button><button type="button" onClick={() => setMigrationOpen(false)} className="mt-2 w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">Not now</button></SimpleModal> : null}
+    {conflict ? <SimpleModal title="Two different Splitzap copies found" closable={false}><p className="text-sm leading-6 text-slate-600">This device and your cloud account both contain data. Choose which copy should become your main Splitzap data.</p><div className="mt-4 grid gap-2"><button type="button" onClick={() => void keepLocalConflict()} className="rounded-xl bg-[#256f66] px-4 py-3 text-left text-sm font-bold text-white">Keep this device · {conflict.local.groups.length} groups</button><button type="button" onClick={keepCloudConflict} className="rounded-xl bg-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-800">Use cloud copy · {conflict.cloud.groups.length} groups</button></div></SimpleModal> : null}
+  </>;
+}
+
