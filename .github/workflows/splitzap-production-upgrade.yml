@@ -65,6 +65,27 @@ jobs:
             echo "Skipped because data patch failed." | tee -a "$LOG"
           fi
 
+          if [ "$UI" -eq 0 ]; then
+            python - <<'PY'
+          from pathlib import Path
+          import re
+          v4 = Path('src/features/splitzap/SplitzapAppV4.tsx')
+          s = v4.read_text()
+          s = s.replace('  Scale,\n', '')
+          s = re.sub(r"function AnimatedMoney\([\s\S]*?\n}\n\nfunction Avatar", "function Avatar", s, count=1)
+          s = s.replace(".replaceAll('_', ' ')", ".replace(/_/g, ' ')")
+          s = s.replace(' data={data} defaultGroupId={group.id} onUse=', ' data={data} onUse=')
+          s = s.replace('buildGroupShareMessage(group, data, balances)', 'buildGroupShareMessage(group, data)')
+          v4.write_text(s)
+
+          cloud = Path('src/features/splitzap/SplitzapCloudApp.tsx')
+          c = cloud.read_text()
+          c = c.replace('listSharedActivity,', 'loadSharedActivity,')
+          c = c.replace('const [joinRequested, setJoinRequested] = useState(false);', 'const [, setJoinRequested] = useState(false);')
+          cloud.write_text(c)
+          PY
+          fi
+
           echo "== typecheck ==" | tee -a "$LOG"
           if [ "$DATA" -eq 0 ] && [ "$UI" -eq 0 ]; then
             npm run typecheck 2>&1 | tee -a "$LOG"
