@@ -1,0 +1,107 @@
+function SharedGroupInviteSheet({ open, group, memberships, presetMemberId, onClose, onEnable, onChanged }: {
+  open: boolean;
+  group: Group | null;
+  memberships: SharedMembership[];
+  presetMemberId?: string | null;
+  onClose: () => void;
+  onEnable: (groupId: string) => Promise<void>;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [memberId, setMemberId] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [createdCode, setCreatedCode] = useState('');
+  const [invites, setInvites] = useState<SharedInvite[]>([]);
+  const joinedIds = new Set(memberships.filter((item) => item.group_id === group?.sharedId).map((item) => item.member_id));
+  const unjoined = group?.members.filter((member) => !joinedIds.has(member.id)) ?? [];
+  const generalLink = group?.sharedJoinCode ? buildInviteLink(group.sharedJoinCode) : '';
+  const createdLink = createdCode ? buildInviteLink(createdCode) : '';
+
+  const refreshInvites = async () => {
+    if (!group?.sharedId) { setInvites([]); return; }
+    try { setInvites(await listSharedInvites(group.sharedId)); } catch { setInvites([]); }
+  };
+
+  useEffect(() => {
+    if (!open || !group) return;
+    const requested = presetMemberId && group.members.some((member) => member.id === presetMemberId) ? presetMemberId : '';
+    const requestedMember = group.members.find((member) => member.id === requested);
+    setMemberId(requested);
+    setName(requestedMember?.name ?? '');
+    setEmail('');
+    setCreatedCode('');
+    setFeedback('');
+    void refreshInvites();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, group?.id, group?.sharedId, presetMemberId]);
+
+  if (!open || !group) return null;
+
+  const enable = async () => {
+    setBusy(true); setFeedback('');
+    try { await onEnable(group.id); setFeedback('Sharing is now live. You can create a targeted invite.'); onChanged(); }
+    catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not enable sharing.'); }
+    finally { setBusy(false); }
+  };
+
+  const chooseMember = (id: string) => {
+    setMemberId(id);
+    const member = group.members.find((item) => item.id === id);
+    setName(member?.name ?? '');
+    setCreatedCode('');
+  };
+
+  const createInvite = async () => {
+    if (!group.sharedId) return;
+    if (!memberId && !name.trim()) { setFeedback('Enter a name, or choose an existing member.'); return; }
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) { setFeedback('Enter a valid email address or leave email blank.'); return; }
+    setBusy(true); setFeedback('');
+    try {
+      const result = await createSharedInvite(group.sharedId, { memberId: memberId || null, name: name.trim() || null, email: email.trim() || null });
+      setCreatedCode(result.code);
+      setFeedback(email.trim() ? 'Invite ready. The recipient must sign in with this exact email.' : 'Invite ready. A joined group member must approve the recipient after they request access.');
+      await refreshInvites();
+      onChanged();
+    } catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not create invite.'); }
+    finally { setBusy(false); }
+  };
+
+  const share = async (link: string, inviteName?: string) => {
+    const message = `Join ${group.name} on Splitzap${inviteName ? ` as ${inviteName}` : ''}: ${link}`;
+    try {
+      if (navigator.share) await navigator.share({ title: `Join ${group.name}`, text: message, url: link });
+      else { await navigator.clipboard.writeText(message); setFeedback('Invite copied.'); }
+    } catch { /* Native share cancellation is not an error. */ }
+  };
+
+  const copy = async (link: string) => {
+    try { await navigator.clipboard.writeText(link); setFeedback('Invite link copied.'); }
+    catch { setFeedback('Could not copy automatically.'); }
+  };
+
+  const disable = async (id: string) => {
+    setBusy(true);
+    try { await disableSharedInvite(id); await refreshInvites(); onChanged(); setFeedback('Invite disabled.'); }
+    catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not disable invite.'); }
+    finally { setBusy(false); }
+  };
+
+  return <SimpleModal title={group.sharedId ? 'Invite people' : 'Share this group live'} onClose={onClose}>
+    {!group.sharedId ? <><div className="rounded-2xl bg-[#eef6f3] p-4"><div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-xl">{group.emoji}</span><div><p className="text-sm font-extrabold text-slate-900">{group.name}</p><p className="mt-1 text-xs leading-5 text-slate-600">Turn on live sharing first. Existing expenses and balances stay exactly as they are.</p></div></div></div><button type="button" disabled={busy} onClick={() => void enable()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />} Turn on sharing</button></> : <>
+      <div className="rounded-2xl bg-[#eef6f3] p-3"><p className="text-xs font-extrabold text-[#256f66]">Targeted invite</p><p className="mt-1 text-[11px] leading-5 text-slate-600">Use a member-specific invite when possible. Email is optional; without it, the join request needs approval from any already joined member.</p></div>
+      {unjoined.length ? <><label className="mt-4 block text-xs font-bold text-slate-600">Existing member</label><select value={memberId} onChange={(event) => chooseMember(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#256f66]"><option value="">New person / not listed yet</option>{unjoined.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></> : null}
+      <label className="mt-3 block text-xs font-bold text-slate-600">Name</label><input value={name} disabled={Boolean(memberId)} onChange={(event) => setName(event.target.value)} placeholder="Rahul" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none disabled:bg-slate-50 disabled:text-slate-500 focus:border-[#256f66]" />
+      <label className="mt-3 block text-xs font-bold text-slate-600">Email <span className="font-medium text-slate-400">(optional)</span></label><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="rahul@example.com" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#256f66]" />
+      <p className="mt-1.5 text-[10px] leading-4 text-slate-500">{email.trim() ? 'Only this signed-in email can accept the invite.' : 'No email: the recipient signs in, claims their identity, then waits for a group member to approve.'}</p>
+      <button type="button" disabled={busy || (!memberId && !name.trim())} onClick={() => void createInvite()} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-40">{busy ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />} Create invite link</button>
+      {createdLink ? <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3"><p className="break-all text-[10px] leading-4 text-emerald-900">{createdLink}</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => void copy(createdLink)} className="rounded-xl bg-white py-2.5 text-xs font-bold text-[#256f66]"><Copy size={14} className="mr-1 inline" /> Copy</button><button type="button" onClick={() => void share(createdLink, name.trim())} className="rounded-xl bg-[#256f66] py-2.5 text-xs font-bold text-white"><Share2 size={14} className="mr-1 inline" /> Share</button></div></div> : null}
+      <div className="my-4 flex items-center gap-2"><div className="h-px flex-1 bg-slate-200" /><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">or</span><div className="h-px flex-1 bg-slate-200" /></div>
+      <div className="rounded-2xl border border-slate-200 p-3"><p className="text-xs font-extrabold text-slate-800">General group invite</p><p className="mt-1 text-[10px] leading-4 text-slate-500">Useful for dropping one link into a WhatsApp group. Every new identity claim requires approval.</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => void copy(generalLink)} className="rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-[#256f66]">Copy link</button><button type="button" onClick={() => void share(generalLink)} className="rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-[#256f66]">Share</button></div></div>
+      {invites.filter((invite) => invite.status === 'active' && invite.code !== group.sharedJoinCode).length ? <div className="mt-4"><p className="mb-2 text-xs font-extrabold text-slate-700">Active targeted invites</p><div className="space-y-2">{invites.filter((invite) => invite.status === 'active' && invite.code !== group.sharedJoinCode).map((invite) => <div key={invite.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{invite.intended_name || 'Invite'}</p><p className="truncate text-[10px] text-slate-500">{invite.intended_email || 'Approval required'}</p></div><button type="button" disabled={busy} onClick={() => void disable(invite.id)} className="rounded-lg px-2 py-1.5 text-[10px] font-bold text-red-600">Disable</button></div>)}</div></div> : null}
+    </>}
+    {feedback ? <p role="status" className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">{feedback}</p> : null}
+  </SimpleModal>;
+}
+
