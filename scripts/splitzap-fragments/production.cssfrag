@@ -57,3 +57,5 @@ html[data-splitzap-reduced-motion="true"] .splitzap-root *::after { animation-du
 @media (prefers-reduced-motion: reduce) {
   .splitzap-root *, .splitzap-root *::before, .splitzap-root *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
+
+/* validation trigger */
