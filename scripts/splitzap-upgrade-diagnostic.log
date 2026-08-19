@@ -1,26 +1,24 @@
 == data patch ==
 Splitzap production phase 1 patch applied.
+exit=0
 == product patch ==
 Splitzap production UI and lifecycle patch applied.
+Splitzap generated-source compatibility pass applied.
+exit=0
+== final product polish ==
+Splitzap final production polish applied.
+exit=0
 == typecheck ==
 
 > zapora@0.0.0 typecheck
 > tsc --noEmit -p tsconfig.app.json
 
-src/features/splitzap/SplitzapAppV4.tsx(25,3): error TS6133: 'Scale' is declared but its value is never read.
-src/features/splitzap/SplitzapAppV4.tsx(217,10): error TS6133: 'AnimatedMoney' is declared but its value is never read.
-src/features/splitzap/SplitzapAppV4.tsx(481,114): error TS2550: Property 'replaceAll' does not exist on type 'string'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2021' or later.
-src/features/splitzap/SplitzapAppV4.tsx(661,90): error TS2322: Type '{ open: boolean; onClose: () => void; data: SplitData; defaultGroupId: string; onUse: (seed: ScanExpenseSeed) => void; }' is not assignable to type 'IntrinsicAttributes & { open: boolean; onClose: () => void; data: SplitData; onUse: (seed: ScanExpenseSeed) => void; }'.
-  Property 'defaultGroupId' does not exist on type 'IntrinsicAttributes & { open: boolean; onClose: () => void; data: SplitData; onUse: (seed: ScanExpenseSeed) => void; }'.
-src/features/splitzap/SplitzapAppV4.tsx(665,146): error TS2554: Expected 2 arguments, but got 3.
-src/features/splitzap/SplitzapCloudApp.tsx(12,196): error TS2724: '"./splitzapProduction"' has no exported member named 'listSharedActivity'. Did you mean 'loadSharedActivity'?
-src/features/splitzap/SplitzapCloudApp.tsx(12,196): error TS6133: 'listSharedActivity' is declared but its value is never read.
-src/features/splitzap/SplitzapCloudApp.tsx(63,10): error TS6133: 'joinRequested' is declared but its value is never read.
-src/features/splitzap/SplitzapCloudApp.tsx(197,69): error TS2552: Cannot find name 'loadSharedActivity'. Did you mean 'sharedActivity'?
+src/features/splitzap/SplitzapAppV4.tsx(662,150): error TS2322: Type '(() => void) | undefined' is not assignable to type '() => void'.
+  Type 'undefined' is not assignable to type '() => void'.
+exit=2
 == splitzap tests ==
-Skipped because typecheck failed.
+skipped because an earlier validation failed
 == production build ==
-Skipped because tests failed.
+skipped because an earlier validation failed
 == production dependency audit ==
-Skipped because build failed.
-RESULT data=0 ui=0 typecheck=2 tests=99 build=99 audit=99
+skipped because an earlier validation failed
