@@ -15,6 +15,7 @@ const run = (label, command, args) => {
 const checks = [
   ['data patch', 'node', ['scripts/splitzap-production-upgrade.mjs']],
   ['product patch', 'node', ['scripts/run-splitzap-production-ui.mjs']],
+  ['final product polish', 'node', ['scripts/splitzap-final-polish.mjs']],
   ['typecheck', 'npm', ['run', 'typecheck']],
   ['splitzap tests', 'npm', ['run', 'test:splitzap']],
   ['production build', 'npm', ['run', 'build']],
