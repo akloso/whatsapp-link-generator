@@ -1,0 +1,179 @@
+function ProfileScreen({ open, onClose, session, data, update, status, statusMessage, lastSyncedAt, profile, onProfileChanged, onOpenSecurity, onRestored }: {
+  open: boolean;
+  onClose: () => void;
+  session: SplitzapSession;
+  data: SplitData;
+  update: (fn: (data: SplitData) => SplitData) => void;
+  status: SyncStatus;
+  statusMessage: string;
+  lastSyncedAt: string | null;
+  profile: SplitzapProfile | null;
+  onProfileChanged: (profile: SplitzapProfile) => void;
+  onOpenSecurity: () => void;
+  onRestored: () => void;
+}) {
+  const [name, setName] = useState(profile?.display_name || data.myName || '');
+  const [currency, setCurrency] = useState(profile?.default_currency || data.preferences?.defaultCurrency || '₹');
+  const [theme, setTheme] = useState<SplitzapProfile['theme']>(profile?.theme || data.preferences?.theme || 'system');
+  const [reducedMotion, setReducedMotion] = useState(profile?.reduced_motion ?? data.preferences?.reducedMotion ?? false);
+  const [deleted, setDeleted] = useState<RecentlyDeletedGroup[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+
+  const refreshDeleted = async () => {
+    try { setDeleted(await listRecentlyDeletedGroups()); } catch { setDeleted([]); }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    setName(profile?.display_name || data.myName || '');
+    setCurrency(profile?.default_currency || data.preferences?.defaultCurrency || '₹');
+    setTheme(profile?.theme || data.preferences?.theme || 'system');
+    setReducedMotion(profile?.reduced_motion ?? data.preferences?.reducedMotion ?? false);
+    setFeedback('');
+    void refreshDeleted();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, profile?.display_name, profile?.default_currency, profile?.theme, profile?.reduced_motion]);
+
+  if (!open) return null;
+
+  const saveName = async () => {
+    const clean = name.trim();
+    if (!clean) { setFeedback('Enter your name.'); return; }
+    setBusy(true); setFeedback('');
+    try {
+      await updateSplitzapProfileName(clean);
+      update((current) => {
+        const groups = current.groups.map((group) => {
+          const id = memberIdFor(group, current);
+          return { ...group, members: group.members.map((member) => member.id === id ? { ...member, name: clean } : member) };
+        });
+        return { ...current, myName: clean, groups };
+      });
+      const next = { display_name: clean, default_currency: currency, theme, reduced_motion: reducedMotion };
+      onProfileChanged(next);
+      setFeedback('Name updated everywhere. Existing audit entries keep their original event-time name.');
+    } catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not update your name.'); }
+    finally { setBusy(false); }
+  };
+
+  const savePreferences = async () => {
+    setBusy(true); setFeedback('');
+    try {
+      await updateSplitzapProfilePreferences({ default_currency: currency, theme, reduced_motion: reducedMotion });
+      update((current) => ({ ...current, preferences: { defaultCurrency: currency, theme, reducedMotion } }));
+      onProfileChanged({ display_name: profile?.display_name || name.trim(), default_currency: currency, theme, reduced_motion: reducedMotion });
+      setFeedback('Preferences saved.');
+    } catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not save preferences.'); }
+    finally { setBusy(false); }
+  };
+
+  const downloadExport = () => {
+    try {
+      const blob = new Blob([createSplitBackup()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `splitzap-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      setFeedback('Splitzap data exported.');
+    } catch { setFeedback('Could not export data on this device.'); }
+  };
+
+  const importFile = async (file: File | null) => {
+    if (!file) return;
+    setBusy(true); setFeedback('');
+    try {
+      const result = importSplitBackupSafely(await file.text());
+      setFeedback(`Imported ${result.importedGroups} personal ${result.importedGroups === 1 ? 'group' : 'groups'}.${result.skippedSharedGroups ? ` ${result.skippedSharedGroups} shared ${result.skippedSharedGroups === 1 ? 'group was' : 'groups were'} skipped to protect the live cloud copy.` : ''}`);
+      onRestored();
+    } catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not import this Splitzap file.'); }
+    finally { setBusy(false); }
+  };
+
+  const restoreDeleted = async (id: string) => {
+    setBusy(true); setFeedback('');
+    try { await restoreSharedGroup(id); await refreshDeleted(); onRestored(); setFeedback('Group restored. Old invite links remain invalid; a new general invite was created.'); }
+    catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not restore this group.'); }
+    finally { setBusy(false); }
+  };
+
+  const removeAccount = async () => {
+    if (deleteConfirm !== 'DELETE') return;
+    setBusy(true); setFeedback('');
+    try {
+      await deleteSplitzapAccount();
+      try { await signOutSplitzap(); } catch { /* account may already be removed */ }
+      window.localStorage.removeItem('splitzap.cloud.lastSyncHash');
+      window.localStorage.removeItem('splitzap.cloud.lastSyncAt');
+      window.location.replace('/splitzap');
+    } catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not delete your account.'); setBusy(false); }
+  };
+
+  const providers = session.user.identities?.map((identity) => identity.provider) ?? [];
+  const initial = (name.trim()?.[0] || session.user.email?.[0] || '?').toUpperCase();
+
+  return <div className="fixed inset-0 z-[140] overflow-y-auto bg-[#fbfaf6] text-slate-900"><div className="mx-auto min-h-[100dvh] w-full max-w-[520px] bg-[#fbfaf6] pb-[max(2rem,env(safe-area-inset-bottom))]"><header className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200/80 bg-[#fbfaf6]/95 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur"><button type="button" onClick={onClose} aria-label="Back" className="grid size-10 place-items-center rounded-full bg-white shadow-sm"><X size={18} /></button><div className="min-w-0 flex-1"><h2 className="text-lg font-extrabold">My Profile</h2><p className="truncate text-[11px] text-slate-500">Account, preferences and your data</p></div></header><main className="space-y-4 p-4"><section className="flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm"><span className="grid size-14 place-items-center rounded-2xl bg-[#e7f4ef] text-xl font-extrabold text-[#256f66]">{initial}</span><div className="min-w-0 flex-1"><p className="truncate text-base font-extrabold">{name.trim() || 'Splitzap user'}</p><p className="truncate text-xs text-slate-500">{session.user.email}</p></div>{status === 'offline' || status === 'error' ? <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${status === 'offline' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>{status === 'offline' ? 'Offline' : 'Sync issue'}</span> : null}</section>
+      <ProfileSection title="Personal information"><label className="block text-xs font-bold text-slate-600">Name</label><div className="mt-1 flex gap-2"><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#256f66]" /><button type="button" disabled={busy || !name.trim()} onClick={() => void saveName()} className="rounded-xl bg-[#256f66] px-4 text-xs font-bold text-white disabled:opacity-40">Save</button></div><label className="mt-3 block text-xs font-bold text-slate-600">Email</label><div className="mt-1 rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-600">{session.user.email}</div></ProfileSection>
+      <ProfileSection title="Account & Security"><ProfileRow label="Google" value={providers.includes('google') ? 'Connected' : 'Not connected'} /><ProfileRow label="Email sign-in" value={session.user.email ? 'Available' : 'Unavailable'} /><button type="button" onClick={onOpenSecurity} className="mt-2 w-full rounded-xl bg-slate-50 px-3 py-3 text-left text-xs font-bold text-[#256f66]">Password & sign-in settings</button></ProfileSection>
+      <ProfileSection title="Preferences"><div className="grid grid-cols-2 gap-2"><div><label className="block text-[11px] font-bold text-slate-600">Default currency</label><select value={currency} onChange={(event) => setCurrency(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">{['₹','$','€','£','¥'].map((item) => <option key={item}>{item}</option>)}</select></div><div><label className="block text-[11px] font-bold text-slate-600">Theme</label><select value={theme} onChange={(event) => setTheme(event.target.value as SplitzapProfile['theme'])} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div><label className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold">Reduced animations<input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} className="size-5" /></label><button type="button" disabled={busy} onClick={() => void savePreferences()} className="mt-3 w-full rounded-xl bg-[#e7f4ef] py-3 text-xs font-bold text-[#256f66]">Save preferences</button></ProfileSection>
+      <ProfileSection title="Data & Privacy"><div className="rounded-xl bg-slate-50 px-3 py-3"><p className="text-xs font-bold">Cloud sync</p><p className="mt-0.5 text-[10px] text-slate-500">{status === 'synced' ? `Up to date${lastSyncedAt ? ` · ${new Date(lastSyncedAt).toLocaleString()}` : ''}` : statusMessage}</p></div><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={downloadExport} className="rounded-xl bg-slate-50 px-3 py-3 text-left"><Download size={16} className="text-[#256f66]" /><b className="mt-2 block text-xs">Export data</b></button><label className="cursor-pointer rounded-xl bg-slate-50 px-3 py-3 text-left"><Upload size={16} className="text-[#256f66]" /><b className="mt-2 block text-xs">Import data</b><input type="file" accept="application/json,.json" className="hidden" onChange={(event) => { void importFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label></div><p className="mt-2 text-[10px] leading-4 text-slate-500">Import never overwrites a live shared group. Shared cloud copies are protected and skipped.</p><button type="button" onClick={() => setDeleteAccountOpen(true)} className="mt-3 w-full rounded-xl bg-red-50 py-3 text-xs font-bold text-red-700">Delete account</button></ProfileSection>
+      <ProfileSection title="Recently Deleted"><p className="mb-2 text-[10px] leading-4 text-slate-500">Shared groups deleted for everyone can be restored for 30 days.</p>{deleted.length ? <div className="space-y-2">{deleted.map((item) => { const group = item.snapshot.group; const days = item.purge_after ? Math.max(0, Math.ceil((+new Date(item.purge_after) - Date.now()) / 86400000)) : 30; return <div key={item.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><span className="text-xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{group.name}</p><p className="text-[10px] text-slate-500">{days} days left to restore</p></div><button type="button" disabled={busy} onClick={() => void restoreDeleted(item.id)} className="rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-[#256f66]">Restore</button></div>; })}</div> : <p className="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-500">Nothing recently deleted.</p>}</ProfileSection>
+      <ProfileSection title="Help & About"><a href="/contact" className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold">Help & feedback <ChevronRight size={14} /></a><a href="/privacy" className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold">Privacy <ChevronRight size={14} /></a></ProfileSection>
+      {feedback ? <p role="status" className="rounded-xl bg-[#eef6f3] px-3 py-3 text-xs leading-5 text-slate-700">{feedback}</p> : null}
+      <button type="button" onClick={() => void signOutSplitzap()} className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700">Sign out</button>
+    </main></div>{deleteAccountOpen ? <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/40 p-3"><div className="w-full max-w-[500px] rounded-3xl bg-white p-5"><h3 className="text-base font-extrabold">Delete Splitzap account?</h3><p className="mt-2 text-xs leading-5 text-slate-600">This removes your account data. If you own a shared group with other joined members, Splitzap will block deletion until you transfer ownership or remove those members.</p><label className="mt-4 block text-xs font-bold text-slate-600">Type DELETE</label><input value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm" /><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => { setDeleteAccountOpen(false); setDeleteConfirm(''); }} className="rounded-xl bg-slate-100 py-3 text-xs font-bold">Cancel</button><button type="button" disabled={busy || deleteConfirm !== 'DELETE'} onClick={() => void removeAccount()} className="rounded-xl bg-red-600 py-3 text-xs font-bold text-white disabled:opacity-40">Delete account</button></div></div></div> : null}</div>;
+}
+
+function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="rounded-3xl bg-white p-4 shadow-sm"><h3 className="mb-3 text-sm font-extrabold">{title}</h3>{children}</section>;
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between border-b border-slate-100 py-2.5 last:border-b-0"><span className="text-xs font-semibold text-slate-600">{label}</span><span className="text-xs font-bold text-slate-800">{value}</span></div>;
+}
+
+function ManageMembersSheet({ open, group, memberships, requests, onClose, onInvite, onResolve, onRename, onUnlink, onTransfer }: {
+  open: boolean;
+  group: Group | null;
+  memberships: SharedMembership[];
+  requests: SharedJoinRequest[];
+  onClose: () => void;
+  onInvite: (memberId: string) => void;
+  onResolve: (requestId: string, approve: boolean) => Promise<void>;
+  onRename: (memberId: string, name: string) => Promise<void>;
+  onUnlink: (memberId: string) => Promise<void>;
+  onTransfer: (memberId: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [editingMember, setEditingMember] = useState('');
+  const [editingName, setEditingName] = useState('');
+  if (!open || !group?.sharedId) return null;
+  const groupMemberships = memberships.filter((item) => item.group_id === group.sharedId);
+  const membershipByMember = new Map(groupMemberships.map((item) => [item.member_id, item]));
+  const groupRequests = requests.filter((item) => item.group_id === group.sharedId);
+  const myMemberId = group.myMemberId;
+  const ownerMemberId = groupMemberships.find((item) => item.role === 'owner')?.member_id;
+  const isOwner = group.sharedRole === 'owner';
+
+  const run = async (key: string, fn: () => Promise<void>) => {
+    setBusy(key); setFeedback('');
+    try { await fn(); }
+    catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not complete that action.'); }
+    finally { setBusy(''); }
+  };
+
+  return <SimpleModal title="Manage members" onClose={onClose}>
+    {groupRequests.length ? <div className="mb-4"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-extrabold text-slate-700">Pending requests</p><span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">{groupRequests.length}</span></div><div className="space-y-2">{groupRequests.map((request) => <div key={request.id} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3"><p className="text-sm font-extrabold text-slate-900">{request.requested_name}</p><p className="mt-0.5 break-all text-[11px] text-slate-600">{request.requested_email}</p>{request.requested_member_id ? <p className="mt-1 text-[10px] text-slate-500">Claims existing member: {group.members.find((member) => member.id === request.requested_member_id)?.name || 'Unknown'}</p> : <p className="mt-1 text-[10px] text-slate-500">New member identity</p>}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={Boolean(busy)} onClick={() => void run(`deny-${request.id}`, () => onResolve(request.id, false))} className="rounded-xl bg-white py-2.5 text-xs font-bold text-red-600">Deny</button><button type="button" disabled={Boolean(busy)} onClick={() => void run(`approve-${request.id}`, () => onResolve(request.id, true))} className="rounded-xl bg-[#256f66] py-2.5 text-xs font-bold text-white">Approve</button></div></div>)}</div></div> : null}
+    <div className="space-y-2">{group.members.map((member) => { const membership = membershipByMember.get(member.id); const joined = Boolean(membership); const isSelf = member.id === myMemberId; const isMemberOwner = member.id === ownerMemberId; return <div key={member.id} className="rounded-2xl border border-slate-200 bg-white p-3"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-full bg-slate-100 text-xs font-extrabold">{member.name.trim().charAt(0).toUpperCase() || '?'}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{member.name}{isSelf ? ' (You)' : ''}</p><p className="text-[10px] text-slate-500">{isMemberOwner ? 'Owner' : joined ? 'Joined' : 'Not joined'}</p></div>{!joined ? <button type="button" onClick={() => onInvite(member.id)} className="rounded-lg bg-[#eef6f3] px-3 py-2 text-[10px] font-bold text-[#256f66]">Invite</button> : null}</div>{isOwner && !isSelf ? <div className="mt-2 flex flex-wrap gap-1.5">{editingMember === member.id ? <div className="flex w-full gap-2"><input value={editingName} onChange={(event) => setEditingName(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs" /><button type="button" disabled={!editingName.trim() || Boolean(busy)} onClick={() => void run(`rename-${member.id}`, async () => { await onRename(member.id, editingName.trim()); setEditingMember(''); })} className="rounded-lg bg-[#256f66] px-3 text-[10px] font-bold text-white">Save</button></div> : <button type="button" onClick={() => { setEditingMember(member.id); setEditingName(member.name); }} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Rename</button>}{joined && !isMemberOwner ? <button type="button" disabled={Boolean(busy)} onClick={() => window.confirm(`Reset ${member.name}'s account connection? Their historical expenses remain intact.`) && void run(`unlink-${member.id}`, () => onUnlink(member.id))} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Reset account link</button> : null}{joined && !isMemberOwner ? <button type="button" disabled={Boolean(busy)} onClick={() => window.confirm(`Transfer ownership of ${group.name} to ${member.name}?`) && void run(`owner-${member.id}`, () => onTransfer(member.id))} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Make owner</button> : null}</div> : null}</div>; })}</div>
+    <button type="button" onClick={() => onInvite('')} className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-3 text-xs font-bold text-[#256f66]">+ Invite a new person</button>
+    {feedback ? <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">{feedback}</p> : null}
+  </SimpleModal>;
+}
+
