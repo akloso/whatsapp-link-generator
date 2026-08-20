@@ -145,36 +145,14 @@ jobs:
           git add .splitzap-runtime-error.log
           git commit -m "Record Splitzap runtime hardening validation failure" || true
           git push origin HEAD:testing
-      - name: Commit validated runtime hardening
+      - name: Commit validated Splitzap source only
         if: success()
         shell: bash
         run: |
-          git checkout df7400660c79e545808aaf297673c56e9c904526 -- .github/workflows/splitzap-readiness.yml
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('.github/workflows/splitzap-readiness.yml')
-          text = p.read_text()
-          old = '          grep -q "expense-confetti" src/features/splitzap/splitzap.css\n          grep -q "@supports (-webkit-touch-callout: none)" src/features/splitzap/splitzap.css'
-          new = old + '''\n          grep -q "clearPendingJoinIntent" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "preview.already_joined" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Token refresh / same-account auth events" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Install Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Settle related balance" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "current simplified transfer as paid" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzap-main-scroll" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzap.expenseDraft" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "fixed-shell and mobile touch hardening" src/features/splitzap/splitzap.css
-          grep -q "persistSession: true" src/features/splitzap/splitzapCloud.ts
-          grep -q "autoRefreshToken: true" src/features/splitzap/splitzapCloud.ts'''
-          if old not in text:
-              raise SystemExit('Could not restore final readiness assertions')
-          p.write_text(text.replace(old, new, 1))
-          PY
+          git restore --source=HEAD --staged --worktree .github/workflows/splitzap-readiness.yml .github/workflows/splitzap-runtime-hardening.yml scripts/splitzap_runtime_hardening.py
           rm -f .splitzap-runtime-error.log
-          rm -f scripts/splitzap_runtime_hardening.py
-          rm -f .github/workflows/splitzap-runtime-hardening.yml
           git config user.name "splitzap-runtime-bot"
           git config user.email "splitzap-runtime-bot@users.noreply.github.com"
-          git add -A
+          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/SplitzapCloudApp.tsx src/features/splitzap/splitzap.css
           git commit -m "Harden Splitzap runtime continuity and settlement UX"
           git push origin HEAD:testing
