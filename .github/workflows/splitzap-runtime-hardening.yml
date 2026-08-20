@@ -86,3 +86,5 @@ jobs:
           fi
           git commit -m "Harden Splitzap runtime continuity and settlement UX"
           git push origin HEAD:testing
+
+# trigger after workflow registration
