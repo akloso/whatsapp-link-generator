@@ -1,7 +1,7 @@
-import { ChevronRight, Cloud, CloudOff, Copy, Download, Eye, EyeOff, KeyRound, Link2, Loader2, LogOut, Mail, Share2, ShieldCheck, Upload, UserPlus, UserRound, X } from 'lucide-react';
+import { ChevronRight, Cloud, CloudOff, Copy, Download, Eye, EyeOff, KeyRound, Link2, Loader2, LogOut, Mail, Share2, ShieldCheck, Upload, UserPlus, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import SplitzapAppV4 from './SplitzapAppV4';
-import { createSplitBackup, importSplitBackupSafely, memberIdFor, useSplitData, type Group, type SplitData } from './splitStoreV4';
+import { SPLITZAP_SCHEMA_VERSION, createSplitBackup, importSplitBackupSafely, memberIdFor, useSplitData, type Group, type SplitData } from './splitStoreV4';
 import {
   fetchSplitzapCloudState, getSplitzapSession, onSplitzapAuthChange, saveSplitzapCloudState, sendSplitzapPasswordReset, signInSplitzapWithGoogle, signInSplitzapWithPassword, signOutSplitzap, signUpSplitzapWithPassword, updateSplitzapPassword, type SplitzapSession,
 } from './splitzapCloud';
@@ -14,15 +14,14 @@ import {
 } from './splitzapProduction';
 
 type SyncStatus = 'local' | 'connecting' | 'syncing' | 'synced' | 'offline' | 'error';
-type Conflict = { cloud: SplitData; local: SplitData } | null;
 type EmailMode = 'signin' | 'signup';
 
 const LAST_SYNC_HASH_KEY = 'splitzap.cloud.lastSyncHash';
 const LAST_SYNC_AT_KEY = 'splitzap.cloud.lastSyncAt';
+const LAST_USER_KEY = 'splitzap.cloud.lastUserId';
 const PENDING_JOIN_KEY = 'splitzap.shared.pendingJoin';
 
 const dataHash = (data: SplitData) => JSON.stringify(data);
-const hasMeaningfulData = (data: SplitData) => data.groups.length > 0 || data.expenses.length > 0 || data.settlements.length > 0;
 
 function safeGet(key: string) {
   try { return window.localStorage.getItem(key); } catch { return null; }
@@ -37,7 +36,7 @@ function saveSyncMarker(data: SplitData, updatedAt = new Date().toISOString()) {
 
 function friendlyAuthError(cause: unknown) {
   const message = cause instanceof Error ? cause.message : 'Authentication failed.';
-  if (/email rate limit|over_email_send_rate_limit/i.test(message)) return "Splitzap's temporary test email limit is reached. Use Google or try the email action later.";
+  if (/email rate limit|over_email_send_rate_limit/i.test(message)) return 'Too many emails have been sent recently. Please try again later or use Google sign-in.';
   if (/invalid login credentials/i.test(message)) return 'Email or password is incorrect.';
   if (/email not confirmed/i.test(message)) return 'Confirm your email first, then sign in with your password.';
   if (/provider.*not enabled|unsupported provider/i.test(message)) return 'Google sign-in is not connected yet.';
@@ -52,8 +51,7 @@ export default function SplitzapCloudApp() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<SplitzapProfile | null>(null);
-  const [migrationOpen, setMigrationOpen] = useState(false);
-  const [conflict, setConflict] = useState<Conflict>(null);
+  const [accountDataReady, setAccountDataReady] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [shareGroupId, setShareGroupId] = useState<string | null>(null);
   const [inviteMemberId, setInviteMemberId] = useState<string | null>(null);
@@ -81,19 +79,20 @@ export default function SplitzapCloudApp() {
     const unsubscribe = onSplitzapAuthChange((next, event) => {
       if (!active) return;
       setSession(next);
+      setAccountDataReady(false);
       initializedUser.current = null;
       sharedInitializedUser.current = null;
       sharedHashes.current.clear();
       setProfile(null);
       setSharedActivity([]); setPendingRequests([]); setMemberships([]);
       if (event === 'PASSWORD_RECOVERY') { setRecoveryMode(true); setAccountOpen(true); }
-      if (!next) { setStatus('local'); setStatusMessage('Saved on this device'); setProfileOpen(false); }
+      if (!next) { setStatus('local'); setStatusMessage('Signed out'); setProfileOpen(false); setAccountOpen(false); }
     });
     return () => { active = false; unsubscribe(); };
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !accountDataReady) return;
     let active = true;
     void getSplitzapProfile().then((next) => {
       if (!active) return;
@@ -102,7 +101,7 @@ export default function SplitzapCloudApp() {
       update((current) => ({ ...current, preferences: { defaultCurrency: withLocalFallback.default_currency, theme: withLocalFallback.theme, reducedMotion: withLocalFallback.reduced_motion } }));
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [session, update]);
+  }, [accountDataReady, session, update]);
 
   useEffect(() => {
     const theme = profile?.theme ?? data.preferences?.theme ?? 'system';
@@ -115,40 +114,61 @@ export default function SplitzapCloudApp() {
   useEffect(() => {
     if (!hydrated || !authReady || !session || initializedUser.current === session.user.id) return;
     let active = true;
-    initializedUser.current = session.user.id;
-    setStatus('connecting'); setStatusMessage('Checking cloud copy…');
+    setAccountDataReady(false);
+    setStatus('connecting');
+    setStatusMessage('Loading your Splitzap…');
     void (async () => {
       try {
         const row = await fetchSplitzapCloudState(session.user.id);
         if (!active) return;
-        const local = latestData.current;
-        const localHash = dataHash(local);
-        const lastHash = safeGet(LAST_SYNC_HASH_KEY);
-        if (!row) {
-          if (hasMeaningfulData(local)) { setMigrationOpen(true); setStatus('local'); setStatusMessage('Device data ready to move online'); return; }
-          const updatedAt = await saveSplitzapCloudState(session.user.id, local);
+        if (row) {
+          update(() => row.data);
+          saveSyncMarker(row.data, row.updated_at);
+          setLastSyncedAt(row.updated_at);
+        } else {
+          const fresh: SplitData = {
+            schemaVersion: SPLITZAP_SCHEMA_VERSION,
+            me: session.user.id,
+            myName: '',
+            groups: [],
+            expenses: [],
+            settlements: [],
+            history: [],
+            activity: [],
+            preferences: { defaultCurrency: '₹', theme: 'system', reducedMotion: false },
+          };
+          const updatedAt = await saveSplitzapCloudState(session.user.id, fresh);
           if (!active) return;
-          saveSyncMarker(local, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); return;
+          update(() => fresh);
+          saveSyncMarker(fresh, updatedAt);
+          setLastSyncedAt(updatedAt);
         }
-        const cloudHash = dataHash(row.data);
-        if (localHash === cloudHash) { saveSyncMarker(row.data, row.updated_at); setLastSyncedAt(row.updated_at); setStatus('synced'); setStatusMessage('Synced'); return; }
-        if (lastHash && localHash !== lastHash) {
-          const updatedAt = await saveSplitzapCloudState(session.user.id, local);
-          if (!active) return;
-          saveSyncMarker(local, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Offline changes synced'); return;
-        }
-        if (!lastHash && hasMeaningfulData(local) && hasMeaningfulData(row.data)) { setConflict({ cloud: row.data, local }); setStatus('error'); setStatusMessage('Choose which copy to keep'); return; }
-        update(() => row.data); saveSyncMarker(row.data, row.updated_at); setLastSyncedAt(row.updated_at); setStatus('synced'); setStatusMessage('Cloud data loaded');
+        try { window.localStorage.setItem(LAST_USER_KEY, session.user.id); } catch { /* best effort */ }
+        initializedUser.current = session.user.id;
+        setStatus('synced');
+        setStatusMessage('Synced');
+        setAccountDataReady(true);
       } catch (cause) {
         if (!active) return;
-        setStatus(navigator.onLine ? 'error' : 'offline'); setStatusMessage(navigator.onLine ? (cause instanceof Error ? cause.message : 'Cloud sync failed') : 'Offline · changes stay on this device');
+        const sameCachedUser = !navigator.onLine && safeGet(LAST_USER_KEY) === session.user.id;
+        if (sameCachedUser) {
+          initializedUser.current = session.user.id;
+          setStatus('offline');
+          setStatusMessage('Offline · changes saved on this device');
+          setAccountDataReady(true);
+          return;
+        }
+        initializedUser.current = null;
+        setAccountDataReady(false);
+        setStatus(navigator.onLine ? 'error' : 'offline');
+        setStatusMessage(navigator.onLine ? (cause instanceof Error ? cause.message : 'Could not load your Splitzap') : 'Internet connection required to load your Splitzap');
       }
     })();
     return () => { active = false; };
   }, [authReady, hydrated, session, update]);
 
   useEffect(() => {
-    if (!hydrated || !session || initializedUser.current !== session.user.id || migrationOpen || conflict || status !== 'synced' || sharedInitializedUser.current === session.user.id) return;
+    if (!hydrated || !session || !accountDataReady || initializedUser.current !== session.user.id || sharedInitializedUser.current === session.user.id || !navigator.onLine) return;
     let active = true;
     sharedInitializedUser.current = session.user.id;
     void loadSharedGroupsForUser(session.user.id).then((rows) => {
@@ -158,7 +178,7 @@ export default function SplitzapCloudApp() {
       setProductionTick((value) => value + 1);
     }).catch((cause) => { if (!active) return; sharedInitializedUser.current = null; setStatus('error'); setStatusMessage(cause instanceof Error ? cause.message : 'Could not load shared groups'); });
     return () => { active = false; };
-  }, [conflict, hydrated, migrationOpen, session, status, update]);
+  }, [accountDataReady, hydrated, session, status, update]);
 
   useEffect(() => {
     if (!session || sharedInitializedUser.current !== session.user.id) return;
@@ -185,7 +205,7 @@ export default function SplitzapCloudApp() {
   }, [session]);
 
   useEffect(() => {
-    if (!session || initializedUser.current !== session.user.id || migrationOpen || conflict || status === 'local' || status === 'connecting') return;
+    if (!session || !accountDataReady || initializedUser.current !== session.user.id) return;
     let active = true;
     void (async () => {
       try {
@@ -200,10 +220,10 @@ export default function SplitzapCloudApp() {
       } catch { /* core sync status handles material failures; collaboration metadata retries on next event */ }
     })();
     return () => { active = false; };
-  }, [conflict, migrationOpen, productionTick, session, status, update]);
+  }, [accountDataReady, productionTick, session, status, update]);
 
   useEffect(() => {
-    if (!session || sharedInitializedUser.current !== session.user.id || migrationOpen || conflict || !navigator.onLine) return;
+    if (!session || !accountDataReady || sharedInitializedUser.current !== session.user.id || !navigator.onLine) return;
     const changed = data.groups.filter((group) => group.sharedId && (group.status ?? group.sharedStatus ?? 'active') === 'active').map((group) => ({ group, snapshot: buildSharedGroupSnapshot(data, group.id) })).filter(({ group, snapshot }) => sharedSnapshotHash(snapshot) !== sharedHashes.current.get(group.sharedId!));
     if (!changed.length) return;
     const timer = window.setTimeout(() => {
@@ -221,7 +241,7 @@ export default function SplitzapCloudApp() {
       })();
     }, 850);
     return () => window.clearTimeout(timer);
-  }, [conflict, data, migrationOpen, session, status, update]);
+  }, [accountDataReady, data, session, status, update]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -234,37 +254,38 @@ export default function SplitzapCloudApp() {
   }, [authReady, session]);
 
   useEffect(() => {
-    if (!hydrated || !session || initializedUser.current !== session.user.id || migrationOpen || conflict || syncing.current) return;
+    if (!hydrated || !session || !accountDataReady || initializedUser.current !== session.user.id || syncing.current) return;
     const currentHash = dataHash(data);
     if (currentHash === safeGet(LAST_SYNC_HASH_KEY)) return;
-    if (!navigator.onLine) { setStatus('offline'); setStatusMessage('Offline · changes will sync later'); return; }
+    if (!navigator.onLine) { setStatus('offline'); setStatusMessage('Offline · changes saved on this device'); return; }
     const timer = window.setTimeout(() => {
       syncing.current = true; setStatus('syncing'); setStatusMessage('Syncing…');
-      void saveSplitzapCloudState(session.user.id, latestData.current).then((updatedAt) => { saveSyncMarker(latestData.current, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); }).catch((cause) => { setStatus(navigator.onLine ? 'error' : 'offline'); setStatusMessage(navigator.onLine ? (cause instanceof Error ? cause.message : 'Cloud sync failed') : 'Offline · changes will sync later'); }).finally(() => { syncing.current = false; });
+      void saveSplitzapCloudState(session.user.id, latestData.current).then((updatedAt) => { saveSyncMarker(latestData.current, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); }).catch((cause) => { setStatus(navigator.onLine ? 'error' : 'offline'); setStatusMessage(navigator.onLine ? (cause instanceof Error ? cause.message : 'Sync problem') : 'Offline · changes saved on this device'); }).finally(() => { syncing.current = false; });
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [conflict, data, hydrated, migrationOpen, session]);
+  }, [accountDataReady, data, hydrated, session]);
 
   useEffect(() => {
-    const onOffline = () => { if (session) { setStatus('offline'); setStatusMessage('Offline · changes will sync later'); } };
+    if (!session || !accountDataReady) return;
+    const onOffline = () => { setStatus('offline'); setStatusMessage('Offline · changes saved on this device'); };
     const onOnline = () => {
-      if (!session) return;
       const current = latestData.current;
-      if (dataHash(current) !== safeGet(LAST_SYNC_HASH_KEY)) { setStatus('syncing'); setStatusMessage('Back online · syncing…'); void saveSplitzapCloudState(session.user.id, current).then((updatedAt) => { saveSyncMarker(current, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); }).catch(() => { setStatus('error'); setStatusMessage('Cloud sync failed'); }); }
-      else { setStatus('synced'); setStatusMessage('Synced'); }
+      if (dataHash(current) !== safeGet(LAST_SYNC_HASH_KEY)) {
+        setStatus('syncing');
+        setStatusMessage('Syncing…');
+        void saveSplitzapCloudState(session.user.id, current)
+          .then((updatedAt) => { saveSyncMarker(current, updatedAt); setLastSyncedAt(updatedAt); setStatus('synced'); setStatusMessage('Synced'); })
+          .catch(() => { setStatus('error'); setStatusMessage('Sync problem · tap your profile to retry'); });
+      } else {
+        setStatus('synced');
+        setStatusMessage('Synced');
+      }
     };
-    window.addEventListener('offline', onOffline); window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
     return () => { window.removeEventListener('offline', onOffline); window.removeEventListener('online', onOnline); };
-  }, [session]);
+  }, [accountDataReady, session]);
 
-  const migrate = async () => {
-    if (!session) return;
-    setStatus('syncing'); setStatusMessage('Saving device data online…');
-    try { const current = latestData.current; const updatedAt = await saveSplitzapCloudState(session.user.id, current); saveSyncMarker(current, updatedAt); setLastSyncedAt(updatedAt); setMigrationOpen(false); setStatus('synced'); setStatusMessage('Synced'); }
-    catch (cause) { setStatus('error'); setStatusMessage(cause instanceof Error ? cause.message : 'Could not move data online'); }
-  };
-  const keepLocalConflict = async () => { if (!session || !conflict) return; const updatedAt = await saveSplitzapCloudState(session.user.id, conflict.local); saveSyncMarker(conflict.local, updatedAt); setLastSyncedAt(updatedAt); setConflict(null); setStatus('synced'); setStatusMessage('Device copy saved online'); };
-  const keepCloudConflict = () => { if (!conflict) return; update(() => conflict.cloud); saveSyncMarker(conflict.cloud); setConflict(null); setStatus('synced'); setStatusMessage('Cloud copy loaded'); };
 
   const enableSharing = async (groupId: string) => {
     if (!session) throw new Error('Sign in to share this group.');
@@ -317,10 +338,20 @@ export default function SplitzapCloudApp() {
     onResolveJoinRequest: resolveJoin,
   };
 
-  const indicatorClass = status === 'synced' ? 'bg-emerald-500' : status === 'syncing' || status === 'connecting' ? 'bg-amber-400' : status === 'error' ? 'bg-red-500' : 'bg-slate-400';
+  const indicatorClass = status === 'error' ? 'bg-red-500' : 'bg-amber-400';
   const accountInitial = (profile?.display_name?.trim()?.[0] || data.myName?.trim()?.[0] || session?.user.email?.[0] || '').toUpperCase();
-  const accountAction = <button type="button" onClick={() => session ? setProfileOpen(true) : setAccountOpen(true)} aria-label={session ? 'My Profile' : 'Sign in to sync'} title={session ? (status === 'error' || status === 'offline' ? statusMessage : 'My Profile') : 'Sign in to sync'} className="press relative grid size-9 place-items-center rounded-full border border-border bg-surface text-primary shadow-sm">{status === 'syncing' || status === 'connecting' ? <Loader2 size={15} className="animate-spin" /> : session && accountInitial ? <span className="text-xs font-extrabold">{accountInitial}</span> : <UserRound size={16} />}{status === 'error' || status === 'offline' ? <span aria-hidden="true" className={`absolute right-0 top-0 size-2.5 rounded-full border-2 border-surface ${indicatorClass}`} /> : null}</button>;
+  const accountAction = <button type="button" onClick={() => setProfileOpen(true)} aria-label="My Profile" title={status === 'error' || status === 'offline' ? statusMessage : 'My Profile'} className="press relative grid size-9 place-items-center rounded-full border border-border bg-surface text-primary shadow-sm"><span className="text-xs font-extrabold">{accountInitial || '?'}</span>{status === 'error' || status === 'offline' ? <span aria-hidden="true" className={`absolute right-0 top-0 size-2.5 rounded-full border-2 border-surface ${indicatorClass}`} /> : null}</button>;
   const managedGroup = manageGroupId ? data.groups.find((item) => item.id === manageGroupId) ?? null : null;
+
+  if (!authReady) {
+    return <div className="fixed inset-0 z-[120] grid place-items-center bg-[#fbfaf6] px-6 text-slate-900"><div className="text-center"><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#256f66] text-2xl font-extrabold text-white shadow-lg">₹</div><Loader2 size={22} className="mx-auto mt-5 animate-spin text-[#256f66]" /><p className="mt-3 text-sm font-bold">Opening Splitzap…</p></div></div>;
+  }
+  if (!session) {
+    return <AccountSheet open locked onClose={() => undefined} session={null} status={status} statusMessage={statusMessage} lastSyncedAt={lastSyncedAt} recoveryMode={false} onRecoveryComplete={() => undefined} />;
+  }
+  if (!accountDataReady) {
+    return <div className="fixed inset-0 z-[120] grid place-items-center bg-[#fbfaf6] px-6 text-slate-900"><div className="w-full max-w-sm text-center"><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#256f66] text-2xl font-extrabold text-white shadow-lg">₹</div>{status === 'connecting' ? <Loader2 size={22} className="mx-auto mt-5 animate-spin text-[#256f66]" /> : null}<p className="mt-4 text-sm font-extrabold">{status === 'connecting' ? 'Loading your Splitzap…' : statusMessage}</p>{status !== 'connecting' ? <><button type="button" onClick={() => window.location.reload()} className="mt-4 w-full rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white">Try again</button><button type="button" onClick={() => void signOutSplitzap()} className="mt-2 w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">Sign out</button></> : null}</div></div>;
+  }
 
   return <>
     <SplitzapAppV4 accountAction={accountAction} collaboration={collaboration} />
@@ -329,8 +360,6 @@ export default function SplitzapCloudApp() {
     {session ? <ProfileScreen open={profileOpen} onClose={() => setProfileOpen(false)} session={session} data={data} update={update} status={status} statusMessage={statusMessage} lastSyncedAt={lastSyncedAt} profile={profile} onProfileChanged={setProfile} onOpenSecurity={() => { setProfileOpen(false); setAccountOpen(true); }} onRestored={() => { setProductionTick((value) => value + 1); void refreshProfile(); }} /> : null}
     <ManageMembersSheet open={Boolean(manageGroupId && session)} group={managedGroup} memberships={memberships} requests={pendingRequests} onClose={() => setManageGroupId(null)} onInvite={(memberId) => { if (!managedGroup) return; setManageGroupId(null); setInviteMemberId(memberId || null); setShareGroupId(managedGroup.id); }} onResolve={resolveJoin} onRename={async (memberId, name) => { if (!managedGroup?.sharedId) return; await renameSharedMember(managedGroup.sharedId, memberId, name); setProductionTick((value) => value + 1); }} onUnlink={async (memberId) => { if (!managedGroup?.sharedId) return; await unlinkSharedMember(managedGroup.sharedId, memberId); setProductionTick((value) => value + 1); }} onTransfer={async (memberId) => { if (!managedGroup?.sharedId) return; await transferSharedGroupOwnership(managedGroup.sharedId, memberId); setProductionTick((value) => value + 1); }} />
     <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} session={session} status={status} statusMessage={statusMessage} lastSyncedAt={lastSyncedAt} recoveryMode={recoveryMode} onRecoveryComplete={() => setRecoveryMode(false)} />
-    {migrationOpen ? <SimpleModal title="Move this device's Splitzap data online" onClose={() => setMigrationOpen(false)}><p className="text-sm leading-6 text-slate-600">We found {data.groups.length} {data.groups.length === 1 ? 'group' : 'groups'} on this device. Save them to your account so they can follow you to other devices.</p><button type="button" onClick={() => void migrate()} className="mt-4 w-full rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white">Save device data online</button><button type="button" onClick={() => setMigrationOpen(false)} className="mt-2 w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">Not now</button></SimpleModal> : null}
-    {conflict ? <SimpleModal title="Two different Splitzap copies found" closable={false}><p className="text-sm leading-6 text-slate-600">This device and your cloud account both contain data. Choose which copy should become your main Splitzap data.</p><div className="mt-4 grid gap-2"><button type="button" onClick={() => void keepLocalConflict()} className="rounded-xl bg-[#256f66] px-4 py-3 text-left text-sm font-bold text-white">Keep this device · {conflict.local.groups.length} groups</button><button type="button" onClick={keepCloudConflict} className="rounded-xl bg-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-800">Use cloud copy · {conflict.cloud.groups.length} groups</button></div></SimpleModal> : null}
   </>;
 }
 
@@ -626,6 +655,7 @@ function ProfileScreen({ open, onClose, session, data, update, status, statusMes
       try { await signOutSplitzap(); } catch { /* account may already be removed */ }
       window.localStorage.removeItem('splitzap.cloud.lastSyncHash');
       window.localStorage.removeItem('splitzap.cloud.lastSyncAt');
+      window.localStorage.removeItem('splitzap.cloud.lastUserId');
       window.location.replace('/splitzap');
     } catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not delete your account.'); setBusy(false); }
   };
@@ -639,7 +669,7 @@ function ProfileScreen({ open, onClose, session, data, update, status, statusMes
       <ProfileSection title="Preferences"><div className="grid grid-cols-2 gap-2"><div><label className="block text-[11px] font-bold text-slate-600">Default currency</label><select value={currency} onChange={(event) => setCurrency(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">{['₹','$','€','£','¥'].map((item) => <option key={item}>{item}</option>)}</select></div><div><label className="block text-[11px] font-bold text-slate-600">Theme</label><select value={theme} onChange={(event) => setTheme(event.target.value as SplitzapProfile['theme'])} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div><label className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold">Reduced animations<input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} className="size-5" /></label><button type="button" disabled={busy} onClick={() => void savePreferences()} className="mt-3 w-full rounded-xl bg-[#e7f4ef] py-3 text-xs font-bold text-[#256f66]">Save preferences</button></ProfileSection>
       <ProfileSection title="Data & Privacy">{status === 'offline' || status === 'error' ? <div className={`rounded-xl px-3 py-3 ${status === 'offline' ? 'bg-amber-50' : 'bg-red-50'}`}><p className={`text-xs font-bold ${status === 'offline' ? 'text-amber-800' : 'text-red-800'}`}>{status === 'offline' ? 'Offline' : 'Sync problem'}</p><p className={`mt-0.5 text-[10px] ${status === 'offline' ? 'text-amber-700' : 'text-red-700'}`}>{statusMessage}{lastSyncedAt ? ` · Last synced ${new Date(lastSyncedAt).toLocaleString()}` : ''}</p></div> : null}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={downloadExport} className="rounded-xl bg-slate-50 px-3 py-3 text-left"><Download size={16} className="text-[#256f66]" /><b className="mt-2 block text-xs">Export data</b></button><label className="cursor-pointer rounded-xl bg-slate-50 px-3 py-3 text-left"><Upload size={16} className="text-[#256f66]" /><b className="mt-2 block text-xs">Import data</b><input type="file" accept="application/json,.json" className="hidden" onChange={(event) => { void importFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label></div><p className="mt-2 text-[10px] leading-4 text-slate-500">Import never overwrites a live shared group. Shared cloud copies are protected and skipped.</p><button type="button" onClick={() => setDeleteAccountOpen(true)} className="mt-3 w-full rounded-xl bg-red-50 py-3 text-xs font-bold text-red-700">Delete account</button></ProfileSection>
       <ProfileSection title="Recently Deleted"><p className="mb-2 text-[10px] leading-4 text-slate-500">Shared groups deleted for everyone can be restored for 30 days.</p>{deleted.length ? <div className="space-y-2">{deleted.map((item) => { const group = item.snapshot.group; const days = item.purge_after ? Math.max(0, Math.ceil((+new Date(item.purge_after) - Date.now()) / 86400000)) : 30; return <div key={item.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><span className="text-xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{group.name}</p><p className="text-[10px] text-slate-500">{days} days left to restore</p></div><button type="button" disabled={busy} onClick={() => void restoreDeleted(item.id)} className="rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-[#256f66]">Restore</button></div>; })}</div> : <p className="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-500">Nothing recently deleted.</p>}</ProfileSection>
-      <ProfileSection title="Help & About"><a href="/contact" className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold">Help & feedback <ChevronRight size={14} /></a><a href="/privacy" className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold">Privacy <ChevronRight size={14} /></a></ProfileSection>
+      <ProfileSection title="Help & About"><details className="rounded-xl bg-slate-50 px-3 py-3"><summary className="cursor-pointer list-none text-xs font-bold">Help & feedback <ChevronRight size={14} className="float-right" /></summary><p className="mt-2 text-[11px] leading-5 text-slate-600">For help with groups, expenses, payments, invites or anything that does not look right, email <a className="font-bold text-[#256f66]" href="mailto:hizapora@gmail.com?subject=Splitzap%20Help">hizapora@gmail.com</a>.</p></details><details className="mt-2 rounded-xl bg-slate-50 px-3 py-3"><summary className="cursor-pointer list-none text-xs font-bold">Privacy <ChevronRight size={14} className="float-right" /></summary><p className="mt-2 text-[11px] leading-5 text-slate-600">Splitzap uses your account information to provide the service and keep your expense data available across your devices. Information inside a shared group can be seen by people in that group. We do not sell your personal information. You can export your data or delete your account from My Profile. For privacy questions, email hizapora@gmail.com.</p></details></ProfileSection>
       {feedback ? <p role="status" className="rounded-xl bg-[#eef6f3] px-3 py-3 text-xs leading-5 text-slate-700">{feedback}</p> : null}
       <button type="button" onClick={() => void signOutSplitzap()} className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700">Sign out</button>
     </main></div>{deleteAccountOpen ? <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/40 p-3"><div className="w-full max-w-[500px] rounded-3xl bg-white p-5"><h3 className="text-base font-extrabold">Delete Splitzap account?</h3><p className="mt-2 text-xs leading-5 text-slate-600">This removes your account data. If you own a shared group with other joined members, Splitzap will block deletion until you transfer ownership or remove those members.</p><label className="mt-4 block text-xs font-bold text-slate-600">Type DELETE</label><input value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm" /><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => { setDeleteAccountOpen(false); setDeleteConfirm(''); }} className="rounded-xl bg-slate-100 py-3 text-xs font-bold">Cancel</button><button type="button" disabled={busy || deleteConfirm !== 'DELETE'} onClick={() => void removeAccount()} className="rounded-xl bg-red-600 py-3 text-xs font-bold text-white disabled:opacity-40">Delete account</button></div></div></div> : null}</div>;
@@ -686,13 +716,13 @@ function ManageMembersSheet({ open, group, memberships, requests, onClose, onInv
 
   return <SimpleModal title="Manage members" onClose={onClose}>
     {groupRequests.length ? <div className="mb-4"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-extrabold text-slate-700">Pending requests</p><span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">{groupRequests.length}</span></div><div className="space-y-2">{groupRequests.map((request) => <div key={request.id} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3"><p className="text-sm font-extrabold text-slate-900">{request.requested_name}</p><p className="mt-0.5 break-all text-[11px] text-slate-600">{request.requested_email}</p>{request.requested_member_id ? <p className="mt-1 text-[10px] text-slate-500">Claims existing member: {group.members.find((member) => member.id === request.requested_member_id)?.name || 'Unknown'}</p> : <p className="mt-1 text-[10px] text-slate-500">New member identity</p>}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={Boolean(busy)} onClick={() => void run(`deny-${request.id}`, () => onResolve(request.id, false))} className="rounded-xl bg-white py-2.5 text-xs font-bold text-red-600">Deny</button><button type="button" disabled={Boolean(busy)} onClick={() => void run(`approve-${request.id}`, () => onResolve(request.id, true))} className="rounded-xl bg-[#256f66] py-2.5 text-xs font-bold text-white">Approve</button></div></div>)}</div></div> : null}
-    <div className="space-y-2">{group.members.map((member) => { const membership = membershipByMember.get(member.id); const joined = Boolean(membership); const isSelf = member.id === myMemberId; const isMemberOwner = member.id === ownerMemberId; return <div key={member.id} className="rounded-2xl border border-slate-200 bg-white p-3"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-full bg-slate-100 text-xs font-extrabold">{member.name.trim().charAt(0).toUpperCase() || '?'}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{member.name}{isSelf ? ' (You)' : ''}</p><p className="text-[10px] text-slate-500">{isMemberOwner ? 'Owner' : joined ? 'Joined' : 'Not joined'}</p></div>{!joined ? <button type="button" onClick={() => onInvite(member.id)} className="rounded-lg bg-[#eef6f3] px-3 py-2 text-[10px] font-bold text-[#256f66]">Invite</button> : null}</div>{isOwner && !isSelf ? <div className="mt-2 flex flex-wrap gap-1.5">{editingMember === member.id ? <div className="flex w-full gap-2"><input value={editingName} onChange={(event) => setEditingName(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs" /><button type="button" disabled={!editingName.trim() || Boolean(busy)} onClick={() => void run(`rename-${member.id}`, async () => { await onRename(member.id, editingName.trim()); setEditingMember(''); })} className="rounded-lg bg-[#256f66] px-3 text-[10px] font-bold text-white">Save</button></div> : <button type="button" onClick={() => { setEditingMember(member.id); setEditingName(member.name); }} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Rename</button>}{joined && !isMemberOwner ? <button type="button" disabled={Boolean(busy)} onClick={() => window.confirm(`Reset ${member.name}'s account connection? Their historical expenses remain intact.`) && void run(`unlink-${member.id}`, () => onUnlink(member.id))} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Reset account link</button> : null}{joined && !isMemberOwner ? <button type="button" disabled={Boolean(busy)} onClick={() => window.confirm(`Transfer ownership of ${group.name} to ${member.name}?`) && void run(`owner-${member.id}`, () => onTransfer(member.id))} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Make owner</button> : null}</div> : null}</div>; })}</div>
+    <div className="space-y-2">{group.members.map((member) => { const membership = membershipByMember.get(member.id); const joined = Boolean(membership); const isSelf = member.id === myMemberId; const isMemberOwner = member.id === ownerMemberId; return <div key={member.id} className="rounded-2xl border border-slate-200 bg-white p-3"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-full bg-slate-100 text-xs font-extrabold">{member.name.trim().charAt(0).toUpperCase() || '?'}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{member.name}{isSelf ? ' (You)' : ''}</p><p className="text-[10px] text-slate-500">{isMemberOwner ? 'Owner' : joined ? 'Joined' : 'Not joined'}</p></div>{!joined ? <button type="button" onClick={() => onInvite(member.id)} className="rounded-lg bg-[#eef6f3] px-3 py-2 text-[10px] font-bold text-[#256f66]">Invite</button> : null}</div>{isOwner && !isSelf ? <div className="mt-2 flex flex-wrap gap-1.5">{editingMember === member.id ? <div className="flex w-full gap-2"><input value={editingName} onChange={(event) => setEditingName(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs" /><button type="button" disabled={!editingName.trim() || Boolean(busy)} onClick={() => void run(`rename-${member.id}`, async () => { await onRename(member.id, editingName.trim()); setEditingMember(''); })} className="rounded-lg bg-[#256f66] px-3 text-[10px] font-bold text-white">Save</button></div> : <button type="button" onClick={() => { setEditingMember(member.id); setEditingName(member.name); }} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Rename</button>}{joined && !isMemberOwner ? <button type="button" disabled={Boolean(busy)} onClick={() => window.confirm(`Remove ${member.name} from ${group.name}? They will lose access, but their historical expenses and balances will remain intact.`) && void run(`unlink-${member.id}`, () => onUnlink(member.id))} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Remove from group</button> : null}{joined && !isMemberOwner ? <button type="button" disabled={Boolean(busy)} onClick={() => window.confirm(`Transfer ownership of ${group.name} to ${member.name}?`) && void run(`owner-${member.id}`, () => onTransfer(member.id))} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold text-slate-600">Make owner</button> : null}</div> : null}</div>; })}</div>
     <button type="button" onClick={() => onInvite('')} className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-3 text-xs font-bold text-[#256f66]">+ Invite a new person</button>
     {feedback ? <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">{feedback}</p> : null}
   </SimpleModal>;
 }
 
-function AccountSheet({ open, onClose, session, status, statusMessage, lastSyncedAt, recoveryMode, onRecoveryComplete }: {
+function AccountSheet({ open, onClose, session, status, statusMessage, lastSyncedAt, recoveryMode, onRecoveryComplete, locked = false }: {
   open: boolean;
   onClose: () => void;
   session: SplitzapSession | null;
@@ -701,6 +731,7 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
   lastSyncedAt: string | null;
   recoveryMode: boolean;
   onRecoveryComplete: () => void;
+  locked?: boolean;
 }) {
   const [mode, setMode] = useState<EmailMode>('signin');
   const [email, setEmail] = useState('');
@@ -719,14 +750,14 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !recoveryMode) onClose();
+      if (event.key === 'Escape' && !recoveryMode && !locked) onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = previous;
       document.removeEventListener('keydown', onKey);
     };
-  }, [onClose, open, recoveryMode]);
+  }, [locked, onClose, open, recoveryMode]);
 
   useEffect(() => {
     if (recoveryMode) {
@@ -769,7 +800,7 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
         if (result.user?.identities?.length === 0) {
           setFeedback('An account may already exist for this email. Try Sign in instead.');
         } else if (!result.session) {
-          setFeedback('Account created. Verification email sent. This used 1 email from the shared 2-per-hour test allowance.');
+          setFeedback('Account created. Verification email sent. If you do not receive it, wait a little and try again later.');
         } else {
           setFeedback('Account created. Loading your Splitzap data…');
         }
@@ -790,7 +821,7 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
     setFeedback('');
     try {
       await sendSplitzapPasswordReset(email);
-      setFeedback('Password reset email sent. This action used 1 email from the shared 2-per-hour test allowance.');
+      setFeedback('Password reset email sent. If you do not receive it, wait a little and try again later.');
       setResetOpen(false);
     } catch (cause) {
       setFeedback(friendlyAuthError(cause));
@@ -829,12 +860,12 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
 
   return (
     <div className="fixed inset-0 z-[125] flex items-end justify-center" role="presentation">
-      {!recoveryMode ? <button type="button" aria-label="Close account" onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" /> : <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />}
-      <section role="dialog" aria-modal="true" aria-label={session ? 'Splitzap account' : 'Sign in to Splitzap'} className="relative max-h-[92dvh] w-full max-w-[520px] overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl">
-        <div className="mx-auto h-1 w-10 rounded-full bg-slate-200" />
+      {locked ? <div className="absolute inset-0 bg-[#fbfaf6]" /> : !recoveryMode ? <button type="button" aria-label="Close account" onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" /> : <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />}
+      <section role="dialog" aria-modal="true" aria-label={session ? 'Splitzap account' : 'Sign in to Splitzap'} className={locked ? 'relative min-h-[100dvh] w-full max-w-[520px] overflow-y-auto bg-[#fbfaf6] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]' : 'relative max-h-[92dvh] w-full max-w-[520px] overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl'}>
+        {!locked ? <div className="mx-auto h-1 w-10 rounded-full bg-slate-200" /> : <div className="mx-auto mt-5 grid size-16 place-items-center rounded-2xl bg-[#256f66] text-2xl font-extrabold text-white shadow-lg">₹</div>}
         <div className="flex items-center justify-between gap-3 pb-3 pt-3">
-          <div><h2 className="text-lg font-extrabold text-slate-900">{session ? 'Account & sync' : 'Keep your data synced'}</h2><p className="mt-0.5 text-xs text-slate-500">{session ? 'Your Splitzap account and cloud status' : 'Sign in once, use Splitzap across devices'}</p></div>
-          {!recoveryMode ? <button type="button" onClick={onClose} aria-label="Close" className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500"><X size={15} /></button> : null}
+          <div><h2 className="text-lg font-extrabold text-slate-900">{session ? 'Account & sync' : 'Sign in to Splitzap'}</h2><p className="mt-0.5 text-xs text-slate-500">{session ? 'Your Splitzap account and sync status' : 'Your groups and expenses stay with your account'}</p></div>
+          {!recoveryMode && !locked ? <button type="button" onClick={onClose} aria-label="Close" className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500"><X size={15} /></button> : null}
         </div>
 
         {session ? (
@@ -860,7 +891,7 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
             ) : null}
 
             {feedback ? <p role="status" className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">{feedback}</p> : null}
-            <p className="mt-3 text-xs leading-5 text-slate-500">Expenses continue saving instantly on this device. When online, Splitzap also keeps the latest copy in your private cloud account.</p>
+            <p className="mt-3 text-xs leading-5 text-slate-500">When you are online, Splitzap keeps your latest changes synced to your account. If your connection drops while you are signed in, you can keep working and changes will sync when you reconnect.</p>
             <button type="button" onClick={() => void signOutSplitzap().then(onClose)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700"><LogOut size={16} /> Sign out</button>
           </div>
         ) : (
@@ -882,10 +913,10 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
 
             {mode === 'signup' ? <EmailAllowanceNotice action="Creating an account" /> : null}
 
-            <button type="button" disabled={busy || !email.trim() || !password || (mode === 'signup' && (password.length < 8 || password !== confirmPassword))} onClick={() => void runEmailAuth()} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-45">{busy ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}{mode === 'signin' ? 'Sign in with email' : 'Create account · sends 1 email'}</button>
+            <button type="button" disabled={busy || !email.trim() || !password || (mode === 'signup' && (password.length < 8 || password !== confirmPassword))} onClick={() => void runEmailAuth()} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-45">{busy ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}{mode === 'signin' ? 'Sign in with email' : 'Create account'}</button>
 
             {mode === 'signin' ? <button type="button" onClick={() => setResetOpen((value) => !value)} className="mt-3 w-full text-center text-xs font-bold text-[#256f66]">Forgot password?</button> : null}
-            {resetOpen ? <div className="mt-3"><EmailAllowanceNotice action="Password reset" /><button type="button" disabled={busy || !email.trim()} onClick={() => void runPasswordReset()} className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-bold text-amber-800 disabled:opacity-45">Send reset email · uses 1 email</button></div> : null}
+            {resetOpen ? <div className="mt-3"><EmailAllowanceNotice action="Password reset" /><button type="button" disabled={busy || !email.trim()} onClick={() => void runPasswordReset()} className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-bold text-amber-800 disabled:opacity-45">Send reset email</button></div> : null}
             {feedback ? <p role="status" className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">{feedback}</p> : null}
           </div>
         )}
@@ -895,7 +926,7 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
 }
 
 function EmailAllowanceNotice({ action }: { action: string }) {
-  return <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5"><div className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-amber-700" /><div><p className="text-[11px] font-extrabold text-amber-900">Temporary email limit</p><p className="mt-0.5 text-[11px] leading-4 text-amber-800">{action} sends 1 email. Supabase's current test sender allows only 2 authentication emails per hour across the whole Splitzap project.</p><div className="mt-2 flex gap-2 text-[10px] font-bold text-amber-800"><span className="rounded-full bg-white/70 px-2 py-1">This action: 1 email</span><span className="rounded-full bg-white/70 px-2 py-1">Hourly test allowance: 2</span></div></div></div></div>;
+  return <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5"><div className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-amber-700" /><div><p className="text-[11px] font-extrabold text-amber-900">Temporary email limit</p><p className="mt-0.5 text-[11px] leading-4 text-amber-800">{action} sends an email. Authentication emails are temporarily limited, so if the limit is reached please try again later or use Google sign-in.</p></div></div></div>;
 }
 
 function PasswordInput({ label, value, onChange, show, onToggle }: { label: string; value: string; onChange: (value: string) => void; show: boolean; onToggle?: () => void }) {
