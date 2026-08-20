@@ -64,18 +64,32 @@ jobs:
           grep -q "splitzap_transfer_ownership" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_update_profile_name" src/features/splitzap/splitzapProduction.ts
           grep -q "importSplitBackupSafely" src/features/splitzap/SplitzapCloudApp.tsx
-      - name: Production UX assertions
+      - name: Production UX and account-safety assertions
         shell: bash
         run: |
           grep -q "My Profile" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Sign in to Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Loading your Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
+          ! grep -q "Move this device's Splitzap data online" src/features/splitzap/SplitzapCloudApp.tsx
+          ! grep -q "Two different Splitzap copies found" src/features/splitzap/SplitzapCloudApp.tsx
+          ! grep -qEi "Supabase|2-per-hour test|test sender" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Remove from group" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Create invite link" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Wrong signed-in email" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Any already joined group member" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Offline · changes saved on this device" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q 'type="date"' src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Original breakdown" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Simplified settlement" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "expense_restored" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "More options" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Share group summary" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Close group menu" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Scan receipt" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "More options" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q ">+ label</button>" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "validationMessage" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "sheet-scroll" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "availableGroups = data.groups.filter" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "onEdit={isArchived ? undefined" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "expense-confetti" src/features/splitzap/splitzap.css
+          grep -q "@supports (-webkit-touch-callout: none)" src/features/splitzap/splitzap.css
