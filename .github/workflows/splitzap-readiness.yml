@@ -10,8 +10,6 @@ on:
       - 'public/splitzap*'
       - 'package.json'
       - 'package-lock.json'
-      - 'scripts/splitzap_runtime_hardening.py'
-      - '.github/workflows/splitzap-runtime-hardening.yml'
       - '.github/workflows/splitzap-readiness.yml'
   pull_request:
     paths:
@@ -24,60 +22,29 @@ on:
       - '.github/workflows/splitzap-readiness.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: testing
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - name: Apply approved runtime hardening
-        shell: bash
-        run: |
-          set -o pipefail
-          echo apply_patch > /tmp/splitzap-stage
-          python3 scripts/splitzap_runtime_hardening.py 2>&1 | tee /tmp/splitzap-validation.log
-      - name: Install dependencies
-        shell: bash
-        run: |
-          set -o pipefail
-          echo npm_ci > /tmp/splitzap-stage
-          npm ci 2>&1 | tee /tmp/splitzap-validation.log
+      - run: npm ci
       - name: TypeScript
-        shell: bash
-        run: |
-          set -o pipefail
-          echo typecheck > /tmp/splitzap-stage
-          npm run typecheck 2>&1 | tee /tmp/splitzap-validation.log
+        run: npm run typecheck
       - name: Splitzap calculation tests
-        shell: bash
-        run: |
-          set -o pipefail
-          echo splitzap_tests > /tmp/splitzap-stage
-          npm run test:splitzap 2>&1 | tee /tmp/splitzap-validation.log
+        run: npm run test:splitzap
       - name: Production build
-        shell: bash
-        run: |
-          set -o pipefail
-          echo production_build > /tmp/splitzap-stage
-          npm run build 2>&1 | tee /tmp/splitzap-validation.log
+        run: npm run build
       - name: Production dependency security gate
-        shell: bash
-        run: |
-          set -o pipefail
-          echo production_audit > /tmp/splitzap-stage
-          npm audit --omit=dev --audit-level=high 2>&1 | tee /tmp/splitzap-validation.log
+        run: npm audit --omit=dev --audit-level=high
       - name: PWA asset assertions
         shell: bash
         run: |
-          echo pwa_assertions > /tmp/splitzap-stage
           grep -q '"id": "/splitzap"' public/splitzap.webmanifest
           grep -q "splitzap-v3" public/splitzap-sw.js
           test -f public/splitzap-icon-192.png
@@ -85,7 +52,6 @@ jobs:
       - name: Production collaboration and data-safety assertions
         shell: bash
         run: |
-          echo collaboration_assertions > /tmp/splitzap-stage
           test -f src/features/splitzap/splitzapShared.ts
           test -f src/features/splitzap/splitzapProduction.ts
           grep -q "SPLITZAP_SCHEMA_VERSION = 2" src/features/splitzap/splitStoreV4.ts
@@ -101,7 +67,6 @@ jobs:
       - name: Production UX and account-safety assertions
         shell: bash
         run: |
-          echo ux_assertions > /tmp/splitzap-stage
           grep -q "My Profile" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Sign in to Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Loading your Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
@@ -128,31 +93,14 @@ jobs:
           grep -q "onEdit={isArchived ? undefined" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "expense-confetti" src/features/splitzap/splitzap.css
           grep -q "@supports (-webkit-touch-callout: none)" src/features/splitzap/splitzap.css
-      - name: Record validation failure
-        if: failure()
-        shell: bash
-        run: |
-          stage=$(cat /tmp/splitzap-stage 2>/dev/null || echo unknown)
-          {
-            echo "FAILED_STAGE=$stage"
-            echo "RUN_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo
-            tail -n 500 /tmp/splitzap-validation.log 2>/dev/null || true
-          } > .splitzap-runtime-error.log
-          git reset -- . >/dev/null 2>&1 || true
-          git config user.name "splitzap-runtime-bot"
-          git config user.email "splitzap-runtime-bot@users.noreply.github.com"
-          git add .splitzap-runtime-error.log
-          git commit -m "Record Splitzap runtime hardening validation failure" || true
-          git push origin HEAD:testing
-      - name: Commit validated Splitzap source only
-        if: success()
-        shell: bash
-        run: |
-          git restore --source=HEAD --staged --worktree .github/workflows/splitzap-readiness.yml .github/workflows/splitzap-runtime-hardening.yml scripts/splitzap_runtime_hardening.py
-          rm -f .splitzap-runtime-error.log
-          git config user.name "splitzap-runtime-bot"
-          git config user.email "splitzap-runtime-bot@users.noreply.github.com"
-          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/SplitzapCloudApp.tsx src/features/splitzap/splitzap.css
-          git commit -m "Harden Splitzap runtime continuity and settlement UX"
-          git push origin HEAD:testing
+          grep -q "clearPendingJoinIntent" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "preview.already_joined" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Token refresh / same-account auth events" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Install Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Settle related balance" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "current simplified transfer as paid" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "splitzap-main-scroll" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "splitzap.expenseDraft" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "fixed-shell and mobile touch hardening" src/features/splitzap/splitzap.css
+          grep -q "persistSession: true" src/features/splitzap/splitzapCloud.ts
+          grep -q "autoRefreshToken: true" src/features/splitzap/splitzapCloud.ts
