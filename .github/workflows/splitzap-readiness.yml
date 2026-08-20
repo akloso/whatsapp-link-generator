@@ -41,78 +41,100 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Apply approved production polish
-        run: python3 scripts/splitzap_product_polish.py
-
-      - run: npm ci
-
-      - name: TypeScript
-        run: npm run typecheck
-
-      - name: Splitzap calculation tests
-        run: npm run test:splitzap
-
-      - name: Production build
-        run: npm run build
-
-      - name: Production dependency security gate
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: PWA asset assertions
+      - name: Apply, validate, and commit approved Splitzap polish
         shell: bash
         run: |
-          grep -q '"id": "/splitzap"' public/splitzap.webmanifest
-          grep -q "splitzap-v3" public/splitzap-sw.js
-          test -f public/splitzap-icon-192.png
-          test -f public/splitzap-icon-512.png
+          set -uo pipefail
+          git config user.name "splitzap-production-bot"
+          git config user.email "splitzap-production-bot@users.noreply.github.com"
 
-      - name: Collaboration and data-safety assertions
-        shell: bash
-        run: |
-          test -f src/features/splitzap/splitzapShared.ts
-          test -f src/features/splitzap/splitzapProduction.ts
-          grep -q "SPLITZAP_SCHEMA_VERSION = 2" src/features/splitzap/splitStoreV4.ts
-          grep -q "splitzap_update_shared_group" src/features/splitzap/splitzapShared.ts
-          grep -q "splitzap_create_invite" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_join_v2" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_resolve_join_request" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_soft_delete_shared_group" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_restore_shared_group" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_transfer_ownership" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_update_profile_name" src/features/splitzap/splitzapProduction.ts
-          grep -q "importSplitBackupSafely" src/features/splitzap/SplitzapCloudApp.tsx
+          report_failure() {
+            stage="$1"
+            code="$2"
+            {
+              echo "FAILED_STAGE=$stage"
+              echo "EXIT_CODE=$code"
+              echo "RUN_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo
+              cat /tmp/splitzap-stage.log 2>/dev/null || true
+            } > .splitzap-polish-error.log
+            git add .splitzap-polish-error.log
+            git commit -m "Report Splitzap polish validation failure" || true
+            git push origin HEAD:testing || true
+            exit "$code"
+          }
 
-      - name: Approved UX and account-safety assertions
-        shell: bash
-        run: |
-          grep -q "Sign in to Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Loading your Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
-          ! grep -q "Move this device's Splitzap data online" src/features/splitzap/SplitzapCloudApp.tsx
-          ! grep -q "Two different Splitzap copies found" src/features/splitzap/SplitzapCloudApp.tsx
-          ! grep -qEi "Supabase|2-per-hour test|test sender" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Remove from group" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Create invite link" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Wrong signed-in email" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Any already joined group member" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Offline · changes saved on this device" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q 'type="date"' src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Original breakdown" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Simplified settlement" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "expense_restored" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Share group summary" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Close group menu" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Scan receipt" src/features/splitzap/SplitzapAppV4.tsx
-          ! grep -q "More options" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q ">+ label</button>" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "validationMessage" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "sheet-scroll" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "@supports (-webkit-touch-callout: none)" src/features/splitzap/splitzap.css
+          run_stage() {
+            stage="$1"
+            shift
+            echo "===== $stage ====="
+            set +e
+            "$@" > /tmp/splitzap-stage.log 2>&1
+            code=$?
+            set -e
+            cat /tmp/splitzap-stage.log
+            if [ "$code" -ne 0 ]; then
+              report_failure "$stage" "$code"
+            fi
+          }
 
-      - name: Restore permanent readiness workflow and remove temporary patch files
-        shell: bash
-        run: |
+          set -e
+          run_stage patch python3 scripts/splitzap_product_polish.py
+          run_stage install npm ci
+          run_stage typecheck npm run typecheck
+          run_stage splitzap_tests npm run test:splitzap
+          run_stage production_build npm run build
+          run_stage dependency_audit npm audit --omit=dev --audit-level=high
+
+          set +e
+          bash -c '
+            set -e
+            grep -q '"'"'"id"'"'": '"'"'/splitzap'"'"'' public/splitzap.webmanifest
+            grep -q "splitzap-v3" public/splitzap-sw.js
+            test -f public/splitzap-icon-192.png
+            test -f public/splitzap-icon-512.png
+            test -f src/features/splitzap/splitzapShared.ts
+            test -f src/features/splitzap/splitzapProduction.ts
+            grep -q "SPLITZAP_SCHEMA_VERSION = 2" src/features/splitzap/splitStoreV4.ts
+            grep -q "splitzap_update_shared_group" src/features/splitzap/splitzapShared.ts
+            grep -q "splitzap_create_invite" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_join_v2" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_resolve_join_request" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_soft_delete_shared_group" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_restore_shared_group" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_transfer_ownership" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_update_profile_name" src/features/splitzap/splitzapProduction.ts
+            grep -q "Sign in to Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q "Loading your Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
+            ! grep -q "Move this device'"'"'s Splitzap data online" src/features/splitzap/SplitzapCloudApp.tsx
+            ! grep -q "Two different Splitzap copies found" src/features/splitzap/SplitzapCloudApp.tsx
+            ! grep -qEi "Supabase|2-per-hour test|test sender" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q "Remove from group" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q "Create invite link" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q "Wrong signed-in email" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q "Any already joined group member" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q "Offline · changes saved on this device" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q '"'"'type="date"'"'"' src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "Original breakdown" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "Simplified settlement" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "expense_restored" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "Share group summary" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "Close group menu" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "Scan receipt" src/features/splitzap/SplitzapAppV4.tsx
+            ! grep -q "More options" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q ">+ label</button>" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "validationMessage" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "sheet-scroll" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "@supports (-webkit-touch-callout: none)" src/features/splitzap/splitzap.css
+          ' > /tmp/splitzap-stage.log 2>&1
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then report_failure assertions "$code"; fi
+
+          rm -f .splitzap-polish-error.log
           rm -f scripts/splitzap_product_polish.py
           rm -f .github/workflows/splitzap-product-polish.yml
+
           cat > .github/workflows/splitzap-readiness.yml <<'WORKFLOW'
           name: Splitzap Readiness
 
@@ -165,7 +187,7 @@ jobs:
                     grep -q "splitzap-v3" public/splitzap-sw.js
                     test -f public/splitzap-icon-192.png
                     test -f public/splitzap-icon-512.png
-                - name: Collaboration and data-safety assertions
+                - name: Production collaboration and data-safety assertions
                   shell: bash
                   run: |
                     test -f src/features/splitzap/splitzapShared.ts
@@ -180,7 +202,7 @@ jobs:
                     grep -q "splitzap_transfer_ownership" src/features/splitzap/splitzapProduction.ts
                     grep -q "splitzap_update_profile_name" src/features/splitzap/splitzapProduction.ts
                     grep -q "importSplitBackupSafely" src/features/splitzap/SplitzapCloudApp.tsx
-                - name: Approved UX and account-safety assertions
+                - name: Production UX and account-safety assertions
                   shell: bash
                   run: |
                     grep -q "Sign in to Splitzap" src/features/splitzap/SplitzapCloudApp.tsx
@@ -207,11 +229,6 @@ jobs:
                     grep -q "@supports (-webkit-touch-callout: none)" src/features/splitzap/splitzap.css
           WORKFLOW
 
-      - name: Commit only after the full gate passed
-        shell: bash
-        run: |
-          git config user.name "splitzap-production-bot"
-          git config user.email "splitzap-production-bot@users.noreply.github.com"
           git add -A
           git commit -m "Polish Splitzap production UX and account safety"
           git push origin HEAD:testing
