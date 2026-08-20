@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+export const SPLITZAP_SCHEMA_VERSION = 2;
+
 export type Member = { id: string; name: string };
 export type SplitMode = 'equal' | 'exact' | 'percentage';
 export type ChargeDistribution = 'equal' | 'proportional';
@@ -80,6 +82,11 @@ export type Group = {
   myMemberId?: string;
   sharedRevision?: number;
   sharedJoinCode?: string;
+  /** Local metadata returned by Level 2. Never used for bill math. */
+  sharedStatus?: 'active' | 'archived';
+  sharedSchemaVersion?: number;
+  archivedAt?: string;
+  status?: 'active' | 'archived';
 };
 
 export type HistoryChange = {
@@ -96,13 +103,27 @@ export type ExpenseHistoryEntry = {
   changes: HistoryChange[];
 };
 
+export type LocalActivityEvent = {
+  id: string;
+  groupId: string;
+  actorName: string;
+  eventType: string;
+  entityType: 'expense' | 'payment' | 'member' | 'group';
+  entityId?: string;
+  date: string;
+  data?: Record<string, unknown>;
+};
+
 export type SplitData = {
+  schemaVersion?: number;
   me: string;
   myName?: string;
   groups: Group[];
   expenses: Expense[];
   settlements: Settlement[];
   history?: ExpenseHistoryEntry[];
+  activity?: LocalActivityEvent[];
+  preferences?: { defaultCurrency: string; theme: 'system' | 'light' | 'dark'; reducedMotion: boolean };
 };
 
 /** A shared group can map this account to a canonical member id that differs from data.me. */
@@ -110,7 +131,7 @@ export const memberIdFor = (group: Group, data: Pick<SplitData, 'me'>) => group.
 
 export type SplitzapBackup = {
   app: 'Splitzap';
-  version: 2;
+  version: 2 | 3;
   exportedAt: string;
   data: SplitData;
 };
@@ -134,21 +155,25 @@ export const CURRENCIES = ['₹', '$', '€', '£', '¥'];
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
 const emptyData = (me = uid()): SplitData => ({
+  schemaVersion: SPLITZAP_SCHEMA_VERSION,
   me,
   myName: '',
   groups: [],
   expenses: [],
   settlements: [],
   history: [],
+  activity: [],
 });
 
 const EMPTY: SplitData = {
+  schemaVersion: SPLITZAP_SCHEMA_VERSION,
   me: 'me',
   myName: '',
   groups: [],
   expenses: [],
   settlements: [],
   history: [],
+  activity: [],
 };
 
 function normalizeSplit(rawMode: unknown, rawSplit: unknown) {
@@ -261,12 +286,19 @@ function normalize(data: SplitData): SplitData {
     ?.name.trim() || '';
 
   return {
+    schemaVersion: SPLITZAP_SCHEMA_VERSION,
     me: data.me || uid(),
     myName: inferredName,
     groups,
     expenses: Array.isArray(data.expenses) ? data.expenses.map((expense) => normalizeExpense(expense)) : [],
     settlements: Array.isArray(data.settlements) ? data.settlements : [],
     history: Array.isArray(data.history) ? data.history : [],
+    activity: Array.isArray(data.activity) ? data.activity : [],
+    preferences: data.preferences && typeof data.preferences === 'object' ? {
+      defaultCurrency: typeof data.preferences.defaultCurrency === 'string' ? data.preferences.defaultCurrency : '₹',
+      theme: data.preferences.theme === 'light' || data.preferences.theme === 'dark' ? data.preferences.theme : 'system',
+      reducedMotion: Boolean(data.preferences.reducedMotion),
+    } : { defaultCurrency: '₹', theme: 'system', reducedMotion: false },
   };
 }
 
@@ -290,6 +322,7 @@ function stripLegacyDemo(data: SplitData): SplitData {
     expenses: data.expenses.filter((expense) => !demoGroupIds.has(expense.groupId)),
     settlements: data.settlements.filter((settlement) => !demoGroupIds.has(settlement.groupId)),
     history: (data.history ?? []).filter((entry) => !demoGroupIds.has(entry.groupId)),
+    activity: (data.activity ?? []).filter((entry) => !demoGroupIds.has(entry.groupId)),
   };
 }
 
@@ -367,8 +400,65 @@ function read(): SplitData {
   return cache;
 }
 
+
+function currentActorName(data: SplitData, group?: Group) {
+  const clean = data.myName?.trim();
+  if (clean) return clean;
+  if (group) {
+    const member = group.members.find((item) => item.id === memberIdFor(group, data));
+    if (member?.name?.trim()) return member.name.trim();
+  }
+  return 'You';
+}
+
+function deriveLocalActivity(previous: SplitData, next: SplitData): SplitData {
+  if ((next.activity?.length ?? 0) !== (previous.activity?.length ?? 0)) return next;
+  const events: LocalActivityEvent[] = [];
+  const now = new Date().toISOString();
+  const previousGroups = new Map(previous.groups.map((group) => [group.id, group]));
+  const nextGroups = new Map(next.groups.map((group) => [group.id, group]));
+  const add = (groupId: string, actorName: string, eventType: string, entityType: LocalActivityEvent['entityType'], entityId?: string, data?: Record<string, unknown>) => events.push({ id: uid(), groupId, actorName, eventType, entityType, entityId, date: now, data });
+
+  next.groups.forEach((group) => {
+    if (group.sharedId) return;
+    const before = previousGroups.get(group.id);
+    const actor = currentActorName(previous, before ?? group);
+    if (!before) { add(group.id, currentActorName(next, group), 'group_created', 'group', group.id, { name: group.name }); return; }
+    if (before.name !== group.name) add(group.id, actor, 'group_renamed', 'group', group.id, { from: before.name, to: group.name });
+    if (before.currency !== group.currency) add(group.id, actor, 'group_currency_changed', 'group', group.id, { from: before.currency, to: group.currency });
+    if ((before.status ?? 'active') !== (group.status ?? 'active')) add(group.id, actor, group.status === 'archived' ? 'group_archived' : 'group_unarchived', 'group', group.id, { status: group.status ?? 'active' });
+    group.members.forEach((member) => {
+      const oldMember = before.members.find((item) => item.id === member.id);
+      if (!oldMember) add(group.id, actor, 'member_added', 'member', member.id, { member });
+      else if (oldMember.name !== member.name) add(group.id, actor, 'member_renamed', 'member', member.id, { from: oldMember.name, to: member.name });
+    });
+    before.members.forEach((member) => { if (!group.members.some((item) => item.id === member.id)) add(group.id, actor, 'member_removed', 'member', member.id, { member }); });
+  });
+  previous.groups.forEach((group) => { if (!group.sharedId && !nextGroups.has(group.id)) add(group.id, currentActorName(previous, group), 'group_deleted', 'group', group.id, { name: group.name }); });
+
+  const oldExpenses = new Map(previous.expenses.map((expense) => [expense.id, expense]));
+  const newExpenses = new Map(next.expenses.map((expense) => [expense.id, expense]));
+  next.expenses.forEach((expense) => {
+    const group = nextGroups.get(expense.groupId);
+    if (group?.sharedId) return;
+    const before = oldExpenses.get(expense.id);
+    const actor = currentActorName(previous, previousGroups.get(expense.groupId) ?? group);
+    if (!before) add(expense.groupId, actor, 'expense_added', 'expense', expense.id, { after: expense });
+    else if (JSON.stringify(before) !== JSON.stringify(expense)) add(expense.groupId, actor, 'expense_updated', 'expense', expense.id, { before, after: expense });
+  });
+  previous.expenses.forEach((expense) => { const group = previousGroups.get(expense.groupId); if (!group?.sharedId && !newExpenses.has(expense.id)) add(expense.groupId, currentActorName(previous, group), 'expense_deleted', 'expense', expense.id, { before: expense }); });
+
+  const oldPayments = new Map(previous.settlements.map((payment) => [payment.id, payment]));
+  const newPayments = new Map(next.settlements.map((payment) => [payment.id, payment]));
+  next.settlements.forEach((payment) => { const group = nextGroups.get(payment.groupId); if (group?.sharedId) return; const before = oldPayments.get(payment.id); const actor = currentActorName(previous, previousGroups.get(payment.groupId) ?? group); if (!before) add(payment.groupId, actor, 'payment_recorded', 'payment', payment.id, { after: payment }); else if (JSON.stringify(before) !== JSON.stringify(payment)) add(payment.groupId, actor, 'payment_updated', 'payment', payment.id, { before, after: payment }); });
+  previous.settlements.forEach((payment) => { const group = previousGroups.get(payment.groupId); if (!group?.sharedId && !newPayments.has(payment.id)) add(payment.groupId, currentActorName(previous, group), 'payment_removed', 'payment', payment.id, { before: payment }); });
+
+  return events.length ? { ...next, activity: [...events, ...(next.activity ?? [])].slice(0, 2000) } : next;
+}
+
 function write(next: SplitData): boolean {
-  cache = normalize(next);
+  const previous = cache ?? read();
+  cache = normalize(deriveLocalActivity(previous, normalize(next)));
   let saved = true;
   if (typeof window !== 'undefined') {
     try {
@@ -403,7 +493,7 @@ function validateBackupCandidate(value: unknown): value is SplitData {
 export function createSplitBackup(): string {
   const payload: SplitzapBackup = {
     app: 'Splitzap',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     data: read(),
   };
@@ -423,6 +513,43 @@ export function restoreSplitBackup(raw: string): SplitData {
   const next = normalize(candidate);
   if (!write(next)) throw new Error('The backup was read, but your browser could not save the restored data.');
   return next;
+}
+
+
+export function importSplitBackupSafely(raw: string): { importedGroups: number; skippedSharedGroups: number } {
+  const parsed = JSON.parse(raw) as unknown;
+  const record = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+  const candidate = record.app === 'Splitzap' && record.data ? record.data : parsed;
+  if (!validateBackupCandidate(candidate)) throw new Error('This file is not a valid Splitzap export.');
+  const imported = normalize(candidate as SplitData);
+  const current = read();
+  let importedGroups = 0;
+  let skippedSharedGroups = 0;
+  let groups = [...current.groups];
+  let expenses = [...current.expenses];
+  let settlements = [...current.settlements];
+  let history = [...(current.history ?? [])];
+  let activity = [...(current.activity ?? [])];
+
+  for (const sourceGroup of imported.groups) {
+    if (sourceGroup.sharedId) { skippedSharedGroups += 1; continue; }
+    const groupId = groups.some((item) => item.id === sourceGroup.id) ? uid() : sourceGroup.id;
+    const group = { ...sourceGroup, id: groupId, sharedId: undefined, sharedJoinCode: undefined, sharedRevision: undefined, sharedRole: undefined, myMemberId: sourceGroup.myMemberId && sourceGroup.myMemberId !== imported.me ? sourceGroup.myMemberId : undefined, status: sourceGroup.status ?? 'active' };
+    const expenseIdMap = new Map<string, string>();
+    const clonedExpenses = imported.expenses.filter((item) => item.groupId === sourceGroup.id).map((item) => { const id = expenses.some((existing) => existing.id === item.id) || groupId !== sourceGroup.id ? uid() : item.id; expenseIdMap.set(item.id, id); return { ...item, id, groupId }; });
+    const clonedPayments = imported.settlements.filter((item) => item.groupId === sourceGroup.id).map((item) => ({ ...item, id: settlements.some((existing) => existing.id === item.id) || groupId !== sourceGroup.id ? uid() : item.id, groupId }));
+    const clonedHistory = (imported.history ?? []).filter((item) => item.groupId === sourceGroup.id).map((item) => ({ ...item, id: uid(), groupId, expenseId: expenseIdMap.get(item.expenseId) ?? item.expenseId }));
+    const clonedActivity = (imported.activity ?? []).filter((item) => item.groupId === sourceGroup.id).map((item) => ({ ...item, id: uid(), groupId, entityId: item.entityType === 'expense' && item.entityId ? expenseIdMap.get(item.entityId) ?? item.entityId : item.entityId }));
+    groups = [group, ...groups]; expenses = [...clonedExpenses, ...expenses]; settlements = [...clonedPayments, ...settlements]; history = [...clonedHistory, ...history]; activity = [...clonedActivity, ...activity]; importedGroups += 1;
+  }
+
+  write({ ...current, groups, expenses, settlements, history, activity });
+  return { importedGroups, skippedSharedGroups };
+}
+
+export function withLocalActivity(data: SplitData, event: Omit<LocalActivityEvent, 'id' | 'date'> & { id?: string; date?: string }): SplitData {
+  const next: LocalActivityEvent = { ...event, id: event.id ?? uid(), date: event.date ?? new Date().toISOString() };
+  return { ...data, activity: [next, ...(data.activity ?? [])].slice(0, 2000) };
 }
 
 export function useSplitData() {
