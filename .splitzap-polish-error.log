@@ -1,9 +1,0 @@
-FAILED_STAGE=typecheck
-EXIT_CODE=2
-RUN_AT=2026-08-20T03:20:32Z
-
-
-> zapora@0.0.0 typecheck
-> tsc --noEmit -p tsconfig.app.json
-
-src/features/splitzap/SplitzapCloudApp.tsx(1,149): error TS6133: 'UserRound' is declared but its value is never read.

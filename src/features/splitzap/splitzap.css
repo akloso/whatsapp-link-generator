@@ -4,15 +4,15 @@
   --background: 0.982 0.008 95;
   --foreground: 0.22 0.03 165;
   --surface: 1 0 0;
-  --surface-2: 0.962 0.012 120;
-  --primary: 0.52 0.115 176;
+  --surface-2: 0.965 0.025 150;
+  --primary: 0.55 0.15 171;
   --primary-foreground: 0.99 0.01 150;
-  --secondary: 0.945 0.03 160;
+  --secondary: 0.94 0.055 165;
   --secondary-foreground: 0.32 0.06 172;
   --muted: 0.955 0.012 140;
   --muted-foreground: 0.52 0.02 160;
-  --positive: 0.55 0.13 165;
-  --negative: 0.6 0.17 30;
+  --positive: 0.56 0.16 158;
+  --negative: 0.61 0.19 28;
   --border: 0.91 0.014 150;
   --ring: 0.52 0.115 176;
   --gradient-hero: linear-gradient(145deg, oklch(0.39 0.095 180), oklch(0.53 0.13 168));
@@ -32,7 +32,7 @@
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: auto;
 }
 
 .splitzap-root *,
@@ -838,3 +838,63 @@ html[data-splitzap-reduced-motion="true"] .splitzap-root *::after { animation-du
 
 /* validation trigger */
 
+
+
+/* Production mobile polish: stable sheets, stronger affordances, larger group marks. */
+.sheet-panel {
+  max-height: calc(100dvh - max(0.5rem, env(safe-area-inset-top)));
+  overscroll-behavior: contain;
+}
+
+.sheet-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-gutter: stable;
+}
+
+.group-emoji {
+  font-size: 1.7rem !important;
+  line-height: 1;
+}
+
+.welcome-action {
+  border: 1px solid oklch(var(--border) / 0.55);
+  min-height: 84px;
+}
+
+.quick-food { background: linear-gradient(145deg, oklch(0.98 0.045 70), oklch(1 0 0)); }
+.quick-payment { background: linear-gradient(145deg, oklch(0.97 0.04 155), oklch(1 0 0)); }
+.quick-group { background: linear-gradient(145deg, oklch(0.97 0.04 285), oklch(1 0 0)); }
+
+/* iOS Chrome uses WebKit. Remove the continuous motion/blur that makes the UI feel unstable. */
+@supports (-webkit-touch-callout: none) {
+  .splitzap-ambient,
+  .splitzap-fab,
+  .splitzap-hero::before,
+  .splitzap-hero::after {
+    animation: none !important;
+  }
+
+  .splitzap-bottom-nav {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: oklch(var(--surface) / 0.98);
+  }
+
+  .sheet-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .screen-enter,
+  .list-enter {
+    animation-duration: 0.16s !important;
+    transform: none !important;
+  }
+
+  .splitzap-root .press {
+    transition-duration: 0.1s;
+  }
+}
