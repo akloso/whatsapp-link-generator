@@ -1,4 +1,0 @@
-FAILED_STAGE=apply_patch
-RUN_AT=2026-08-21T07:43:50Z
-
-SettleSheet callsites: expected 3, found 4
