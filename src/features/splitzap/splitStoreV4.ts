@@ -33,8 +33,9 @@ export type ReceiptItem = {
   id: string;
   description: string;
   amount: number;
-  /** Empty/undefined means shared by the group; a member id means personal to that member. */
+  /** Empty/undefined means shared by the whole group; one id means personal; multiple ids mean shared by that subset. */
   memberId?: string;
+  memberIds?: string[];
 };
 
 export type Expense = {
@@ -224,6 +225,7 @@ function normalizeExpense(rawValue: unknown): Expense {
       description: typeof item.description === 'string' && item.description.trim() ? item.description.trim() : 'Bill item',
       amount: Math.max(0, Number(item.amount) || 0),
       memberId: typeof item.memberId === 'string' && item.memberId ? item.memberId : undefined,
+      memberIds: Array.isArray(item.memberIds) ? [...new Set(item.memberIds.filter((id): id is string => typeof id === 'string' && Boolean(id)))] : undefined,
     }))
     .filter((item) => item.amount > 0);
   const chargeTotal = normalizedCharges.reduce((sum, charge) => sum + charge.amount, 0);

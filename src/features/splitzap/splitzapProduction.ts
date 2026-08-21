@@ -9,6 +9,24 @@ export type SplitzapProfile = {
   reduced_motion: boolean;
 };
 
+export type SplitzapPaymentProfile = {
+  upi_id: string | null;
+  allow_group_upi: boolean;
+};
+
+export type SplitzapReceiptIntelligence = {
+  merchant: string;
+  detectedTotal: number | null;
+  items: Array<{ id: string; description: string; amount: number; quantity?: number; confidence?: 'high' | 'low' }>;
+  charges: Array<{ id: string; description: string; amount: number; distribution: 'equal' | 'proportional'; confidence?: 'high' | 'low' }>;
+  itemsTotal: number;
+  chargesTotal: number;
+  difference: number | null;
+  matched: boolean;
+  warnings: string[];
+  engine: string;
+};
+
 export type SharedMembership = {
   group_id: string;
   user_id: string;
@@ -113,6 +131,46 @@ export async function updateSplitzapProfilePreferences(values: Partial<Pick<Spli
     p_reduced_motion: values.reduced_motion ?? null,
   });
   if (error) throw error;
+}
+
+export async function getSplitzapPaymentProfile(): Promise<SplitzapPaymentProfile> {
+  const { data, error } = await splitzapSupabase.rpc('splitzap_get_payment_profile');
+  if (error) throw error;
+  const row = one(data) as SplitzapPaymentProfile | null;
+  return row ?? { upi_id: null, allow_group_upi: false };
+}
+
+export async function updateSplitzapPaymentProfile(upiId: string, allowGroupUpi: boolean) {
+  const { error } = await splitzapSupabase.rpc('splitzap_update_payment_profile', {
+    p_upi_id: upiId.trim() || null,
+    p_allow_group_upi: allowGroupUpi,
+  });
+  if (error) throw error;
+}
+
+export async function getSharedMemberUpi(groupId: string, memberId: string): Promise<string | null> {
+  const { data, error } = await splitzapSupabase.rpc('splitzap_get_group_member_upi', { p_group_id: groupId, p_member_id: memberId });
+  if (error) throw error;
+  const row = one(data) as { upi_id: string | null } | null;
+  return row?.upi_id?.trim() || null;
+}
+
+export async function parseSplitzapReceiptText(text: string): Promise<SplitzapReceiptIntelligence> {
+  const { data, error } = await splitzapSupabase.rpc('splitzap_parse_receipt_text', { p_text: text });
+  if (error) throw error;
+  const raw = (data && typeof data === 'object' ? data : {}) as Partial<SplitzapReceiptIntelligence>;
+  return {
+    merchant: typeof raw.merchant === 'string' && raw.merchant.trim() ? raw.merchant.trim() : 'Scanned bill',
+    detectedTotal: raw.detectedTotal == null ? null : Number(raw.detectedTotal),
+    items: Array.isArray(raw.items) ? raw.items : [],
+    charges: Array.isArray(raw.charges) ? raw.charges : [],
+    itemsTotal: Number(raw.itemsTotal) || 0,
+    chargesTotal: Number(raw.chargesTotal) || 0,
+    difference: raw.difference == null ? null : Number(raw.difference),
+    matched: Boolean(raw.matched),
+    warnings: Array.isArray(raw.warnings) ? raw.warnings.filter((item): item is string => typeof item === 'string') : [],
+    engine: typeof raw.engine === 'string' ? raw.engine : 'rules-v1',
+  };
 }
 
 export async function createSharedInvite(groupId: string, options: { memberId?: string | null; name?: string | null; email?: string | null } = {}) {
