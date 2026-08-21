@@ -46,6 +46,16 @@ jobs:
           }
 
           cat scripts/splitzap-upi-receipt.part1 scripts/splitzap-upi-receipt.part2 scripts/splitzap-upi-receipt.part3 | base64 -d | gzip -d > /tmp/splitzap-upi-receipt.py || fail reconstruct /tmp/reconstruct.log
+          python3 - <<'PY' > /tmp/runner-fix.log 2>&1 || fail runner_fix /tmp/runner-fix.log
+          from pathlib import Path
+          p=Path('/tmp/splitzap-upi-receipt.py')
+          s=p.read_text()
+          old="s, n = re.subn(r'(<SettleSheet\\b[^>]*?\\bdata=\\{data\\}\\s+update=\\{update\\})(\\s*/>)', r'\\1 getMemberUpi={collaboration?.onGetMemberUpi}\\2', s)\nif n != 3:\n    raise SystemExit(f'SettleSheet callsites: expected 3, found {n}')"
+          new="old_settle_call = 'data={data} update={update} />'\ns, n = s.replace(old_settle_call, 'data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} />'), s.count(old_settle_call)\nif n != 3:\n    raise SystemExit(f'SettleSheet callsites: expected 3, found {n}')"
+          if old not in s:
+              raise SystemExit('Could not patch temporary SettleSheet matcher')
+          p.write_text(s.replace(old,new,1))
+          PY
           python3 /tmp/splitzap-upi-receipt.py > /tmp/apply.log 2>&1 || fail apply_patch /tmp/apply.log
           npm ci > /tmp/npm-ci.log 2>&1 || fail npm_ci /tmp/npm-ci.log
           npm run typecheck > /tmp/typecheck.log 2>&1 || fail typecheck /tmp/typecheck.log
