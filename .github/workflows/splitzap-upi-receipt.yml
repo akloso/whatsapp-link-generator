@@ -22,40 +22,54 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Reconstruct and apply approved patch
+      - name: Apply, validate, and commit approved source
         shell: bash
         run: |
-          cat scripts/splitzap-upi-receipt.part1 scripts/splitzap-upi-receipt.part2 scripts/splitzap-upi-receipt.part3 | base64 -d | gzip -d > /tmp/splitzap-upi-receipt.py
-          python3 /tmp/splitzap-upi-receipt.py
-      - name: Install dependencies
-        run: npm ci
-      - name: TypeScript
-        run: npm run typecheck
-      - name: Splitzap calculation tests
-        run: npm run test:splitzap
-      - name: Production build
-        run: npm run build
-      - name: Production dependency security gate
-        run: npm audit --omit=dev --audit-level=high
-      - name: Approved feature assertions
-        shell: bash
-        run: |
-          grep -q "splitzap_get_payment_profile" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_update_payment_profile" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_get_group_member_upi" src/features/splitzap/splitzapProduction.ts
-          grep -q "splitzap_parse_receipt_text" src/features/splitzap/splitzapProduction.ts
-          grep -q "Allow group members to pay me via UPI" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Pay with UPI" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "upi://pay" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Did you complete the payment?" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "paymentMode === 'partial'" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "memberIds?: string\[\]" src/features/splitzap/splitStoreV4.ts
-          grep -q "Same as previous" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Receipt total matched" src/features/splitzap/SplitzapAppV4.tsx
-          ! grep -q "function parseReceiptText" src/features/splitzap/SplitzapAppV4.tsx
-      - name: Commit validated Splitzap source
-        shell: bash
-        run: |
+          set -uo pipefail
+          fail() {
+            stage="$1"
+            log="$2"
+            {
+              echo "FAILED_STAGE=$stage"
+              echo "RUN_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo
+              tail -n 500 "$log" 2>/dev/null || true
+            } > /tmp/splitzap-upi-receipt-error.log
+            git reset --hard HEAD >/dev/null 2>&1 || true
+            cp /tmp/splitzap-upi-receipt-error.log .splitzap-upi-receipt-error.log
+            git config user.name "splitzap-upgrade-bot"
+            git config user.email "splitzap-upgrade-bot@users.noreply.github.com"
+            git add .splitzap-upi-receipt-error.log
+            git commit -m "Record Splitzap UPI receipt validation failure" || true
+            git push origin HEAD:testing
+            exit 1
+          }
+
+          cat scripts/splitzap-upi-receipt.part1 scripts/splitzap-upi-receipt.part2 scripts/splitzap-upi-receipt.part3 | base64 -d | gzip -d > /tmp/splitzap-upi-receipt.py || fail reconstruct /tmp/reconstruct.log
+          python3 /tmp/splitzap-upi-receipt.py > /tmp/apply.log 2>&1 || fail apply_patch /tmp/apply.log
+          npm ci > /tmp/npm-ci.log 2>&1 || fail npm_ci /tmp/npm-ci.log
+          npm run typecheck > /tmp/typecheck.log 2>&1 || fail typecheck /tmp/typecheck.log
+          npm run test:splitzap > /tmp/tests.log 2>&1 || fail splitzap_tests /tmp/tests.log
+          npm run build > /tmp/build.log 2>&1 || fail production_build /tmp/build.log
+          npm audit --omit=dev --audit-level=high > /tmp/audit.log 2>&1 || fail production_audit /tmp/audit.log
+
+          {
+            grep -q "splitzap_get_payment_profile" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_update_payment_profile" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_get_group_member_upi" src/features/splitzap/splitzapProduction.ts
+            grep -q "splitzap_parse_receipt_text" src/features/splitzap/splitzapProduction.ts
+            grep -q "Allow group members to pay me via UPI" src/features/splitzap/SplitzapCloudApp.tsx
+            grep -q "Pay with UPI" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "upi://pay" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "Did you complete the payment?" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "paymentMode === 'partial'" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "memberIds?: string\[\]" src/features/splitzap/splitStoreV4.ts
+            grep -q "Same as previous" src/features/splitzap/SplitzapAppV4.tsx
+            grep -q "Receipt total matched" src/features/splitzap/SplitzapAppV4.tsx
+            ! grep -q "function parseReceiptText" src/features/splitzap/SplitzapAppV4.tsx
+          } > /tmp/assertions.log 2>&1 || fail feature_assertions /tmp/assertions.log
+
+          rm -f .splitzap-upi-receipt-error.log
           git config user.name "splitzap-upgrade-bot"
           git config user.email "splitzap-upgrade-bot@users.noreply.github.com"
           git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/SplitzapCloudApp.tsx src/features/splitzap/splitzapProduction.ts src/features/splitzap/splitStoreV4.ts
