@@ -64,6 +64,10 @@ jobs:
           grep -q "splitzap_transfer_ownership" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_update_profile_name" src/features/splitzap/splitzapProduction.ts
           grep -q "importSplitBackupSafely" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "splitzap_get_payment_profile" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_update_payment_profile" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_get_group_member_upi" src/features/splitzap/splitzapProduction.ts
+          grep -q "splitzap_parse_receipt_text" src/features/splitzap/splitzapProduction.ts
       - name: Production UX and account-safety assertions
         shell: bash
         run: |
@@ -104,3 +108,14 @@ jobs:
           grep -q "fixed-shell and mobile touch hardening" src/features/splitzap/splitzap.css
           grep -q "persistSession: true" src/features/splitzap/splitzapCloud.ts
           grep -q "autoRefreshToken: true" src/features/splitzap/splitzapCloud.ts
+          grep -q "Allow group members to pay me via UPI" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "It is not shown as public profile information" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "onGetMemberUpi" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Pay with UPI" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "upi://pay" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Did you complete the payment?" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "paymentMode === 'partial'" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "memberIds?: string\[\]" src/features/splitzap/splitStoreV4.ts
+          grep -q "Same as previous" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Receipt total matched" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "function parseReceiptText" src/features/splitzap/SplitzapAppV4.tsx
