@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'splitzap-';
-const CACHE = 'splitzap-v3';
+const CACHE = 'splitzap-v4';
 const CORE = ['/splitzap', '/splitzap.webmanifest', '/splitzap-icon-192.png', '/splitzap-icon-512.png'];
 
 self.addEventListener('install', (event) => {
