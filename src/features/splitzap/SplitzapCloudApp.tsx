@@ -8,7 +8,7 @@ import {
 import {
   buildSharedGroupSnapshot, createSharedGroup, fetchSharedGroup, loadSharedGroupsForUser, mergeSharedRowsIntoLocal, removeGroupFromLocal, sharedSnapshotHash, subscribeToSharedGroupChanges, updateSharedGroup, type SharedGroupRow,
 } from './splitzapShared';
-import { preserveDirtyRemoteRow } from './splitzapSyncSafety';
+import { compactSnapshotFingerprint, preserveDirtyRemoteRow, preserveDirtySharedGroupsOnBootstrap, type ConfirmedSharedState } from './splitzapSyncSafety';
 import {
   archiveSharedGroup, buildInviteLink, createSharedInvite, deleteSplitzapAccount, disableSharedInvite, getSharedMemberUpi, getSplitzapPaymentProfile, getSplitzapProfile, leaveSharedGroupV2, listPendingJoinRequests, listRecentlyDeletedGroups, loadSharedActivity, listSharedInvites, listSharedMemberships, parseSplitzapReceiptText, previewSharedInviteV2, renameSharedMember, requestSharedJoinV2, resolveSharedJoinRequest, restoreSharedGroup, sharedRowFromJoin, softDeleteSharedGroup, subscribeToProductionChanges, transferSharedGroupOwnership, unlinkSharedMember, updateSplitzapPaymentProfile, updateSplitzapProfileName, updateSplitzapProfilePreferences,
   type InvitePreviewV2, type RecentlyDeletedGroup, type SharedActivityEvent, type SharedInvite, type SharedJoinRequest, type SharedMembership, type SplitzapProfile,
@@ -21,11 +21,46 @@ const LAST_SYNC_HASH_KEY = 'splitzap.cloud.lastSyncHash';
 const LAST_SYNC_AT_KEY = 'splitzap.cloud.lastSyncAt';
 const LAST_USER_KEY = 'splitzap.cloud.lastUserId';
 const PENDING_JOIN_KEY = 'splitzap.shared.pendingJoin';
+const SHARED_CONFIRMED_PREFIX = 'splitzap.shared.confirmed.';
 
 const dataHash = (data: SplitData) => JSON.stringify(data);
 
 function safeGet(key: string) {
   try { return window.localStorage.getItem(key); } catch { return null; }
+}
+
+function loadConfirmedSharedState(userId: string) {
+  const map = new Map<string, ConfirmedSharedState>();
+  if (!userId) return map;
+  try {
+    const raw = window.localStorage.getItem(`${SHARED_CONFIRMED_PREFIX}${userId}`);
+    if (!raw) return map;
+    const parsed = JSON.parse(raw) as Record<string, ConfirmedSharedState>;
+    Object.entries(parsed).forEach(([sharedId, record]) => {
+      if (record && Number.isFinite(Number(record.revision)) && typeof record.fingerprint === 'string') {
+        map.set(sharedId, { revision: Number(record.revision), fingerprint: record.fingerprint });
+      }
+    });
+  } catch { /* best effort */ }
+  return map;
+}
+
+function persistConfirmedSharedState(userId: string, map: Map<string, ConfirmedSharedState>) {
+  if (!userId) return;
+  try { window.localStorage.setItem(`${SHARED_CONFIRMED_PREFIX}${userId}`, JSON.stringify(Object.fromEntries(map))); } catch { /* best effort */ }
+}
+
+function rememberConfirmedSharedState(userId: string, map: Map<string, ConfirmedSharedState>, row: Pick<SharedGroupRow, 'id' | 'revision' | 'snapshot'>) {
+  map.set(row.id, {
+    revision: row.revision,
+    fingerprint: compactSnapshotFingerprint(sharedSnapshotHash(row.snapshot)),
+  });
+  persistConfirmedSharedState(userId, map);
+}
+
+function forgetConfirmedSharedState(userId: string, map: Map<string, ConfirmedSharedState>, sharedId: string) {
+  map.delete(sharedId);
+  persistConfirmedSharedState(userId, map);
 }
 
 function clearPendingJoinIntent() {
@@ -95,6 +130,8 @@ export default function SplitzapCloudApp() {
   const initializedUser = useRef<string | null>(null);
   const sharedInitializedUser = useRef<string | null>(null);
   const sharedHashes = useRef(new Map<string, string>());
+  const confirmedSharedState = useRef(new Map<string, ConfirmedSharedState>());
+  const restartDirtySharedIds = useRef(new Set<string>());
   const accountSyncing = useRef(false);
   const sharedSyncing = useRef(false);
   const latestData = useRef(data);
@@ -114,6 +151,8 @@ export default function SplitzapCloudApp() {
       initializedUser.current = null;
       sharedInitializedUser.current = null;
       sharedHashes.current.clear();
+      confirmedSharedState.current.clear();
+      restartDirtySharedIds.current.clear();
       setProfile(null); setProfileReady(false);
       setSharedActivity([]); setPendingRequests([]); setMemberships([]);
       if (event === 'PASSWORD_RECOVERY') { setRecoveryMode(true); setAccountOpen(true); }
@@ -157,10 +196,21 @@ export default function SplitzapCloudApp() {
     setStatusMessage('Loading your Splitzap…');
     void (async () => {
       try {
+        const localBeforeCloud = latestData.current;
+        const sameLocalUser = safeGet(LAST_USER_KEY) === session.user.id;
+        const accountHasUnsyncedLocalChanges = sameLocalUser && dataHash(localBeforeCloud) !== safeGet(LAST_SYNC_HASH_KEY);
+        confirmedSharedState.current = loadConfirmedSharedState(session.user.id);
+        restartDirtySharedIds.current.clear();
         const row = await fetchSplitzapCloudState(session.user.id);
         if (!active) return;
         if (row) {
-          update(() => row.data);
+          const protectedBootstrap = sameLocalUser
+            ? preserveDirtySharedGroupsOnBootstrap(row.data, localBeforeCloud, confirmedSharedState.current, accountHasUnsyncedLocalChanges)
+            : { data: row.data, dirtyIds: new Set<string>() };
+          restartDirtySharedIds.current = protectedBootstrap.dirtyIds;
+          update(() => protectedBootstrap.data);
+          // The sync marker must represent the actual server account copy, not
+          // locally preserved dirty financial state, so account sync still runs.
           saveSyncMarker(row.data, row.updated_at);
           setLastSyncedAt(row.updated_at);
         } else {
@@ -211,8 +261,34 @@ export default function SplitzapCloudApp() {
     sharedInitializedUser.current = session.user.id;
     void loadSharedGroupsForUser(session.user.id).then((rows) => {
       if (!active) return;
-      sharedHashes.current.clear(); rows.forEach((row) => sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)));
-      update((current) => mergeSharedRowsIntoLocal(current, rows, true));
+      const current = latestData.current;
+      sharedHashes.current.clear();
+      const protectedRows = rows.map((row) => {
+        const remoteHash = sharedSnapshotHash(row.snapshot);
+        sharedHashes.current.set(row.id, remoteHash);
+        const localGroup = current.groups.find((group) => group.sharedId === row.id || group.id === row.snapshot.group.id);
+        if (!localGroup) {
+          rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, row);
+          return row;
+        }
+        let localSnapshot;
+        try { localSnapshot = buildSharedGroupSnapshot(current, localGroup.id); } catch {
+          rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, row);
+          return row;
+        }
+        const localHash = sharedSnapshotHash(localSnapshot);
+        const noBaselineButSameRevisionChanged = !confirmedSharedState.current.has(row.id)
+          && localGroup.sharedRevision === row.revision
+          && localHash !== remoteHash;
+        const shouldProtect = restartDirtySharedIds.current.has(row.id) || noBaselineButSameRevisionChanged;
+        if (!shouldProtect || localHash === remoteHash) {
+          restartDirtySharedIds.current.delete(row.id);
+          rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, row);
+          return row;
+        }
+        return { ...row, snapshot: localSnapshot, revision: localGroup.sharedRevision ?? row.revision };
+      });
+      update((value) => mergeSharedRowsIntoLocal(value, protectedRows, true));
       setProductionTick((value) => value + 1);
     }).catch((cause) => { if (!active) return; sharedInitializedUser.current = null; setStatus('error'); setStatusMessage(cause instanceof Error ? cause.message : 'Could not load shared groups'); });
     return () => { active = false; };
@@ -226,15 +302,16 @@ export default function SplitzapCloudApp() {
       if (!sharedId) return;
       if (payload.eventType === 'DELETE' || fresh?.status === 'deleted') {
         sharedHashes.current.delete(sharedId);
+        forgetConfirmedSharedState(session.user.id, confirmedSharedState.current, sharedId);
         update((current) => { const group = current.groups.find((item) => item.sharedId === sharedId); return group ? removeGroupFromLocal(current, group.id) : current; });
         setProductionTick((value) => value + 1);
         return;
       }
       void fetchSharedGroup(sharedId, session.user.id).then((row) => {
-        if (!row || row.status === 'deleted') { sharedHashes.current.delete(sharedId); update((current) => { const group = current.groups.find((item) => item.sharedId === sharedId); return group ? removeGroupFromLocal(current, group.id) : current; }); return; }
+        if (!row || row.status === 'deleted') { sharedHashes.current.delete(sharedId); forgetConfirmedSharedState(session.user.id, confirmedSharedState.current, sharedId); update((current) => { const group = current.groups.find((item) => item.sharedId === sharedId); return group ? removeGroupFromLocal(current, group.id) : current; }); return; }
         update((current) => {
           const protectedRow = protectDirtySharedRows(current, [row], sharedHashes.current)[0]!;
-          if (!protectedRow.dirty) sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot));
+          if (!protectedRow.dirty) { sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, row); }
           return mergeSharedRowsIntoLocal(current, [protectedRow.row], false);
         });
         setProductionTick((value) => value + 1);
@@ -257,7 +334,7 @@ export default function SplitzapCloudApp() {
         update((current) => {
           const protectedRows = protectDirtySharedRows(current, rows, sharedHashes.current);
           protectedRows.forEach((entry, index) => {
-            if (!entry.dirty) sharedHashes.current.set(rows[index]!.id, sharedSnapshotHash(rows[index]!.snapshot));
+            if (!entry.dirty) { sharedHashes.current.set(rows[index]!.id, sharedSnapshotHash(rows[index]!.snapshot)); rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, rows[index]!); }
           });
           return mergeSharedRowsIntoLocal(current, protectedRows.map((entry) => entry.row), true);
         });
@@ -287,6 +364,8 @@ export default function SplitzapCloudApp() {
             const sharedId = item.group.sharedId!;
             const result = await updateSharedGroup(sharedId, item.snapshot, item.group.sharedRevision);
             sharedHashes.current.set(sharedId, sharedSnapshotHash(item.snapshot));
+            restartDirtySharedIds.current.delete(sharedId);
+            rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, { id: sharedId, revision: result.revision, snapshot: item.snapshot });
             update((current) => ({ ...current, groups: current.groups.map((group) => group.id === item.group.id ? { ...group, sharedRevision: result.revision } : group) }));
           }
           setStatus('synced'); setStatusMessage('Synced'); setProductionTick((value) => value + 1);
@@ -383,11 +462,11 @@ export default function SplitzapCloudApp() {
     const current = latestData.current; const group = current.groups.find((item) => item.id === groupId);
     if (!group) throw new Error('Group not found.'); if (group.sharedId) return;
     const row = await createSharedGroup(buildSharedGroupSnapshot(current, groupId), memberIdFor(group, current));
-    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); update((value) => mergeSharedRowsIntoLocal(value, [row], false)); setProductionTick((value) => value + 1);
+    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, row); update((value) => mergeSharedRowsIntoLocal(value, [row], false)); setProductionTick((value) => value + 1);
   };
 
   const completeJoin = (row: SharedGroupRow) => {
-    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); update((current) => mergeSharedRowsIntoLocal(current, [row], false));
+    sharedHashes.current.set(row.id, sharedSnapshotHash(row.snapshot)); rememberConfirmedSharedState(session!.user.id, confirmedSharedState.current, row); update((current) => mergeSharedRowsIntoLocal(current, [row], false));
     clearPendingJoinIntent();
     setJoinOpen(false); setJoinRequested(false); setJoinCode(''); setProductionTick((value) => value + 1);
     window.history.replaceState({}, '', `/splitzap#group=${encodeURIComponent(row.snapshot.group.id)}`); window.dispatchEvent(new Event('popstate'));
@@ -406,7 +485,7 @@ export default function SplitzapCloudApp() {
         }
         await leaveSharedGroupV2(group.sharedId);
       }
-      sharedHashes.current.delete(group.sharedId); setProductionTick((value) => value + 1);
+      sharedHashes.current.delete(group.sharedId); forgetConfirmedSharedState(session.user.id, confirmedSharedState.current, group.sharedId); setProductionTick((value) => value + 1);
     }
     update((current) => removeGroupFromLocal(current, group.id));
   };
