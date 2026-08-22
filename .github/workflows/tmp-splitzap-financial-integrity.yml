@@ -23,7 +23,15 @@ jobs:
           node-version: 20
           cache: npm
       - name: Apply scoped patch
-        run: python scripts/tmp_splitzap_financial_integrity_patch.py
+        shell: bash
+        run: |
+          set +e
+          python scripts/tmp_splitzap_financial_integrity_patch.py > /tmp/splitzap-patch.log 2>&1
+          code=$?
+          cat /tmp/splitzap-patch.log
+          cp /tmp/splitzap-patch.log tmp-splitzap-financial-integrity-result.txt
+          echo "PATCH_EXIT_CODE=$code" >> tmp-splitzap-financial-integrity-result.txt
+          exit $code
       - name: Install dependencies
         run: npm ci
       - name: TypeScript
@@ -51,6 +59,7 @@ jobs:
         run: |
           git config user.name "splitzap-integrity-bot"
           git config user.email "actions@users.noreply.github.com"
+          rm -f tmp-splitzap-financial-integrity-result.txt
           git add \
             src/features/splitzap/SplitzapCloudApp.tsx \
             src/features/splitzap/SplitzapAppV4.tsx \
@@ -67,4 +76,17 @@ jobs:
             exit 0
           fi
           git commit -m "Harden Splitzap financial sync and personal settlement access"
+          git push origin HEAD:testing
+      - name: Publish patch failure diagnostic
+        if: failure()
+        shell: bash
+        run: |
+          git config user.name "splitzap-integrity-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if [ ! -f tmp-splitzap-financial-integrity-result.txt ]; then
+            echo "Patch step passed; a later validation gate failed." > tmp-splitzap-financial-integrity-result.txt
+          fi
+          echo "JOB_STATUS=${{ job.status }}" >> tmp-splitzap-financial-integrity-result.txt
+          git add tmp-splitzap-financial-integrity-result.txt
+          git commit -m "Record Splitzap integrity patch failure" || exit 0
           git push origin HEAD:testing
