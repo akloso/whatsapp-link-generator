@@ -74,8 +74,7 @@ jobs:
             src/features/splitzap/splitzapProduction.ts \
             src/features/splitzap/splitzapSyncSafety.ts \
             src/features/splitzap/splitzapSyncSafety.test.ts \
-            package.json \
-            .github/workflows/splitzap-readiness.yml
+            package.json
           if git diff --cached --quiet; then
             echo "No validated source changes to commit."
             exit 0
