@@ -1,0 +1,5 @@
+/home/runner/work/whatsapp-link-generator/whatsapp-link-generator/scripts/tmp_splitzap_financial_integrity_patch.py:444: SyntaxWarning: invalid escape sequence '\['
+  '''          ! grep -q "function parseReceiptText" src/features/splitzap/SplitzapAppV4.tsx
+CloudApp sync-safety import: expected exactly 1 match, found 0
+PATCH_EXIT_CODE=1
+JOB_STATUS=failure
