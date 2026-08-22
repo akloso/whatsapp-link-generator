@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   groupBalances,
   memberIdFor,
+  personalSettlementBuckets,
   shareOf,
   simplify,
   type Expense,
@@ -148,6 +149,19 @@ describe('Splitzap calculation regression suite', () => {
       { from: 'adarsh', to: 'aryan', amount: 90 },
       { from: 'madhav', to: 'aryan', amount: 35 },
     ]);
+  });
+
+  it('only exposes settlement actions for the signed-in debtor while keeping receivables view-only', () => {
+    const balances = { a: -100, b: 60, c: 40, d: 0 };
+    const mine = personalSettlementBuckets(balances, 'a');
+    expect(mine.payable).toEqual([
+      { from: 'a', to: 'b', amount: 60 },
+      { from: 'a', to: 'c', amount: 40 },
+    ]);
+    expect(mine.receivable).toEqual([]);
+    const creditor = personalSettlementBuckets(balances, 'b');
+    expect(creditor.payable).toEqual([]);
+    expect(creditor.receivable).toEqual([{ from: 'a', to: 'b', amount: 60 }]);
   });
 
   it('reduces balances after a partial settlement without changing the expense', () => {

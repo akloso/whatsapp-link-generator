@@ -280,7 +280,7 @@ export async function joinSharedGroup(code: string, memberId?: string, displayNa
 }
 
 export async function updateSharedGroup(sharedId: string, snapshot: SharedGroupSnapshot, expectedRevision?: number) {
-  const { data, error } = await splitzapSupabase.rpc('splitzap_update_shared_group', {
+  const { data, error } = await splitzapSupabase.rpc('splitzap_update_shared_group_v2', {
     p_group_id: sharedId,
     p_snapshot: snapshot,
     p_expected_revision: expectedRevision ?? null,
