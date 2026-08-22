@@ -6,6 +6,11 @@ on:
     paths:
       - 'scripts/tmp_splitzap_financial_integrity_patch.py'
       - '.github/workflows/tmp-splitzap-financial-integrity.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/tmp_splitzap_financial_integrity_patch.py'
+      - '.github/workflows/tmp-splitzap-financial-integrity.yml'
 
 permissions:
   contents: write
