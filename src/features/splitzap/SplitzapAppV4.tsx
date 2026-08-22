@@ -64,13 +64,14 @@ import {
   type SplitData,
   type SplitMode,
 } from './splitStoreV4';
+import type { SplitzapReceiptIntelligence } from './splitzapProduction';
 
 type View = { name: 'home' } | { name: 'activity' } | { name: 'group'; groupId: string };
 type GroupTab = 'expenses' | 'balances' | 'insights';
 type PersonalDraft = { id?: string; memberId: string; description: string; amount: string };
 type SelectiveDraft = { id?: string; description: string; amount: string; memberIds: string[]; mode: SplitMode; split: Record<string, number> };
-type ScanExpenseSeed = { groupId: string; description: string; amount: number; personalItems: PersonalItem[]; additionalCharges: AdditionalCharge[]; receiptItems: ReceiptItem[] };
-type ParsedReceipt = { merchant: string; detectedTotal: number | null; items: ReceiptItem[]; charges: AdditionalCharge[] };
+type ScanExpenseSeed = { groupId: string; description: string; amount: number; personalItems: PersonalItem[]; selectiveItems: SelectiveItem[]; additionalCharges: AdditionalCharge[]; receiptItems: ReceiptItem[] };
+type ReceiptScanItem = ReceiptItem & { quantity?: number; confidence?: 'high' | 'low' };
 
 export type SplitzapAuditEvent = { id: string; group_id: string; actor_user_id: string | null; actor_member_id: string | null; actor_name: string | null; event_type: string; entity_type: string; entity_id: string | null; event_data: Record<string, unknown>; revision: number | null; occurred_at: string };
 export type SplitzapJoinRequestView = { id: string; group_id: string; requested_member_id: string | null; requested_name: string; requested_email: string; status: string; requested_at: string };
@@ -86,6 +87,8 @@ export type SplitzapCollaboration = {
   onDeleteGroup: (group: Group, mode: 'self' | 'everyone', transferMemberId?: string) => Promise<void>;
   onArchiveGroup?: (group: Group, archive: boolean) => Promise<void>;
   onResolveJoinRequest?: (requestId: string, approve: boolean) => Promise<void>;
+  onGetMemberUpi?: (group: Group, memberId: string) => Promise<string | null>;
+  onParseReceipt?: (text: string) => Promise<SplitzapReceiptIntelligence>;
 };
 
 type BeforeInstallPromptEvent = Event & {
@@ -523,9 +526,9 @@ function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (vie
     <QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onRecordPayment={beginPayment} />
     <GroupPickerSheet open={paymentPickerOpen} onClose={() => setPaymentPickerOpen(false)} groups={activeGroups} onPick={setPaymentGroupId} />
     {activeGroups.length ? <AddExpenseSheet key={addOpen ? 'expense-open' : 'expense-closed'} open={addOpen} onClose={() => { setAddOpen(false); setScanSeed(null); }} data={data} update={update} seed={scanSeed} /> : null}
-    <ReceiptScanner open={scannerOpen} onClose={() => setScannerOpen(false)} data={data} onUse={(seed) => { setScanSeed(seed); setScannerOpen(false); setAddOpen(true); }} />
+    <ReceiptScanner open={scannerOpen} onClose={() => setScannerOpen(false)} data={data} onParseReceipt={collaboration?.onParseReceipt} onUse={(seed) => { setScanSeed(seed); setScannerOpen(false); setAddOpen(true); }} />
     <NewGroupSheet open={groupOpen} onClose={() => setGroupOpen(false)} data={data} update={update} onCreated={(groupId) => navigate({ name: 'group', groupId })} onJoinGroup={collaboration?.onJoinGroup} />
-    {paymentGroup ? <SettleSheet open={Boolean(paymentGroup)} onClose={() => setPaymentGroupId(null)} group={paymentGroup} balances={paymentBalances} data={data} update={update} /> : null}
+    {paymentGroup ? <SettleSheet open={Boolean(paymentGroup)} onClose={() => setPaymentGroupId(null)} group={paymentGroup} balances={paymentBalances} data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} /> : null}
   </AppShell>;
 }
 
@@ -639,7 +642,7 @@ function ActivityScreen({ navigate, collaboration }: { navigate: (view: View) =>
     <GroupPickerSheet open={paymentPickerOpen} onClose={() => setPaymentPickerOpen(false)} groups={activeGroups} onPick={setPaymentGroupId} />
     {activeGroups.length ? <AddExpenseSheet key={addOpen ? 'expense-open' : 'expense-closed'} open={addOpen} onClose={() => setAddOpen(false)} data={data} update={update} /> : null}
     <NewGroupSheet open={groupOpen} onClose={() => setGroupOpen(false)} data={data} update={update} onCreated={(groupId) => navigate({ name: 'group', groupId })} onJoinGroup={collaboration?.onJoinGroup} />
-    {paymentGroup ? <SettleSheet open={Boolean(paymentGroup)} onClose={() => setPaymentGroupId(null)} group={paymentGroup} balances={groupBalances(paymentGroup, data.expenses, data.settlements)} data={data} update={update} /> : null}
+    {paymentGroup ? <SettleSheet open={Boolean(paymentGroup)} onClose={() => setPaymentGroupId(null)} group={paymentGroup} balances={groupBalances(paymentGroup, data.expenses, data.settlements)} data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} /> : null}
   </AppShell>;
 }
 
@@ -746,7 +749,7 @@ function GroupScreen({ groupId, navigate, collaboration }: { groupId: string; na
     {tab === 'expenses' ? <section className="px-5 pt-3"><div className="mb-3 flex gap-2"><div className="relative min-w-0 flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search expenses" className="w-full rounded-xl border border-border bg-surface pl-9 pr-3 py-2.5 text-xs outline-none focus:border-primary" /></div><button type="button" onClick={() => setFilterOpen(true)} className={`press grid size-10 place-items-center rounded-xl border ${categoryFilter !== 'all' || mineOnly || unsettledOnly ? 'border-primary bg-secondary text-primary' : 'border-border bg-surface text-muted-foreground'}`}><Filter size={15} /></button></div><div className="overflow-hidden rounded-2xl border border-border bg-surface">{filteredExpenses.map((expense) => { const category = categoryOf(expense.category); return <button type="button" key={expense.id} onClick={() => setSelectedExpense(expense)} className={`expense-row category-${category.id} press flex w-full items-center gap-3 border-b border-border px-3 py-3.5 text-left last:border-b-0`}><span className="expense-category grid size-10 shrink-0 place-items-center rounded-xl text-lg">{category.emoji}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{expense.description}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{payerSummary(expense, group, data)} paid · {new Date(expense.date).toLocaleDateString([], { day: 'numeric', month: 'short' })}</p></div><span className="tabular shrink-0 text-sm font-extrabold">{money(expense.amount, group.currency)}</span><ChevronRight size={14} className="text-muted-foreground" /></button>; })}{filteredExpenses.length === 0 ? <div className="p-8 text-center"><p className="text-sm font-extrabold">No matching expenses</p><p className="mt-1 text-xs text-muted-foreground">Change your search or filters.</p></div> : null}</div></section> : tab === 'balances' ? <BalancesTab group={group} data={data} balances={balances} update={update} newMember={newMember} setNewMember={setNewMember} /> : <InsightsTab group={group} data={data} expenses={expenses} />}
     <QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => !isArchived && setAddOpen(true)} onNewGroup={() => navigate({ name: 'home' })} onRecordPayment={() => !isArchived && setSettleOpen(true)} />
     <AddExpenseSheet key={addOpen ? 'expense-open' : 'expense-closed'} open={addOpen} onClose={() => { setAddOpen(false); setEditingExpense(null); }} data={data} update={update} defaultGroupId={group.id} editing={editingExpense} />
-    <SettleSheet open={settleOpen} onClose={() => setSettleOpen(false)} group={group} balances={balances} data={data} update={update} />
+    <SettleSheet open={settleOpen} onClose={() => setSettleOpen(false)} group={group} balances={balances} data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} />
     <EditGroupSheet open={editGroupOpen} onClose={() => setEditGroupOpen(false)} group={group} update={update} />
     <DuplicateGroupDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} group={group} data={data} update={update} onCreated={(id) => navigate({ name: 'group', groupId: id })} />
     <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} title={`Share ${group.name}`} message={buildGroupShareMessage(group, data)} />
@@ -841,7 +844,7 @@ function ExpenseBreakdown({ expense, group, data, onHistory }: { expense: Expens
   const historyCount = (data.history ?? []).filter((entry) => entry.expenseId === expense.id).length;
   const receiptItems = expense.receiptItems ?? [];
   const selectiveItems = expense.selectiveItems ?? [];
-  return <div className="space-y-3"><div className="result-total rounded-2xl bg-surface-2 p-4"><p className="text-[12px] font-extrabold text-primary">💸 Splitzap</p><p className="mt-1.5 text-xl font-extrabold">{expense.description} · {shareMoney(expense.amount, group.currency)}</p>{chargeLine ? <p className="mt-1.5 text-[11px] font-semibold text-muted-foreground">Additional charges · {chargeLine}</p> : null}<p className="mt-1 text-[12px] text-muted-foreground">Paid by {payerSummary(expense, group, data, true)}</p></div><div className="result-document overflow-hidden rounded-2xl border border-border bg-surface"><section className="p-4"><div className="flex items-center justify-between"><p className="text-sm font-extrabold">Settlement</p><span className="text-[11px] font-semibold text-muted-foreground">Who owes whom</span></div><div className="mt-3 space-y-2">{debts.length ? debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-3"><span className="min-w-0 flex-1 truncate text-sm font-semibold">{displayName(group, data, debt.from)} → {displayName(group, data, debt.to)}</span><span className="tabular text-sm font-extrabold">{shareMoney(debt.amount, group.currency)}</span></div>) : <div className="rounded-xl bg-surface-2 px-3 py-3 text-sm font-semibold text-muted-foreground">Everyone is settled for this expense.</div>}</div></section>{selectiveItems.length ? <section className="border-t border-border p-4"><div className="flex items-center justify-between"><p className="text-sm font-extrabold">Shared by some people</p><span className="text-[11px] text-muted-foreground">{selectiveItems.length} {selectiveItems.length === 1 ? 'item' : 'items'}</span></div><div className="mt-2 space-y-2">{selectiveItems.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 py-1"><div className="min-w-0"><p className="truncate text-xs font-bold">{item.description}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{item.memberIds.map((id) => displayName(group, data, id)).join(', ')} · {item.mode === 'equal' ? 'Equal' : item.mode === 'exact' ? 'Exact' : 'Percentage'}</p></div><span className="tabular shrink-0 text-xs font-extrabold">{shareMoney(item.amount, group.currency)}</span></div>)}</div></section> : null}{receiptItems.length ? <section className="border-t border-border p-4"><div className="flex items-center justify-between"><p className="text-sm font-extrabold">Scanned bill items</p><span className="text-[11px] text-muted-foreground">{receiptItems.length} items</span></div><div className="mt-2 divide-y divide-border">{receiptItems.map((item) => <div key={item.id} className="flex items-center gap-3 py-2.5"><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{item.description}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{item.memberId ? displayName(group, data, item.memberId) : 'Shared'}</p></div><span className="tabular text-xs font-extrabold">{shareMoney(item.amount, group.currency)}</span></div>)}</div></section> : null}{labels.length ? <section className="border-t border-border p-4"><p className="text-sm font-extrabold">Details</p><div className="mt-2 divide-y divide-border">{labels.map((detail) => <div key={detail.key} className="py-2.5 text-[12px] text-muted-foreground">{detail.text}</div>)}</div></section> : null}</div>{historyCount && onHistory ? <button type="button" onClick={onHistory} className="press flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-surface-2 px-3 text-xs font-bold text-muted-foreground"><History size={14} /> View edit history ({historyCount})</button> : null}</div>;
+  return <div className="space-y-3"><div className="result-total rounded-2xl bg-surface-2 p-4"><p className="text-[12px] font-extrabold text-primary">💸 Splitzap</p><p className="mt-1.5 text-xl font-extrabold">{expense.description} · {shareMoney(expense.amount, group.currency)}</p>{chargeLine ? <p className="mt-1.5 text-[11px] font-semibold text-muted-foreground">Additional charges · {chargeLine}</p> : null}<p className="mt-1 text-[12px] text-muted-foreground">Paid by {payerSummary(expense, group, data, true)}</p></div><div className="result-document overflow-hidden rounded-2xl border border-border bg-surface"><section className="p-4"><div className="flex items-center justify-between"><p className="text-sm font-extrabold">Settlement</p><span className="text-[11px] font-semibold text-muted-foreground">Who owes whom</span></div><div className="mt-3 space-y-2">{debts.length ? debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-3"><span className="min-w-0 flex-1 truncate text-sm font-semibold">{displayName(group, data, debt.from)} → {displayName(group, data, debt.to)}</span><span className="tabular text-sm font-extrabold">{shareMoney(debt.amount, group.currency)}</span></div>) : <div className="rounded-xl bg-surface-2 px-3 py-3 text-sm font-semibold text-muted-foreground">Everyone is settled for this expense.</div>}</div></section>{selectiveItems.length ? <section className="border-t border-border p-4"><div className="flex items-center justify-between"><p className="text-sm font-extrabold">Shared by some people</p><span className="text-[11px] text-muted-foreground">{selectiveItems.length} {selectiveItems.length === 1 ? 'item' : 'items'}</span></div><div className="mt-2 space-y-2">{selectiveItems.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 py-1"><div className="min-w-0"><p className="truncate text-xs font-bold">{item.description}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{item.memberIds.map((id) => displayName(group, data, id)).join(', ')} · {item.mode === 'equal' ? 'Equal' : item.mode === 'exact' ? 'Exact' : 'Percentage'}</p></div><span className="tabular shrink-0 text-xs font-extrabold">{shareMoney(item.amount, group.currency)}</span></div>)}</div></section> : null}{receiptItems.length ? <section className="border-t border-border p-4"><div className="flex items-center justify-between"><p className="text-sm font-extrabold">Scanned bill items</p><span className="text-[11px] text-muted-foreground">{receiptItems.length} items</span></div><div className="mt-2 divide-y divide-border">{receiptItems.map((item) => <div key={item.id} className="flex items-center gap-3 py-2.5"><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{item.description}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{item.memberIds?.length ? item.memberIds.map((id) => displayName(group, data, id)).join(', ') : item.memberId ? displayName(group, data, item.memberId) : 'Everyone'}</p></div><span className="tabular text-xs font-extrabold">{shareMoney(item.amount, group.currency)}</span></div>)}</div></section> : null}{labels.length ? <section className="border-t border-border p-4"><p className="text-sm font-extrabold">Details</p><div className="mt-2 divide-y divide-border">{labels.map((detail) => <div key={detail.key} className="py-2.5 text-[12px] text-muted-foreground">{detail.text}</div>)}</div></section> : null}</div>{historyCount && onHistory ? <button type="button" onClick={onHistory} className="press flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-surface-2 px-3 text-xs font-bold text-muted-foreground"><History size={14} /> View edit history ({historyCount})</button> : null}</div>;
 }
 
 function ExpenseResultSheet({ open, onClose, expense, group, data, onEdit, onDelete, onSettle }: { open: boolean; onClose: () => void; expense: Expense | null; group: Group; data: SplitData; onEdit?: () => void; onDelete?: () => void; onSettle?: () => void }) {
@@ -856,48 +859,6 @@ function HistoryDialog({ open, onClose, expense, data }: { open: boolean; onClos
   return <SheetModal open={open} onClose={onClose} title="Edit history" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>{entries.length ? <div className="space-y-3">{entries.map((entry) => <div key={entry.id} className="rounded-2xl border border-border bg-surface-2 p-3"><p className="mb-2 text-[11px] font-bold text-muted-foreground">{new Date(entry.date).toLocaleString()}</p><div className="space-y-2">{entry.changes.map((change, index) => <div key={`${change.field}-${index}`} className="text-xs"><p className="font-bold">{change.field}</p><p className="mt-0.5 break-words text-muted-foreground">{change.from} → {change.to}</p></div>)}</div></div>)}</div> : <div className="rounded-3xl bg-surface-2 p-6 text-center"><div className="mx-auto grid size-12 place-items-center rounded-2xl bg-secondary text-primary"><History size={20} /></div><p className="mt-3 text-sm font-extrabold">No edits yet</p><p className="mt-1 text-xs text-muted-foreground">Changes to this expense will appear here.</p></div>}</SheetModal>;
 }
 
-
-function receiptAmount(raw: string) {
-  const clean = raw.replace(/[,\s]/g, '').replace(/[^0-9.-]/g, '');
-  const value = Number(clean);
-  return Number.isFinite(value) ? value : 0;
-}
-
-function parseReceiptText(text: string): ParsedReceipt {
-  const rawLines = text.split(/\r?\n/).map((line) => line.replace(/[|]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
-  const totalPattern = /\b(grand\s*total|net\s*total|total\s*amount|amount\s*(due|payable)|payable\s*amount|total)\b/i;
-  const subTotalPattern = /\b(sub\s*total|subtotal)\b/i;
-  const chargePattern = /\b(cgst|sgst|igst|gst|vat|tax|cess|service\s*(charge|fee)|tip|packing\s*(charge|fee)|delivery\s*(charge|fee))\b/i;
-  const discountPattern = /\b(discount|coupon|saving|savings|promo)\b/i;
-  const headerPattern = /\b(qty|quantity|rate|price|amount|description|item)\b/i;
-  const pricePattern = /(?:₹|rs\.?|inr)?\s*(-?\d{1,7}(?:,\d{3})*(?:\.\d{1,2})?)\s*$/i;
-  let detectedTotal: number | null = null;
-  const items: ReceiptItem[] = [];
-  const charges: AdditionalCharge[] = [];
-
-  const merchant = rawLines.find((line) => /[a-z]{3}/i.test(line) && !pricePattern.test(line) && line.length <= 70 && !/invoice|receipt|tax\s*invoice|phone|gstin|date|time/i.test(line))?.slice(0, 60) ?? 'Scanned bill';
-
-  rawLines.forEach((line) => {
-    const match = line.match(pricePattern);
-    if (!match || match.index == null) return;
-    const amount = receiptAmount(match[1] ?? '');
-    if (amount <= 0 || amount > 10000000) return;
-    const description = line.slice(0, match.index).replace(/[.:\-–—]+$/g, '').trim();
-    if (!description) return;
-    if (subTotalPattern.test(description)) return;
-    if (totalPattern.test(description)) { detectedTotal = amount; return; }
-    if (discountPattern.test(description)) return;
-    if (headerPattern.test(description) && description.split(' ').length <= 3) return;
-    if (chargePattern.test(description)) {
-      charges.push({ id: uid(), description, amount, distribution: 'equal' });
-      return;
-    }
-    items.push({ id: uid(), description, amount });
-  });
-
-  if (!items.length && detectedTotal && detectedTotal > 0) items.push({ id: uid(), description: 'Bill total', amount: detectedTotal });
-  return { merchant, detectedTotal, items, charges };
-}
 
 async function preprocessReceiptImage(file: File): Promise<Blob> {
   const url = URL.createObjectURL(file);
@@ -930,7 +891,7 @@ async function preprocessReceiptImage(file: File): Promise<Blob> {
   }
 }
 
-function ReceiptScanner({ open, onClose, data, onUse }: { open: boolean; onClose: () => void; data: SplitData; onUse: (seed: ScanExpenseSeed) => void }) {
+function ReceiptScanner({ open, onClose, data, onParseReceipt, onUse }: { open: boolean; onClose: () => void; data: SplitData; onParseReceipt?: (text: string) => Promise<SplitzapReceiptIntelligence>; onUse: (seed: ScanExpenseSeed) => void }) {
   const availableGroups = data.groups.filter((item) => (item.status ?? item.sharedStatus ?? 'active') !== 'archived');
   const [groupId, setGroupId] = useState(availableGroups[0]?.id ?? '');
   const [file, setFile] = useState<File | null>(null);
@@ -941,8 +902,12 @@ function ReceiptScanner({ open, onClose, data, onUse }: { open: boolean; onClose
   const [error, setError] = useState('');
   const [merchant, setMerchant] = useState('Scanned bill');
   const [detectedTotal, setDetectedTotal] = useState<number | null>(null);
-  const [items, setItems] = useState<ReceiptItem[]>([]);
+  const [items, setItems] = useState<ReceiptScanItem[]>([]);
   const [charges, setCharges] = useState<AdditionalCharge[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [matched, setMatched] = useState(false);
+  const [difference, setDifference] = useState<number | null>(null);
+  const [assigningItemId, setAssigningItemId] = useState<string | null>(null);
   const [rawText, setRawText] = useState('');
   const group = availableGroups.find((entry) => entry.id === groupId) ?? availableGroups[0];
   const baseTotal = items.reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
@@ -967,13 +932,14 @@ function ReceiptScanner({ open, onClose, data, onUse }: { open: boolean; onClose
     setRawText('');
     setItems([]);
     setCharges([]);
+    setWarnings([]); setMatched(false); setDifference(null); setAssigningItemId(null);
     setDetectedTotal(null);
     setMerchant('Scanned bill');
   };
 
   const reset = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setFile(null); setPreviewUrl(''); setStatus('idle'); setProgress(0); setError(''); setRawText(''); setItems([]); setCharges([]); setDetectedTotal(null); setMerchant('Scanned bill');
+    setFile(null); setPreviewUrl(''); setStatus('idle'); setProgress(0); setError(''); setRawText(''); setItems([]); setCharges([]); setWarnings([]); setMatched(false); setDifference(null); setAssigningItemId(null); setDetectedTotal(null); setMerchant('Scanned bill');
   };
 
   const close = () => { reset(); onClose(); };
@@ -994,12 +960,15 @@ function ReceiptScanner({ open, onClose, data, onUse }: { open: boolean; onClose
       } });
       const result = await worker.recognize(processed);
       const text = result.data.text ?? '';
-      const parsed = parseReceiptText(text);
+      if (!onParseReceipt) throw new Error('Receipt intelligence is unavailable right now.');
+      setProgress(0.98); setProgressLabel('Structuring items and charges…');
+      const parsed = await onParseReceipt(text);
       setRawText(text);
       setMerchant(parsed.merchant);
       setDetectedTotal(parsed.detectedTotal);
-      setItems(parsed.items);
-      setCharges(parsed.charges);
+      setItems(parsed.items.map((item) => ({ ...item, id: uid(), amount: Math.max(0, Number(item.amount) || 0) })));
+      setCharges(parsed.charges.map((charge) => ({ id: uid(), description: charge.description, amount: Math.max(0, Number(charge.amount) || 0), distribution: charge.distribution === 'equal' ? 'equal' : 'proportional' })));
+      setWarnings(parsed.warnings); setMatched(parsed.matched); setDifference(parsed.difference);
       setProgress(1);
       setStatus('review');
     } catch (cause) {
@@ -1012,16 +981,38 @@ function ReceiptScanner({ open, onClose, data, onUse }: { open: boolean; onClose
 
   const changeGroup = (nextId: string) => {
     setGroupId(nextId);
-    setItems((current) => current.map((item) => ({ ...item, memberId: undefined })));
+    setItems((current) => current.map((item) => ({ ...item, memberId: undefined, memberIds: undefined })));
   };
 
+  const setItemMembers = (itemId: string, ids: string[]) => {
+    if (!group) return;
+    const unique = [...new Set(ids)].filter((id) => group.members.some((member) => member.id === id));
+    if (!unique.length) return;
+    const all = unique.length === group.members.length;
+    setItems((current) => current.map((item) => item.id === itemId ? { ...item, memberId: !all && unique.length === 1 ? unique[0] : undefined, memberIds: all ? undefined : unique } : item));
+  };
+  const assignedIds = (item: ReceiptScanItem) => item.memberIds?.length ? item.memberIds : item.memberId ? [item.memberId] : group?.members.map((member) => member.id) ?? [];
+  const assignmentLabel = (item: ReceiptScanItem) => {
+    if (!group) return 'Shared';
+    const ids = assignedIds(item);
+    if (ids.length >= group.members.length) return 'Everyone';
+    if (ids.length === 1) return displayName(group, data, ids[0]!);
+    return `${ids.length} people`;
+  };
   const useBill = () => {
     if (!group || baseTotal <= 0) return;
     const cleanItems = items.filter((item) => item.amount > 0).map((item) => ({ ...item, description: item.description.trim() || 'Bill item' }));
-    const receiptIds = new Set(cleanItems.map((item) => item.id));
-    const personalItems: PersonalItem[] = cleanItems.filter((item) => item.memberId).map((item) => ({ id: item.id, memberId: item.memberId!, description: item.description, amount: item.amount }));
+    const personalItems: PersonalItem[] = [];
+    const selectiveItems: SelectiveItem[] = [];
+    const receiptItems: ReceiptItem[] = cleanItems.map((item) => {
+      const ids = assignedIds(item);
+      const all = ids.length >= group.members.length;
+      if (!all && ids.length === 1) personalItems.push({ id: item.id, memberId: ids[0]!, description: item.description, amount: item.amount });
+      else if (!all && ids.length > 1) selectiveItems.push({ id: item.id, description: item.description, amount: item.amount, memberIds: ids, mode: 'equal', split: Object.fromEntries(ids.map((id) => [id, 1])) });
+      return { id: item.id, description: item.description, amount: item.amount, memberId: !all && ids.length === 1 ? ids[0] : undefined, memberIds: all ? undefined : ids };
+    });
     const cleanCharges = charges.filter((charge) => charge.amount > 0).map((charge) => ({ ...charge, description: charge.description.trim() || 'Charge' }));
-    onUse({ groupId: group.id, description: merchant.trim() || 'Scanned bill', amount: cleanItems.reduce((sum, item) => sum + item.amount, 0), personalItems: personalItems.filter((item) => receiptIds.has(item.id)), additionalCharges: cleanCharges, receiptItems: cleanItems });
+    onUse({ groupId: group.id, description: merchant.trim() || 'Scanned bill', amount: cleanItems.reduce((sum, item) => sum + item.amount, 0), personalItems, selectiveItems, additionalCharges: cleanCharges, receiptItems });
     reset();
   };
 
@@ -1031,15 +1022,15 @@ function ReceiptScanner({ open, onClose, data, onUse }: { open: boolean; onClose
       <Field label="Group"><select value={group?.id ?? ''} onChange={(event) => changeGroup(event.target.value)} className={`${inputClass} py-2.5 text-sm`}>{availableGroups.map((entry) => <option key={entry.id} value={entry.id}>{entry.emoji} {entry.name}</option>)}</select></Field>
       {status !== 'review' ? <>
         <div className="grid grid-cols-2 gap-2"><label className="press flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-primary px-3 py-3.5 text-xs font-bold text-primary-foreground"><Camera size={16} /> Camera<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { chooseFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label><label className="press flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-secondary px-3 py-3.5 text-xs font-bold text-primary"><ImagePlus size={16} /> Photo library<input type="file" accept="image/*" className="hidden" onChange={(event) => { chooseFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label></div>
-        {previewUrl ? <div className="mt-3 overflow-hidden rounded-3xl border border-border bg-surface-2"><img src={previewUrl} alt="Receipt preview" className="max-h-72 w-full object-contain" /></div> : <div className="mt-3 rounded-3xl border border-dashed border-border bg-surface-2 p-7 text-center"><div className="mx-auto grid size-14 place-items-center rounded-2xl bg-secondary text-primary"><Camera size={24} /></div><p className="mt-3 text-sm font-extrabold">Photograph the full receipt</p><p className="mx-auto mt-1 max-w-[290px] text-xs leading-5 text-muted-foreground">Keep it flat, well lit and readable. Splitzap processes the image on this device.</p></div>}
+        {previewUrl ? <div className="mt-3 overflow-hidden rounded-3xl border border-border bg-surface-2"><img src={previewUrl} alt="Receipt preview" className="max-h-72 w-full object-contain" /></div> : <div className="mt-3 rounded-3xl border border-dashed border-border bg-surface-2 p-7 text-center"><div className="mx-auto grid size-14 place-items-center rounded-2xl bg-secondary text-primary"><Camera size={24} /></div><p className="mt-3 text-sm font-extrabold">Photograph the full receipt</p><p className="mx-auto mt-1 max-w-[290px] text-xs leading-5 text-muted-foreground">Keep it flat, well lit and readable. The photo stays on this device. Only detected receipt text is analyzed to structure items and charges.</p></div>}
         {status === 'scanning' ? <div className="mt-3 rounded-2xl bg-secondary p-3"><div className="flex items-center gap-2 text-xs font-bold text-primary"><Loader2 size={15} className="animate-spin" /> {progressLabel}</div><div className="mt-2 h-2 overflow-hidden rounded-full bg-surface"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(4, progress * 100)}%` }} /></div></div> : null}
         {status === 'error' ? <div className="mt-3 rounded-2xl border border-negative/20 bg-negative/5 p-3 text-xs font-semibold text-negative">{error}</div> : null}
         <button type="button" disabled={!file || status === 'scanning'} onClick={scan} className="press mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-bold text-primary-foreground disabled:opacity-40">{status === 'scanning' ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} {status === 'scanning' ? 'Scanning…' : 'Scan bill'}</button>
       </> : <>
-        <div className="rounded-2xl bg-secondary p-3"><p className="text-xs font-extrabold text-primary">Review before adding</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">OCR can make mistakes. Edit anything that does not match the receipt.</p></div>
+        <div className={`rounded-2xl p-3 ${matched ? 'bg-positive/10' : 'bg-secondary'}`}><div className="flex items-start justify-between gap-3"><div><p className={`text-xs font-extrabold ${matched ? 'text-positive' : 'text-primary'}`}>{matched ? '✓ Receipt total matched' : 'Review before adding'}</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">Items and charges were structured automatically from the detected receipt text. Edit anything that does not match.</p></div>{detectedTotal != null ? <span className="tabular shrink-0 text-xs font-extrabold">{money(detectedTotal, group?.currency ?? '₹')}</span> : null}</div>{difference != null && Math.abs(difference) > 0.05 ? <p className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] font-semibold text-negative">{money(Math.abs(difference), group?.currency ?? '₹')} {difference > 0 ? 'is not yet identified.' : 'is over the detected total.'}</p> : null}{warnings.length ? <div className="mt-2 space-y-1">{warnings.slice(0, 3).map((warning, index) => <p key={`${warning}-${index}`} className="text-[10px] leading-4 text-muted-foreground">⚠ {warning}</p>)}</div> : null}</div>
         <Field label="Expense name"><input value={merchant} onChange={(event) => setMerchant(event.target.value)} placeholder="Restaurant, groceries…" className={inputClass} /></Field>
-        <div className="mb-1 grid grid-cols-[minmax(100px,1fr)_76px_108px_28px] gap-1.5 px-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span className="text-center">For</span><span /></div>
-        <div className="space-y-1.5">{items.map((item) => <div key={item.id} className="grid grid-cols-[minmax(100px,1fr)_76px_108px_28px] items-center gap-1.5"><input value={item.description} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, description: event.target.value } : entry))} placeholder="Item" className="min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-xs" /><input value={item.amount || ''} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : entry))} inputMode="decimal" placeholder="0" className="tabular min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-right text-xs font-bold" /><select value={item.memberId ?? ''} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, memberId: event.target.value || undefined } : entry))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-1 py-2.5 text-center text-[10px] font-semibold"><option value="">Shared</option>{group?.members.map((member) => <option key={member.id} value={member.id}>{displayName(group, data, member.id)}</option>)}</select><button type="button" onClick={() => setItems((current) => current.filter((entry) => entry.id !== item.id))} className="press grid size-7 place-items-center rounded-full bg-surface-2 text-negative"><X size={12} /></button></div>)}</div>
+        <div className="mb-1 grid grid-cols-[minmax(100px,1fr)_76px_104px_28px] gap-1.5 px-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span className="text-center">For</span><span /></div>
+        <div className="space-y-1.5">{items.map((item, index) => <div key={item.id} className="rounded-xl bg-surface-2/60 p-1"><div className="grid grid-cols-[minmax(100px,1fr)_76px_104px_28px] items-center gap-1.5"><div className="min-w-0"><input value={item.description} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, description: event.target.value } : entry))} placeholder="Item" className="w-full min-w-0 rounded-xl border border-border bg-surface px-2 py-2.5 text-xs" />{item.quantity && item.quantity > 1 ? <span className="mt-0.5 block px-1 text-[9px] font-semibold text-muted-foreground">Qty {item.quantity}</span> : null}{item.confidence === 'low' ? <span className="mt-0.5 block px-1 text-[9px] font-semibold text-amber-700">⚠ Check text</span> : null}</div><input value={item.amount || ''} onChange={(event) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : entry))} inputMode="decimal" placeholder="0" className="tabular min-w-0 rounded-xl border border-border bg-surface px-2 py-2.5 text-right text-xs font-bold" /><button type="button" onClick={() => setAssigningItemId((current) => current === item.id ? null : item.id)} className="press min-h-10 min-w-0 truncate rounded-xl border border-border bg-surface px-1.5 text-[10px] font-bold text-primary">{assignmentLabel(item)}</button><button type="button" onClick={() => setItems((current) => current.filter((entry) => entry.id !== item.id))} className="press grid size-7 place-items-center rounded-full bg-surface text-negative"><X size={12} /></button></div>{assigningItemId === item.id && group ? <div className="mt-1.5 rounded-xl border border-primary/10 bg-surface p-2.5"><div className="flex flex-wrap gap-1.5"><button type="button" onClick={() => setItemMembers(item.id, group.members.map((member) => member.id))} className="press rounded-full bg-secondary px-2.5 py-1.5 text-[10px] font-bold text-primary">Everyone</button><button type="button" onClick={() => setItemMembers(item.id, [memberIdFor(group, data)])} className="press rounded-full bg-secondary px-2.5 py-1.5 text-[10px] font-bold text-primary">Just me</button>{index > 0 ? <button type="button" onClick={() => setItemMembers(item.id, assignedIds(items[index - 1]!))} className="press rounded-full bg-secondary px-2.5 py-1.5 text-[10px] font-bold text-primary">Same as previous</button> : null}</div><div className="mt-2 flex flex-wrap gap-1.5">{group.members.map((member) => { const selected = assignedIds(item).includes(member.id); return <button type="button" key={member.id} onClick={() => { const current = assignedIds(item); const next = selected ? current.filter((id) => id !== member.id) : [...current, member.id]; if (next.length) setItemMembers(item.id, next); }} className={`press rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-surface-2 text-muted-foreground'}`}>{selected ? '✓ ' : '+ '}{displayName(group, data, member.id)}</button>; })}</div></div> : null}</div>)}</div>
         <button type="button" onClick={() => setItems((current) => [...current, { id: uid(), description: '', amount: 0 }])} className="press mt-2 w-full rounded-xl border border-dashed border-border bg-surface-2 py-2.5 text-xs font-bold text-primary">+ Add item</button>
         {charges.length ? <div className="mt-4"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">Detected charges</p><div className="grid grid-cols-[minmax(100px,1fr)_82px_106px_28px] gap-1.5 px-1 pb-1 text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground"><span>Item</span><span className="text-right">Amount</span><span className="text-center">Split</span><span /></div><div className="space-y-1.5">{charges.map((charge) => <div key={charge.id} className="grid grid-cols-[minmax(100px,1fr)_82px_106px_28px] items-center gap-1.5"><input value={charge.description} onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, description: event.target.value } : entry))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-xs" /><input value={charge.amount || ''} onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, amount: Number(event.target.value.replace(/[^0-9.]/g, '')) || 0 } : entry))} inputMode="decimal" className="tabular min-w-0 rounded-xl border border-border bg-surface-2 px-2 py-2.5 text-right text-xs font-bold" /><select value={charge.distribution} onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, distribution: event.target.value === 'proportional' ? 'proportional' : 'equal' } : entry))} className="min-w-0 rounded-xl border border-border bg-surface-2 px-1 py-2.5 text-center text-[10px] font-semibold"><option value="equal">Equal</option><option value="proportional">Proportional</option></select><button type="button" onClick={() => setCharges((current) => current.filter((entry) => entry.id !== charge.id))} className="press grid size-7 place-items-center rounded-full bg-surface-2 text-negative"><X size={12} /></button></div>)}</div></div> : null}
         <div className={`mt-4 rounded-2xl p-3 ${mismatch ? 'border border-amber-300 bg-amber-50' : 'bg-secondary'}`}><div className="flex items-center justify-between text-xs"><span className="font-semibold text-muted-foreground">Reviewed total</span><span className="tabular text-base font-extrabold text-primary">{money(reviewedTotal, group?.currency)}</span></div>{detectedTotal != null ? <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground"><span>Receipt total detected</span><span className="tabular font-bold">{money(detectedTotal, group?.currency)}</span></div> : null}{mismatch ? <p className="mt-2 text-[10px] font-bold text-amber-700">Totals do not match. Review missing items, discounts or OCR mistakes before continuing.</p> : null}</div>
@@ -1170,7 +1161,7 @@ function AddExpenseSheet({ open, onClose, data, update, defaultGroupId, editing,
   const [labelOpen, setLabelOpen] = useState<Record<string, boolean>>({});
   const [personalItems, setPersonalItems] = useState<PersonalItem[]>(editing?.personalItems ?? seed?.personalItems ?? []);
   const [personalOpen, setPersonalOpen] = useState(false);
-  const [selectiveItems, setSelectiveItems] = useState<SelectiveItem[]>(editing?.selectiveItems ?? []);
+  const [selectiveItems, setSelectiveItems] = useState<SelectiveItem[]>(editing?.selectiveItems ?? seed?.selectiveItems ?? []);
   const [selectiveOpen, setSelectiveOpen] = useState(false);
   const [charges, setCharges] = useState<AdditionalCharge[]>(editing?.additionalCharges ?? seed?.additionalCharges ?? []);
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editing?.receiptItems ?? seed?.receiptItems ?? []);
@@ -1366,29 +1357,48 @@ function NewGroupSheet({ open, onClose, data, update, onCreated, onJoinGroup }: 
   </SheetModal>;
 }
 
-function SettleSheet({ open, onClose, group, balances, data, update }: { open: boolean; onClose: () => void; group: Group; balances: Record<string, number>; data: SplitData; update: (fn: (data: SplitData) => SplitData) => void }) {
+function SettleSheet({ open, onClose, group, balances, data, update, getMemberUpi }: { open: boolean; onClose: () => void; group: Group; balances: Record<string, number>; data: SplitData; update: (fn: (data: SplitData) => SplitData) => void; getMemberUpi?: (group: Group, memberId: string) => Promise<string | null> }) {
   const debts = simplify(balances);
   const nameOf = (id: string) => displayName(group, data, id);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial'>('full');
   const [partialAmount, setPartialAmount] = useState('');
   const [breakdownOpen, setBreakdownOpen] = useState(false);
-  useEffect(() => { if (selectedDebt) { setPaymentMode('full'); setPartialAmount(''); } }, [selectedDebt?.from, selectedDebt?.to, selectedDebt?.amount]);
+  const [upiId, setUpiId] = useState<string | null>(null);
+  const [upiLoading, setUpiLoading] = useState(false);
+  const [upiAttempted, setUpiAttempted] = useState(false);
+  useEffect(() => { if (selectedDebt) { setPaymentMode('full'); setPartialAmount(''); setUpiAttempted(false); } }, [selectedDebt?.from, selectedDebt?.to, selectedDebt?.amount]);
   const partialValue = selectedDebt ? Math.min(selectedDebt.amount, Math.max(0, Number(partialAmount) || 0)) : 0;
+  const paymentAmount = selectedDebt ? (paymentMode === 'full' ? selectedDebt.amount : partialValue) : 0;
+  const currentMemberId = memberIdFor(group, data);
+  const canUseUpi = Boolean(selectedDebt && group.sharedId && group.currency === '₹' && selectedDebt.from === currentMemberId && getMemberUpi);
+  useEffect(() => {
+    let active = true;
+    setUpiId(null); setUpiLoading(false); setUpiAttempted(false);
+    if (!selectedDebt || !canUseUpi || !getMemberUpi) return () => { active = false; };
+    setUpiLoading(true);
+    void getMemberUpi(group, selectedDebt.to).then((value) => { if (active) setUpiId(value); }).catch(() => { if (active) setUpiId(null); }).finally(() => { if (active) setUpiLoading(false); });
+    return () => { active = false; };
+  }, [selectedDebt?.from, selectedDebt?.to, group.sharedId, group.currency, currentMemberId, getMemberUpi]);
   const rawDebts = data.expenses.filter((expense) => expense.groupId === group.id).flatMap((expense) => expenseSettlement(expense, group).map((debt) => ({ ...debt, expense })));
   const recorded = data.settlements.filter((settlement) => settlement.groupId === group.id).sort((a, b) => +new Date(b.date) - +new Date(a.date));
-  const savePayment = () => {
-    if (!selectedDebt) return;
-    const amount = paymentMode === 'full' ? selectedDebt.amount : partialValue;
-    if (amount <= 0) return;
-    const settlement = { id: uid(), groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, amount, date: new Date().toISOString() };
+  const recordPayment = () => {
+    if (!selectedDebt || paymentAmount <= 0) return;
+    const settlement = { id: uid(), groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, amount: paymentAmount, date: new Date().toISOString() };
     update((current) => {
       const next = { ...current, settlements: [settlement, ...current.settlements] };
       return group.sharedId ? next : withLocalActivity(next, { groupId: group.id, actorName: current.myName?.trim() || nameOf(memberIdFor(group, current)), eventType: 'payment_recorded', entityType: 'payment', entityId: settlement.id, data: { after: settlement } });
     });
+    setUpiAttempted(false);
     setSelectedDebt(null);
   };
-  return <><SheetModal open={open} onClose={onClose} title="Settle up" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>{debts.length === 0 ? <div className="celebration relative overflow-hidden rounded-3xl bg-secondary p-7 text-center"><ExpenseConfetti strong /><div className="success-check mx-auto grid size-16 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={30} strokeWidth={3} /></div><p className="mt-3 text-xl font-extrabold">All settled up</p><p className="mt-1 text-xs text-muted-foreground">Nothing is owed right now.</p></div> : <><div className="rounded-2xl bg-secondary px-3.5 py-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-sm">↔</span><p className="text-[11px] leading-5 text-secondary-foreground"><b>Simplified settlement.</b> Splitzap nets debts across the whole group to reduce the number of payments. You may be asked to pay someone different from the person who originally covered a specific expense.</p></div></div><div className="mt-3 space-y-2">{debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="settle-row flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"><Avatar name={nameOf(debt.from)} size={32} /><ArrowRight size={16} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={32} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{nameOf(debt.from)} → {nameOf(debt.to)}</p><p className="tabular text-sm font-bold text-primary">{money(debt.amount, group.currency)}</p></div><button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Mark paid</button></div>)}</div><button type="button" onClick={() => setBreakdownOpen((value) => !value)} className="press mt-3 flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-3 text-left"><span className="min-w-0 flex-1"><b className="block text-xs">Original breakdown</b><span className="mt-0.5 block text-[10px] text-muted-foreground">See who originally owed whom before simplification</span></span><ChevronDown size={16} className={`transition-transform ${breakdownOpen ? 'rotate-180' : ''}`} /></button>{breakdownOpen ? <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-surface"><div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Expense obligations</div>{rawDebts.length ? rawDebts.map(({ expense, ...debt }, index) => <div key={`${expense.id}-${debt.from}-${debt.to}-${index}`} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><b className="block truncate text-xs">{nameOf(debt.from)} → {nameOf(debt.to)}</b><span className="block truncate text-[10px] text-muted-foreground">{expense.description}</span></span><span className="tabular shrink-0 text-xs font-extrabold">{money(debt.amount, group.currency)}</span></div>) : <div className="border-t border-border px-3 py-3 text-xs text-muted-foreground">No original obligations.</div>}{recorded.length ? <><div className="border-t border-border px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Payments already recorded</div>{recorded.map((payment) => <div key={payment.id} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1 text-xs font-semibold">{nameOf(payment.from)} → {nameOf(payment.to)}</span><span className="tabular text-xs font-extrabold">{money(payment.amount, group.currency)}</span></div>)}</> : null}</div> : null}</>}</SheetModal><CompactDialog open={!!selectedDebt} onClose={() => setSelectedDebt(null)} title="Record payment" footer={<PrimaryButton onClick={savePayment} disabled={!selectedDebt || (paymentMode === 'partial' && partialValue <= 0)}>Save payment</PrimaryButton>}>{selectedDebt ? <><div className="rounded-2xl bg-surface-2 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Amount due</p><p className="mt-1 text-2xl font-extrabold">{money(selectedDebt.amount, group.currency)}</p><p className="mt-1 text-xs text-muted-foreground">{nameOf(selectedDebt.from)} → {nameOf(selectedDebt.to)}</p></div><div className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-2.5 py-2 text-[10px] leading-4 text-muted-foreground"><Info size={11} className="mt-0.5 shrink-0" /> This records the current simplified transfer as paid. Original expense details stay unchanged.</div><div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-surface-2 p-1"><button type="button" onClick={() => setPaymentMode('full')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'full' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Full payment</button><button type="button" onClick={() => setPaymentMode('partial')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'partial' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Partial payment</button></div>{paymentMode === 'partial' ? <div className="mt-3"><Field label="Amount paid" compact><input value={partialAmount} onChange={(event) => { const raw = event.target.value.replace(/[^0-9.]/g, ''); const next = Math.min(selectedDebt.amount, Math.max(0, Number(raw) || 0)); setPartialAmount(raw === '' ? '' : String(next)); }} inputMode="decimal" placeholder="0" className={`${inputClass} tabular text-right font-bold`} /></Field><div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs"><span className="font-semibold text-muted-foreground">Remaining after payment</span><span className="font-extrabold text-primary">{money(Math.max(0, selectedDebt.amount - partialValue), group.currency)}</span></div></div> : <p className="mt-3 text-xs text-muted-foreground">This records the full outstanding amount as paid.</p>}</> : null}</CompactDialog></>;
+  const launchUpi = () => {
+    if (!selectedDebt || !upiId || paymentAmount <= 0) return;
+    const params = new URLSearchParams({ pa: upiId, pn: nameOf(selectedDebt.to), am: paymentAmount.toFixed(2), cu: 'INR', tn: `Splitzap · ${group.name}` });
+    setUpiAttempted(true);
+    window.location.href = `upi://pay?${params.toString()}`;
+  };
+  return <><SheetModal open={open} onClose={onClose} title="Settle up" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>{debts.length === 0 ? <div className="celebration relative overflow-hidden rounded-3xl bg-secondary p-7 text-center"><ExpenseConfetti strong /><div className="success-check mx-auto grid size-16 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={30} strokeWidth={3} /></div><p className="mt-3 text-xl font-extrabold">All settled up</p><p className="mt-1 text-xs text-muted-foreground">Nothing is owed right now.</p></div> : <><div className="rounded-2xl bg-secondary px-3.5 py-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-sm">↔</span><p className="text-[11px] leading-5 text-secondary-foreground"><b>Simplified settlement.</b> Splitzap nets debts across the whole group to reduce the number of payments. You may be asked to pay someone different from the person who originally covered a specific expense.</p></div></div><div className="mt-3 space-y-2">{debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="settle-row flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"><Avatar name={nameOf(debt.from)} size={32} /><ArrowRight size={16} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={32} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{nameOf(debt.from)} → {nameOf(debt.to)}</p><p className="tabular text-sm font-bold text-primary">{money(debt.amount, group.currency)}</p></div><button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Mark paid</button></div>)}</div><button type="button" onClick={() => setBreakdownOpen((value) => !value)} className="press mt-3 flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-3 text-left"><span className="min-w-0 flex-1"><b className="block text-xs">Original breakdown</b><span className="mt-0.5 block text-[10px] text-muted-foreground">See who originally owed whom before simplification</span></span><ChevronDown size={16} className={`transition-transform ${breakdownOpen ? 'rotate-180' : ''}`} /></button>{breakdownOpen ? <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-surface"><div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Expense obligations</div>{rawDebts.length ? rawDebts.map(({ expense, ...debt }, index) => <div key={`${expense.id}-${debt.from}-${debt.to}-${index}`} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><b className="block truncate text-xs">{nameOf(debt.from)} → {nameOf(debt.to)}</b><span className="block truncate text-[10px] text-muted-foreground">{expense.description}</span></span><span className="tabular shrink-0 text-xs font-extrabold">{money(debt.amount, group.currency)}</span></div>) : <div className="border-t border-border px-3 py-3 text-xs text-muted-foreground">No original obligations.</div>}{recorded.length ? <><div className="border-t border-border px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Payments already recorded</div>{recorded.map((payment) => <div key={payment.id} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1 text-xs font-semibold">{nameOf(payment.from)} → {nameOf(payment.to)}</span><span className="tabular text-xs font-extrabold">{money(payment.amount, group.currency)}</span></div>)}</> : null}</div> : null}</>}</SheetModal><CompactDialog open={!!selectedDebt} onClose={() => setSelectedDebt(null)} title="Record payment" footer={<PrimaryButton onClick={recordPayment} disabled={!selectedDebt || (paymentMode === 'partial' && partialValue <= 0)}>Mark as paid</PrimaryButton>}>{selectedDebt ? <><div className="rounded-2xl bg-surface-2 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Amount due</p><p className="mt-1 text-2xl font-extrabold">{money(selectedDebt.amount, group.currency)}</p><p className="mt-1 text-xs text-muted-foreground">{nameOf(selectedDebt.from)} → {nameOf(selectedDebt.to)}</p></div><div className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-2.5 py-2 text-[10px] leading-4 text-muted-foreground"><Info size={11} className="mt-0.5 shrink-0" /> This records the current simplified transfer as paid. Original expense details stay unchanged.</div>{canUseUpi ? <div className="mt-3 rounded-2xl border border-primary/15 bg-secondary p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-xs font-extrabold text-primary">Pay with UPI</p><p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">Splitzap opens your payment app with the recipient and amount filled in.</p></div><span className="rounded-full bg-surface px-2 py-1 text-[9px] font-bold text-primary">UPI</span></div>{upiLoading ? <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Checking payment details…</p> : upiId ? <><button type="button" disabled={paymentAmount <= 0} onClick={launchUpi} className="press mt-2 w-full rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground disabled:opacity-40">Pay {money(paymentAmount, group.currency)} via UPI</button><p className="mt-1.5 text-[9px] leading-4 text-muted-foreground">Opening a UPI app does not mark the payment as completed. Splitzap will ask you to confirm.</p></> : <p className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] leading-4 text-muted-foreground">{nameOf(selectedDebt!.to)} has not enabled UPI payments in Splitzap.</p>}{upiAttempted ? <div className="mt-2 rounded-xl bg-surface p-2.5"><p className="text-[11px] font-extrabold">Did you complete the payment?</p><p className="mt-0.5 text-[10px] text-muted-foreground">{money(paymentAmount, group.currency)} to {nameOf(selectedDebt!.to)}</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setUpiAttempted(false)} className="press rounded-lg bg-surface-2 py-2 text-[10px] font-bold">Not yet</button><button type="button" onClick={recordPayment} className="press rounded-lg bg-primary py-2 text-[10px] font-bold text-primary-foreground">Yes, mark paid</button></div></div> : null}</div> : null}<div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-surface-2 p-1"><button type="button" onClick={() => setPaymentMode('full')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'full' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Full payment</button><button type="button" onClick={() => setPaymentMode('partial')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'partial' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Partial payment</button></div>{paymentMode === 'partial' ? <div className="mt-3"><Field label="Amount paid" compact><input value={partialAmount} onChange={(event) => { const raw = event.target.value.replace(/[^0-9.]/g, ''); const next = Math.min(selectedDebt.amount, Math.max(0, Number(raw) || 0)); setPartialAmount(raw === '' ? '' : String(next)); }} inputMode="decimal" placeholder="0" className={`${inputClass} tabular text-right font-bold`} /></Field><div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs"><span className="font-semibold text-muted-foreground">Remaining after payment</span><span className="font-extrabold text-primary">{money(Math.max(0, selectedDebt.amount - partialValue), group.currency)}</span></div></div> : <p className="mt-3 text-xs text-muted-foreground">This records the full outstanding amount as paid.</p>}</> : null}</CompactDialog></>;
 }
 
 function buildExpenseShareMessage(expense: Expense, group: Group, data: SplitData) {
