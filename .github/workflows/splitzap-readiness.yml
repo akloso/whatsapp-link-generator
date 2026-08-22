@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           grep -q '"id": "/splitzap"' public/splitzap.webmanifest
-          grep -q "splitzap-v3" public/splitzap-sw.js
+          grep -q "splitzap-v4" public/splitzap-sw.js
           test -f public/splitzap-icon-192.png
           test -f public/splitzap-icon-512.png
       - name: Production collaboration and data-safety assertions
