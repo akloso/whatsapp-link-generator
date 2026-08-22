@@ -56,6 +56,8 @@ jobs:
           test -f src/features/splitzap/splitzapProduction.ts
           test -f src/features/splitzap/splitzapSyncSafety.ts
           test -f src/features/splitzap/splitzapSyncSafety.test.ts
+          test ! -f scripts/tmp_splitzap_durable_sync_patch.py
+          test ! -f .github/workflows/tmp-splitzap-durable-sync.yml
           grep -q "SPLITZAP_SCHEMA_VERSION = 2" src/features/splitzap/splitStoreV4.ts
           grep -q "splitzap_update_shared_group_v2" src/features/splitzap/splitzapShared.ts
           grep -q "splitzap_get_profile_v2" src/features/splitzap/splitzapProduction.ts
@@ -72,6 +74,11 @@ jobs:
           grep -q "splitzap_get_group_member_upi" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_parse_receipt_text" src/features/splitzap/splitzapProduction.ts
           grep -q "preserveDirtyRemoteRow" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "preserveDirtySharedGroupsOnBootstrap" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "compactSnapshotFingerprint" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "SHARED_CONFIRMED_PREFIX" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "restartDirtySharedIds" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "across an app restart" src/features/splitzap/splitzapSyncSafety.test.ts
           grep -q "sharedSyncing" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "setSyncTick" src/features/splitzap/SplitzapCloudApp.tsx
           ! grep -Fq "[accountDataReady, data, session, status, update]" src/features/splitzap/SplitzapCloudApp.tsx
