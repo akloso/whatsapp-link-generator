@@ -68,6 +68,7 @@ export type Settlement = {
   to: string;
   amount: number;
   date: string;
+  note?: string;
 };
 
 export type Group = {
@@ -293,7 +294,7 @@ function normalize(data: SplitData): SplitData {
     myName: inferredName,
     groups,
     expenses: Array.isArray(data.expenses) ? data.expenses.map((expense) => normalizeExpense(expense)) : [],
-    settlements: Array.isArray(data.settlements) ? data.settlements : [],
+    settlements: Array.isArray(data.settlements) ? data.settlements.map((settlement) => ({ ...settlement, note: typeof settlement?.note === 'string' && settlement.note.trim() ? settlement.note.trim() : undefined })) : [],
     history: Array.isArray(data.history) ? data.history : [],
     activity: Array.isArray(data.activity) ? data.activity : [],
     preferences: data.preferences && typeof data.preferences === 'object' ? {

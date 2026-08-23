@@ -957,3 +957,43 @@ html[data-splitzap-reduced-motion="true"] .splitzap-root *::after { animation-du
     transform: scale(0.98);
   }
 }
+
+
+/* Splitzap mobile viewport hardening: center the welcome state without assuming one phone height. */
+.splitzap-home-center {
+  min-height: calc(100dvh - 9.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+}
+
+.sheet-panel--tall {
+  height: min(92dvh, calc(100dvh - max(0.5rem, env(safe-area-inset-top))));
+  max-height: calc(100dvh - max(0.5rem, env(safe-area-inset-top)));
+}
+
+.sheet-panel--tall .sheet-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+}
+
+@media (max-height: 700px) {
+  .splitzap-home-center {
+    min-height: auto;
+    align-items: flex-start;
+    padding-bottom: 1rem;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  .sheet-panel--tall {
+    height: calc(100dvh - max(0.5rem, env(safe-area-inset-top)));
+  }
+  .sheet-panel--tall .sheet-scroll {
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+}

@@ -62,10 +62,12 @@ import {
   type PersonalItem,
   type ReceiptItem,
   type SelectiveItem,
+  type Settlement,
   type SplitData,
   type SplitMode,
 } from './splitStoreV4';
 import type { SplitzapReceiptIntelligence } from './splitzapProduction';
+import { isValidUpiId, normalizeUpiId, settlementAuthority, upiIdFromQrValue } from './splitzapPaymentSafety';
 
 type View = { name: 'home' } | { name: 'activity' } | { name: 'group'; groupId: string };
 type GroupTab = 'expenses' | 'balances' | 'insights';
@@ -207,8 +209,76 @@ const payerSummary = (expense: Expense, group: Group, data: SplitData, detailed 
 
 const expenseSettlement = (expense: Expense, group: Group) => simplify(expenseBalances(expense, group));
 
+
+type PendingUpiAttempt = {
+  groupId: string;
+  from: string;
+  to: string;
+  amount: number;
+  paymentMode: 'full' | 'partial';
+  partialAmount: string;
+  note: string;
+  createdAt: string;
+};
+
+const PENDING_UPI_MAX_AGE_MS = 30 * 60 * 1000;
+const pendingUpiKey = (userId: string) => `splitzap.upiPending.${userId}`;
+
+function readPendingUpiAttempt(userId: string): PendingUpiAttempt | null {
+  if (!userId || typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(pendingUpiKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingUpiAttempt;
+    const created = +new Date(parsed.createdAt);
+    if (!parsed.groupId || !parsed.from || !parsed.to || !(parsed.amount > 0) || !Number.isFinite(created) || Date.now() - created > PENDING_UPI_MAX_AGE_MS) {
+      window.localStorage.removeItem(pendingUpiKey(userId));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingUpiAttempt(userId: string, attempt: PendingUpiAttempt) {
+  if (!userId || typeof window === 'undefined') return;
+  try { window.localStorage.setItem(pendingUpiKey(userId), JSON.stringify(attempt)); } catch { /* best effort */ }
+}
+
+function clearPendingUpiAttempt(userId: string) {
+  if (!userId || typeof window === 'undefined') return;
+  try { window.localStorage.removeItem(pendingUpiKey(userId)); } catch { /* best effort */ }
+}
+
 function useSplitzapPwa() {
   useEffect(() => {
+    const previousTitle = document.title;
+    document.title = 'Splitzap — Split bills, not bonds';
+
+    const setMeta = (name: string, content: string) => {
+      let tag = document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+      const created = !tag;
+      const previous = tag?.content ?? '';
+      if (!tag) {
+        tag = document.createElement('meta');
+        tag.setAttribute('name', name);
+        document.head.appendChild(tag);
+      }
+      tag.content = content;
+      return () => {
+        if (created) tag?.remove();
+        else if (tag) tag.content = previous;
+      };
+    };
+
+    const restoreMeta = [
+      setMeta('apple-mobile-web-app-title', 'Splitzap'),
+      setMeta('apple-mobile-web-app-capable', 'yes'),
+      setMeta('mobile-web-app-capable', 'yes'),
+      setMeta('apple-mobile-web-app-status-bar-style', 'default'),
+    ];
+
     const manifest = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
     const previousManifest = manifest?.getAttribute('href') ?? '/site.webmanifest';
     if (manifest) manifest.setAttribute('href', '/splitzap.webmanifest');
@@ -235,6 +305,8 @@ function useSplitzapPwa() {
     }
 
     return () => {
+      document.title = previousTitle;
+      restoreMeta.forEach((restore) => restore());
       window.removeEventListener('beforeinstallprompt', onInstallPrompt);
       window.removeEventListener('appinstalled', onInstalled);
       if (manifest) manifest.setAttribute('href', previousManifest);
@@ -246,9 +318,25 @@ function useSplitzapPwa() {
 
 export default function SplitzapAppV4({ accountAction, collaboration }: { accountAction?: ReactNode; collaboration?: SplitzapCollaboration } = {}) {
   useSplitzapPwa();
+  const { data: rootData } = useSplitData();
   const [view, setView] = useState<View>(() => parseView());
+  const [resumeSettlementGroupId, setResumeSettlementGroupId] = useState<string | null>(null);
+  const pendingResumeChecked = useRef<string | null>(null);
   const [dataToolsOpen, setDataToolsOpen] = useState(false);
   const { storageError, clearStorageError } = useSplitStorageStatus();
+
+  useEffect(() => {
+    if (!rootData.me || pendingResumeChecked.current === rootData.me) return;
+    const pending = readPendingUpiAttempt(rootData.me);
+    if (!pending) { pendingResumeChecked.current = rootData.me; return; }
+    const group = rootData.groups.find((item) => item.id === pending.groupId);
+    if (!group) return;
+    pendingResumeChecked.current = rootData.me;
+    setResumeSettlementGroupId(group.id);
+    const next: View = { name: 'group', groupId: group.id };
+    window.history.replaceState({}, '', `/splitzap#group=${encodeURIComponent(group.id)}`);
+    setView(next);
+  }, [rootData.me, rootData.groups]);
 
   useEffect(() => {
     const onPop = () => setView(parseView());
@@ -286,7 +374,7 @@ export default function SplitzapAppV4({ accountAction, collaboration }: { accoun
         ? <HomeScreen navigate={navigate} onDataBackup={() => setDataToolsOpen(true)} accountAction={accountAction} collaboration={collaboration} />
         : view.name === 'activity'
           ? <ActivityScreen navigate={navigate} collaboration={collaboration} />
-          : <GroupScreen groupId={view.groupId} navigate={navigate} collaboration={collaboration} />}
+          : <GroupScreen groupId={view.groupId} navigate={navigate} collaboration={collaboration} resumeSettlement={resumeSettlementGroupId === view.groupId} onSettlementResumeConsumed={() => setResumeSettlementGroupId(null)} />}
       {storageError ? <div role="alert" className="fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex w-[calc(100%-1.5rem)] max-w-[496px] -translate-x-1/2 items-start gap-2 rounded-2xl border border-negative/20 bg-surface px-3 py-3 shadow-xl"><AlertTriangle size={18} className="mt-0.5 shrink-0 text-negative" /><p className="min-w-0 flex-1 text-[11px] font-semibold leading-4 text-foreground">{storageError}</p><button type="button" onClick={() => setDataToolsOpen(true)} className="press shrink-0 rounded-lg bg-secondary px-2.5 py-2 text-[11px] font-bold text-primary">Backup</button><button type="button" aria-label="Dismiss storage warning" onClick={clearStorageError} className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div> : null}
       <DataBackupDialog open={dataToolsOpen} onClose={() => setDataToolsOpen(false)} onRestored={afterRestore} />
     </div>
@@ -400,11 +488,11 @@ function useDialogAccessibility(open: boolean, onClose: () => void) {
   return panelRef;
 }
 
-function SheetModal({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
+function SheetModal({ open, onClose, title, children, footer, tall = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; tall?: boolean }) {
   const titleId = useId();
   const panelRef = useDialogAccessibility(open, onClose);
   if (!open) return null;
-  return <div className="sheet-wrap fixed inset-0 z-50 flex items-end justify-center"><button type="button" aria-label="Close dialog" onClick={onClose} className="sheet-backdrop absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="sheet-panel relative flex w-full max-w-[520px] flex-col rounded-t-[28px] bg-surface outline-none"><div className="sheet-handle mx-auto mt-2 h-1 w-10 rounded-full bg-border" /><div className="flex items-center justify-between px-5 pb-2 pt-3"><h2 id={titleId} className="text-lg font-extrabold">{title}</h2><button type="button" onClick={onClose} aria-label="Close" className="press grid size-10 place-items-center rounded-full bg-muted text-muted-foreground"><X size={16} /></button></div><div className="sheet-scroll min-h-0 flex-1 px-5 pb-4">{children}</div>{footer ? <div className="sheet-footer border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{footer}</div> : null}</div></div>;
+  return <div className="sheet-wrap fixed inset-0 z-50 flex items-end justify-center"><button type="button" aria-label="Close dialog" onClick={onClose} className="sheet-backdrop absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={`sheet-panel relative flex w-full max-w-[520px] flex-col rounded-t-[28px] bg-surface outline-none ${tall ? 'sheet-panel--tall' : ''}`}><div className="sheet-handle mx-auto mt-2 h-1 w-10 rounded-full bg-border" /><div className="flex items-center justify-between px-5 pb-2 pt-3"><h2 id={titleId} className="text-lg font-extrabold">{title}</h2><button type="button" onClick={onClose} aria-label="Close" className="press grid size-10 place-items-center rounded-full bg-muted text-muted-foreground"><X size={16} /></button></div><div className="sheet-scroll min-h-0 flex-1 px-5 pb-4">{children}</div>{footer ? <div className="sheet-footer border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{footer}</div> : null}</div></div>;
 }
 
 function CompactDialog({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
@@ -451,7 +539,7 @@ function DataBackupDialog({ open, onClose, onRestored }: { open: boolean; onClos
 }
 
 function IntroPanel({ hasGroups, onPrimary, onNewGroup, onJoinGroup, onAddExpense, onRecordPayment, onActivity, onInstall }: { hasGroups: boolean; onPrimary: () => void; onNewGroup: () => void; onJoinGroup: () => void; onAddExpense: () => void; onRecordPayment: () => void; onActivity: () => void; onInstall?: () => void }) {
-  return <section className="px-5 pt-2"><div className="splitzap-welcome card-soft overflow-hidden p-6 text-center"><div className="welcome-orbit mx-auto mb-5" aria-hidden="true"><span>🍜</span><span>🚕</span><span>🏠</span><span>🎉</span><strong>₹</strong></div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Splitzap</p><h2 className="mt-2 text-3xl font-extrabold">Split bills, not bonds.</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep shared spending clear and settle with fewer payments.</p>{hasGroups ? <><button type="button" onClick={onPrimary} className="press mt-5 text-xs font-bold text-primary">Back to your groups</button><div className="mt-4 grid grid-cols-3 gap-2"><button type="button" onClick={onAddExpense} className="welcome-action press rounded-2xl bg-orange-50 p-3 text-left"><span className="text-lg">＋</span><b className="mt-2 block text-[11px]">Add expense</b></button><button type="button" onClick={onRecordPayment} className="welcome-action press rounded-2xl bg-emerald-50 p-3 text-left"><span className="text-lg">₹</span><b className="mt-2 block text-[11px]">Record payment</b></button><button type="button" onClick={onActivity} className="welcome-action press rounded-2xl bg-violet-50 p-3 text-left"><span className="text-lg">↗</span><b className="mt-2 block text-[11px]">Activity</b></button></div><button type="button" onClick={onNewGroup} className="press mt-3 text-xs font-bold text-muted-foreground">+ Create another group</button></> : <div className="mt-6 grid grid-cols-2 gap-2"><button type="button" onClick={onNewGroup} className="press rounded-2xl bg-primary p-4 text-left text-primary-foreground"><Plus size={18} /><b className="mt-3 block text-sm">Create a group</b><span className="mt-1 block text-[10px] opacity-80">Start a new split</span></button><button type="button" onClick={onJoinGroup} className="press rounded-2xl bg-secondary p-4 text-left text-primary"><UserPlus size={18} /><b className="mt-3 block text-sm">Join a group</b><span className="mt-1 block text-[10px] text-muted-foreground">Use an invite link</span></button></div>}{onInstall ? <button type="button" onClick={onInstall} className="press mt-4 text-xs font-bold text-muted-foreground">Install Splitzap on this device</button> : null}</div></section>;
+  return <section className="splitzap-home-center px-5 pt-2"><div className="splitzap-welcome card-soft w-full overflow-hidden p-6 text-center"><div className="welcome-orbit mx-auto mb-5" aria-hidden="true"><span>🍜</span><span>🚕</span><span>🏠</span><span>🎉</span><strong>₹</strong></div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Splitzap</p><h2 className="mt-2 text-3xl font-extrabold">Split bills, not bonds.</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep shared spending clear and settle with fewer payments.</p>{hasGroups ? <><button type="button" onClick={onPrimary} className="press mt-5 text-xs font-bold text-primary">Back to your groups</button><div className="mt-4 grid grid-cols-3 gap-2"><button type="button" onClick={onAddExpense} className="welcome-action press rounded-2xl bg-orange-50 p-3 text-left"><span className="text-lg">＋</span><b className="mt-2 block text-[11px]">Add expense</b></button><button type="button" onClick={onRecordPayment} className="welcome-action press rounded-2xl bg-emerald-50 p-3 text-left"><span className="text-lg">₹</span><b className="mt-2 block text-[11px]">Record payment</b></button><button type="button" onClick={onActivity} className="welcome-action press rounded-2xl bg-violet-50 p-3 text-left"><span className="text-lg">↗</span><b className="mt-2 block text-[11px]">Activity</b></button></div><button type="button" onClick={onNewGroup} className="press mt-3 text-xs font-bold text-muted-foreground">+ Create another group</button></> : <div className="mt-6 grid grid-cols-2 gap-2"><button type="button" onClick={onNewGroup} className="press rounded-2xl bg-primary p-4 text-left text-primary-foreground"><Plus size={18} /><b className="mt-3 block text-sm">Create a group</b><span className="mt-1 block text-[10px] opacity-80">Start a new split</span></button><button type="button" onClick={onJoinGroup} className="press rounded-2xl bg-secondary p-4 text-left text-primary"><UserPlus size={18} /><b className="mt-3 block text-sm">Join a group</b><span className="mt-1 block text-[10px] text-muted-foreground">Use an invite link</span></button></div>}{onInstall ? <button type="button" onClick={onInstall} className="press mt-4 text-xs font-bold text-muted-foreground">Install Splitzap on this device</button> : null}</div></section>;
 }
 
 function QuickActionsSheet({ open, onClose, onAddExpense, onNewGroup, onRecordPayment }: { open: boolean; onClose: () => void; onAddExpense: () => void; onNewGroup: () => void; onRecordPayment: () => void }) {
@@ -467,6 +555,31 @@ function GroupPickerSheet({ open, onClose, groups, onPick }: { open: boolean; on
   return <SheetModal open={open} onClose={onClose} title="Choose a group"><div className="space-y-2 pb-2">{groups.map((group) => <button type="button" key={group.id} onClick={() => { onClose(); onPick(group.id); }} className="press flex w-full items-center gap-3 rounded-2xl bg-surface-2 px-3 py-3 text-left"><span className="text-xl">{group.emoji}</span><span className="min-w-0 flex-1 truncate text-sm font-bold">{group.name}</span><ChevronRight size={15} className="text-muted-foreground" /></button>)}</div></SheetModal>;
 }
 
+function HomeBalanceSheet({ open, mode, groups, data, onClose, onSettle }: {
+  open: boolean;
+  mode: 'get' | 'owe';
+  groups: Group[];
+  data: SplitData;
+  onClose: () => void;
+  onSettle: (groupId: string) => void;
+}) {
+  const entries = groups.flatMap((group) => {
+    const balances = groupBalances(group, data.expenses, data.settlements);
+    const mine = memberIdFor(group, data);
+    const buckets = personalSettlementBuckets(balances, mine);
+    const debts = mode === 'owe' ? buckets.payable : buckets.receivable;
+    return debts.map((debt) => ({ group, debt }));
+  });
+  const total = entries.reduce((sum, entry) => sum + entry.debt.amount, 0);
+  return <SheetModal open={open} onClose={onClose} title={mode === 'owe' ? 'What you owe' : 'What you get'}>
+    <div className="mb-3 rounded-2xl bg-secondary px-4 py-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Total</p><p className={`tabular mt-1 text-2xl font-extrabold ${mode === 'owe' ? 'text-negative' : 'text-positive'}`}>{money(total)}</p></div>
+    {entries.length ? <div className="space-y-2">{entries.map(({ group, debt }) => {
+      const otherId = mode === 'owe' ? debt.to : debt.from;
+      return <div key={`${group.id}-${debt.from}-${debt.to}`} className="rounded-2xl border border-border bg-surface p-3"><div className="flex items-center gap-3"><span className="group-emoji grid size-10 shrink-0 place-items-center rounded-xl text-lg">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{group.name}</p><p className="truncate text-[10px] text-muted-foreground">{mode === 'owe' ? `You owe ${displayName(group, data, otherId)}` : `${displayName(group, data, otherId)} owes you`}</p></div><p className={`tabular text-sm font-extrabold ${mode === 'owe' ? 'text-negative' : 'text-positive'}`}>{money(debt.amount, group.currency)}</p></div><button type="button" onClick={() => onSettle(group.id)} className="press mt-2 w-full rounded-xl bg-secondary py-2.5 text-xs font-bold text-primary">Settle up</button></div>;
+    })}</div> : <div className="rounded-2xl bg-surface-2 p-5 text-center"><p className="text-sm font-extrabold">Nothing here</p><p className="mt-1 text-xs text-muted-foreground">Your current groups have no matching unsettled balance.</p></div>}
+  </SheetModal>;
+}
+
 const groupAccentIndex = (id: string) => [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 6;
 
 function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (view: View) => void; onDataBackup: () => void; accountAction?: ReactNode; collaboration?: SplitzapCollaboration }) {
@@ -480,6 +593,7 @@ function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (vie
   const [showArchived, setShowArchived] = useState(false);
   const [paymentPickerOpen, setPaymentPickerOpen] = useState(false);
   const [paymentGroupId, setPaymentGroupId] = useState<string | null>(null);
+  const [balanceDetailMode, setBalanceDetailMode] = useState<'get' | 'owe' | null>(null);
   const draftResumeChecked = useRef(false);
   const installState = useSplitzapInstall();
 
@@ -519,17 +633,18 @@ function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (vie
   return <AppShell onAdd={() => setQuickOpen(true)} view={{ name: 'home' }} navigate={navigate}>
     <Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5">{accountAction}<button type="button" onClick={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan receipt" title="Scan receipt" className="press grid size-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="press flex items-center gap-1 rounded-full bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"><Plus size={14} /> New</button></div>} />
     {!hydrated ? <section className="space-y-3 px-5 pt-2"><div className="splitzap-skeleton h-28 rounded-3xl" /><div className="splitzap-skeleton h-20 rounded-3xl" /></section> : introVisible ? <IntroPanel hasGroups={data.groups.length > 0} onPrimary={() => setShowIntro(false)} onNewGroup={() => setGroupOpen(true)} onJoinGroup={() => collaboration?.onJoinGroup()} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onRecordPayment={beginPayment} onActivity={() => navigate({ name: 'activity' })} onInstall={!installState.installed ? install : undefined} /> : <>
-      <section className="px-5"><div className="balance-strip grid grid-cols-2 overflow-hidden rounded-2xl border border-border bg-surface"><div className="p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You get</p><p className="tabular mt-1 text-xl font-extrabold text-positive">{money(totalOwed)}</p></div><div className="border-l border-border p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You owe</p><p className="tabular mt-1 text-xl font-extrabold text-negative">{money(totalOwe)}</p></div></div></section>
+      <section className="px-5"><div className="balance-strip grid grid-cols-2 overflow-hidden rounded-2xl border border-border bg-surface"><button type="button" onClick={() => setBalanceDetailMode('get')} className="press p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You get</p><p className="tabular mt-1 text-xl font-extrabold text-positive">{money(totalOwed)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button><button type="button" onClick={() => setBalanceDetailMode('owe')} className="press border-l border-border p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You owe</p><p className="tabular mt-1 text-xl font-extrabold text-negative">{money(totalOwe)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button></div></section>
       <section className="px-5 pt-5"><div className="mb-2 flex items-end justify-between gap-3"><div><p className="text-sm font-extrabold">Your groups</p><p className="mt-0.5 text-[11px] text-muted-foreground">{activeSummaries.length} active · {archivedSummaries.length} archived</p></div>{archivedSummaries.length ? <button type="button" onClick={() => setShowArchived((value) => !value)} className="press rounded-full bg-surface-2 px-3 py-1.5 text-[10px] font-bold text-primary">{showArchived ? 'Show active' : 'Archived'}</button> : null}</div>
         <div className="overflow-hidden rounded-2xl border border-border bg-surface">{visibleSummaries.map(({ group, mine, spent }, index) => <button type="button" key={group.id} onClick={() => navigate({ name: 'group', groupId: group.id })} className={`group-row group-accent-${groupAccentIndex(group.id)} list-enter press flex w-full items-center gap-3 border-b border-border px-3.5 py-3.5 text-left last:border-b-0`} style={{ animationDelay: `${index * 40}ms` }}><span className="group-emoji grid size-11 shrink-0 place-items-center rounded-2xl text-xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate font-bold">{group.name}</p><p className="truncate text-[11px] text-muted-foreground">{group.members.length} people · {money(spent, group.currency)} spent</p></div><div className="text-right"><p className={`text-[10px] font-semibold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? 'Settled' : mine > 0 ? 'You get' : 'You owe'}</p><p className={`tabular text-sm font-extrabold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? '—' : money(Math.abs(mine), group.currency)}</p></div><ChevronRight size={15} className="shrink-0 text-muted-foreground" /></button>)}{visibleSummaries.length === 0 ? <div className="p-6 text-center"><p className="text-sm font-extrabold">{showArchived ? 'No archived groups' : 'No active groups'}</p><p className="mt-1 text-xs text-muted-foreground">{showArchived ? 'Archived groups will stay safely stored here.' : 'Create a group to start splitting expenses.'}</p></div> : null}</div>
       </section>
     </>}
+    <HomeBalanceSheet open={Boolean(balanceDetailMode)} mode={balanceDetailMode ?? 'owe'} groups={activeGroups} data={data} onClose={() => setBalanceDetailMode(null)} onSettle={(groupId) => { setBalanceDetailMode(null); setPaymentGroupId(groupId); }} />
     <QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onRecordPayment={beginPayment} />
     <GroupPickerSheet open={paymentPickerOpen} onClose={() => setPaymentPickerOpen(false)} groups={activeGroups} onPick={setPaymentGroupId} />
     {activeGroups.length ? <AddExpenseSheet key={addOpen ? 'expense-open' : 'expense-closed'} open={addOpen} onClose={() => { setAddOpen(false); setScanSeed(null); }} data={data} update={update} seed={scanSeed} /> : null}
     <ReceiptScanner open={scannerOpen} onClose={() => setScannerOpen(false)} data={data} onParseReceipt={collaboration?.onParseReceipt} onUse={(seed) => { setScanSeed(seed); setScannerOpen(false); setAddOpen(true); }} />
     <NewGroupSheet open={groupOpen} onClose={() => setGroupOpen(false)} data={data} update={update} onCreated={(groupId) => navigate({ name: 'group', groupId })} onJoinGroup={collaboration?.onJoinGroup} />
-    {paymentGroup ? <SettleSheet open={Boolean(paymentGroup)} onClose={() => setPaymentGroupId(null)} group={paymentGroup} balances={paymentBalances} data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} /> : null}
+    {paymentGroup ? <SettleSheet open={Boolean(paymentGroup)} onClose={() => setPaymentGroupId(null)} group={paymentGroup} balances={paymentBalances} data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} memberships={collaboration?.memberships} /> : null}
   </AppShell>;
 }
 
@@ -647,12 +762,13 @@ function ActivityScreen({ navigate, collaboration }: { navigate: (view: View) =>
   </AppShell>;
 }
 
-function GroupScreen({ groupId, navigate, collaboration }: { groupId: string; navigate: (view: View) => void; collaboration?: SplitzapCollaboration }) {
+function GroupScreen({ groupId, navigate, collaboration, resumeSettlement = false, onSettlementResumeConsumed }: { groupId: string; navigate: (view: View) => void; collaboration?: SplitzapCollaboration; resumeSettlement?: boolean; onSettlementResumeConsumed?: () => void }) {
   const { data, update, hydrated } = useSplitData();
   const group = data.groups.find((item) => item.id === groupId);
   const [tab, setTab] = useState<GroupTab>('expenses');
   const [addOpen, setAddOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
+  useEffect(() => { if (resumeSettlement) { setSettleOpen(true); onSettlementResumeConsumed?.(); } }, [resumeSettlement, onSettlementResumeConsumed]);
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -750,7 +866,7 @@ function GroupScreen({ groupId, navigate, collaboration }: { groupId: string; na
     {tab === 'expenses' ? <section className="px-5 pt-3"><div className="mb-3 flex gap-2"><div className="relative min-w-0 flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search expenses" className="w-full rounded-xl border border-border bg-surface pl-9 pr-3 py-2.5 text-xs outline-none focus:border-primary" /></div><button type="button" onClick={() => setFilterOpen(true)} className={`press grid size-10 place-items-center rounded-xl border ${categoryFilter !== 'all' || mineOnly || unsettledOnly ? 'border-primary bg-secondary text-primary' : 'border-border bg-surface text-muted-foreground'}`}><Filter size={15} /></button></div><div className="overflow-hidden rounded-2xl border border-border bg-surface">{filteredExpenses.map((expense) => { const category = categoryOf(expense.category); return <button type="button" key={expense.id} onClick={() => setSelectedExpense(expense)} className={`expense-row category-${category.id} press flex w-full items-center gap-3 border-b border-border px-3 py-3.5 text-left last:border-b-0`}><span className="expense-category grid size-10 shrink-0 place-items-center rounded-xl text-lg">{category.emoji}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{expense.description}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{payerSummary(expense, group, data)} paid · {new Date(expense.date).toLocaleDateString([], { day: 'numeric', month: 'short' })}</p></div><span className="tabular shrink-0 text-sm font-extrabold">{money(expense.amount, group.currency)}</span><ChevronRight size={14} className="text-muted-foreground" /></button>; })}{filteredExpenses.length === 0 ? <div className="p-8 text-center"><p className="text-sm font-extrabold">No matching expenses</p><p className="mt-1 text-xs text-muted-foreground">Change your search or filters.</p></div> : null}</div></section> : tab === 'balances' ? <BalancesTab group={group} data={data} balances={balances} update={update} newMember={newMember} setNewMember={setNewMember} /> : <InsightsTab group={group} data={data} expenses={expenses} />}
     <QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => !isArchived && setAddOpen(true)} onNewGroup={() => navigate({ name: 'home' })} onRecordPayment={() => !isArchived && setSettleOpen(true)} />
     <AddExpenseSheet key={addOpen ? 'expense-open' : 'expense-closed'} open={addOpen} onClose={() => { setAddOpen(false); setEditingExpense(null); }} data={data} update={update} defaultGroupId={group.id} editing={editingExpense} />
-    <SettleSheet open={settleOpen} onClose={() => setSettleOpen(false)} group={group} balances={balances} data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} />
+    <SettleSheet open={settleOpen} onClose={() => setSettleOpen(false)} group={group} balances={balances} data={data} update={update} getMemberUpi={collaboration?.onGetMemberUpi} memberships={collaboration?.memberships} />
     <EditGroupSheet open={editGroupOpen} onClose={() => setEditGroupOpen(false)} group={group} update={update} />
     <DuplicateGroupDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} group={group} data={data} update={update} onCreated={(id) => navigate({ name: 'group', groupId: id })} />
     <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} title={`Share ${group.name}`} message={buildGroupShareMessage(group, data)} />
@@ -1293,7 +1409,7 @@ function AddExpenseSheet({ open, onClose, data, update, defaultGroupId, editing,
 
   if (savedExpense && group) return <><SheetModal open={open} onClose={discardAndClose} title={editing ? 'Expense updated' : 'Expense added'} footer={<div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setShareOpen(true)} className="press flex items-center justify-center gap-2 rounded-2xl bg-secondary py-3.5 text-sm font-bold text-primary"><Share2 size={16} /> Share</button><PrimaryButton onClick={discardAndClose}>Done</PrimaryButton></div>}><div className="success-state relative py-3 text-center">{!editing ? <ExpenseConfetti /> : null}<div className="success-check mx-auto grid size-16 place-items-center rounded-full bg-secondary text-primary"><Check size={30} strokeWidth={3} /></div><p className="mt-3 text-sm font-extrabold text-primary">{editing ? 'Expense updated' : 'Expense saved'}</p><p className="mt-1 text-xs text-muted-foreground">Balances and settlements are updated instantly.</p></div><ExpenseBreakdown expense={savedExpense} group={group} data={data} /></SheetModal><ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} title="Share expense" message={buildExpenseShareMessage(savedExpense, group, data)} /></>;
 
-  return <><SheetModal open={open} onClose={discardAndClose} title={editing ? 'Edit expense' : 'Add an expense'} footer={<PrimaryButton onClick={save}>{editing ? 'Save changes' : 'Add expense'}</PrimaryButton>}>{groups.length > 1 || !defaultGroupId ? <Field label="Group"><select value={groupId} onChange={(event) => { const nextId = event.target.value; const nextGroup = groups.find((item) => item.id === nextId); setGroupId(nextId); setPaidBy(nextGroup ? memberIdFor(nextGroup, data) : data.me); setPayments({}); setMultiPayer(false); setSplit({}); setPersonalItems([]); setSelectiveItems([]); setCharges([]); }} className={inputClass}>{groups.map((item) => <option key={item.id} value={item.id}>{item.emoji} {item.name}</option>)}</select></Field> : null}<div className="expense-main-row mb-3 grid grid-cols-[46px_minmax(0,1fr)_104px] gap-2"><div><label className="mb-1.5 block text-[11px] font-semibold text-muted-foreground">Category</label><button type="button" onClick={() => setCategoryOpen((value) => !value)} aria-label="Choose category" className={`expense-category-button press grid h-[46px] w-[46px] place-items-center rounded-xl border border-border bg-surface-2 text-xl category-${category}`}>{categoryOf(category).emoji}</button></div><Field label="Description" compact><input value={description} onChange={(event) => { const next = event.target.value; setDescription(next); if (!categoryTouched) setCategory(suggestExpenseCategory(next)); }} placeholder="Dinner, cab…" aria-invalid={submitAttempted && !description.trim()} className={`${inputClass} ${submitAttempted && !description.trim() ? 'border-negative ring-2 ring-negative/15' : ''}`} />{submitAttempted && !description.trim() ? <p className="mt-1 text-[10px] font-bold text-negative">Required</p> : null}</Field><Field label={`Amount (${group?.currency ?? '₹'})`} compact><input value={amount} inputMode="decimal" onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" aria-invalid={submitAttempted && baseTotal <= 0} className={`${inputClass} tabular px-2 text-right font-extrabold ${submitAttempted && baseTotal <= 0 ? 'border-negative ring-2 ring-negative/15' : ''}`} />{submitAttempted && baseTotal <= 0 ? <p className="mt-1 text-right text-[10px] font-bold text-negative">Required</p> : null}</Field></div>{categoryOpen ? <div className="mb-3 grid grid-cols-4 gap-1.5 rounded-2xl border border-border bg-surface p-2">{CATEGORIES.map((item) => <button type="button" key={item.id} onClick={() => { setCategory(item.id); setCategoryTouched(true); setCategoryOpen(false); }} className={`press rounded-xl px-1 py-2 text-center ${category === item.id ? 'bg-secondary text-primary' : 'bg-surface-2'}`}><span className="block text-lg">{item.emoji}</span><span className="mt-1 block truncate text-[9px] font-bold">{item.label}</span></button>)}</div> : null}{group ? <div className="mb-3 grid grid-cols-[minmax(0,1fr)_108px] gap-2"><Field label="Paid by" compact><div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5"><select value={paidBy} onChange={(event) => { setPaidBy(event.target.value); setMultiPayer(false); setPayments({}); setPayersOpen(false); }} className={`${inputClass} min-w-0 py-2.5 text-xs`}>{group.members.map((member) => <option key={member.id} value={member.id}>{displayName(group, data, member.id)}{member.id === memberIdFor(group, data) ? ' (Me)' : ''}</option>)}</select><button type="button" onClick={openMultiplePayers} className={`press shrink-0 rounded-xl px-2 py-2 text-[9px] font-extrabold ${multiPayer ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{multiPayer ? 'Payers' : '+ Multiple'}</button></div></Field><Field label="Date" compact><div className="relative"><CalendarDays size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="date" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)} className={`${inputClass} pl-7 pr-1 py-2.5 text-[10px]`} /></div></Field></div> : null}
+  return <><SheetModal tall open={open} onClose={discardAndClose} title={editing ? 'Edit expense' : 'Add an expense'} footer={<PrimaryButton onClick={save}>{editing ? 'Save changes' : 'Add expense'}</PrimaryButton>}>{groups.length > 1 || !defaultGroupId ? <Field label="Group"><select value={groupId} onChange={(event) => { const nextId = event.target.value; const nextGroup = groups.find((item) => item.id === nextId); setGroupId(nextId); setPaidBy(nextGroup ? memberIdFor(nextGroup, data) : data.me); setPayments({}); setMultiPayer(false); setSplit({}); setPersonalItems([]); setSelectiveItems([]); setCharges([]); }} className={inputClass}>{groups.map((item) => <option key={item.id} value={item.id}>{item.emoji} {item.name}</option>)}</select></Field> : null}<div className="expense-main-row mb-3 grid grid-cols-[46px_minmax(0,1fr)_104px] gap-2"><div><label className="mb-1.5 block text-[11px] font-semibold text-muted-foreground">Category</label><button type="button" onClick={() => setCategoryOpen((value) => !value)} aria-label="Choose category" className={`expense-category-button press grid h-[46px] w-[46px] place-items-center rounded-xl border border-border bg-surface-2 text-xl category-${category}`}>{categoryOf(category).emoji}</button></div><Field label="Description" compact><input value={description} onChange={(event) => { const next = event.target.value; setDescription(next); if (!categoryTouched) setCategory(suggestExpenseCategory(next)); }} placeholder="Dinner, cab…" aria-invalid={submitAttempted && !description.trim()} className={`${inputClass} ${submitAttempted && !description.trim() ? 'border-negative ring-2 ring-negative/15' : ''}`} />{submitAttempted && !description.trim() ? <p className="mt-1 text-[10px] font-bold text-negative">Required</p> : null}</Field><Field label={`Amount (${group?.currency ?? '₹'})`} compact><input value={amount} inputMode="decimal" onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" aria-invalid={submitAttempted && baseTotal <= 0} className={`${inputClass} tabular px-2 text-right font-extrabold ${submitAttempted && baseTotal <= 0 ? 'border-negative ring-2 ring-negative/15' : ''}`} />{submitAttempted && baseTotal <= 0 ? <p className="mt-1 text-right text-[10px] font-bold text-negative">Required</p> : null}</Field></div>{categoryOpen ? <div className="mb-3 grid grid-cols-4 gap-1.5 rounded-2xl border border-border bg-surface p-2">{CATEGORIES.map((item) => <button type="button" key={item.id} onClick={() => { setCategory(item.id); setCategoryTouched(true); setCategoryOpen(false); }} className={`press rounded-xl px-1 py-2 text-center ${category === item.id ? 'bg-secondary text-primary' : 'bg-surface-2'}`}><span className="block text-lg">{item.emoji}</span><span className="mt-1 block truncate text-[9px] font-bold">{item.label}</span></button>)}</div> : null}{group ? <div className="mb-3 grid grid-cols-[minmax(0,1fr)_108px] gap-2"><Field label="Paid by" compact><div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5"><select value={paidBy} onChange={(event) => { setPaidBy(event.target.value); setMultiPayer(false); setPayments({}); setPayersOpen(false); }} className={`${inputClass} min-w-0 py-2.5 text-xs`}>{group.members.map((member) => <option key={member.id} value={member.id}>{displayName(group, data, member.id)}{member.id === memberIdFor(group, data) ? ' (Me)' : ''}</option>)}</select><button type="button" onClick={openMultiplePayers} className={`press shrink-0 rounded-xl px-2 py-2 text-[9px] font-extrabold ${multiPayer ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{multiPayer ? 'Payers' : '+ Multiple'}</button></div></Field><Field label="Date" compact><div className="relative"><CalendarDays size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="date" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)} className={`${inputClass} pl-7 pr-1 py-2.5 text-[10px]`} /></div></Field></div> : null}
 
 <Field label={`Split shared amount · ${money(sharedTotal, group?.currency)}`}><div className={`splitzap-segment mb-2 grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1 ${submitAttempted && !splitSectionValid ? 'ring-2 ring-negative/25' : ''}`}>{([['equal', 'Equally'], ['exact', 'Exact'], ['percentage', 'Percentage']] as const).map(([id, label]) => <button type="button" key={id} onClick={() => setModeCleanly(id)} className={`press rounded-lg py-2 text-xs font-bold ${mode === id ? 'is-active bg-surface text-foreground shadow-sm' : 'text-muted-foreground'}`}>{label}</button>)}</div>{mode === 'equal' && !splitExpanded ? <button type="button" onClick={() => setSplitExpanded(true)} className="press flex w-full items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-3 text-left"><div className="min-w-0 flex-1"><p className="text-sm font-bold">Split equally</p><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{group?.members.filter((member) => Number(activeSplit[member.id] ?? 0) > 0).map((member) => displayName(group, data, member.id)).join(', ') || 'Nobody selected'}</p></div><span className="tabular text-xs font-bold text-muted-foreground">{money(sharedTotal, group?.currency)}</span><span className="text-xs font-extrabold text-primary">Edit</span></button> : <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">{group?.members.map((member) => { const value = Number(activeSplit[member.id] ?? 0); const personal = personalItems.filter((item) => item.memberId === member.id).reduce((sum, item) => sum + item.amount, 0); const selective = selectiveItems.reduce((sum, item) => sum + selectiveItemShare(item, member.id), 0); const sharedOwed = mode === 'exact' ? value : mode === 'percentage' ? sharedTotal * value / 100 : weightTotal ? sharedTotal * value / weightTotal : 0; const coPayerPaid = multiPayer && member.id !== paidBy ? Math.max(0, Number(payments[member.id]) || 0) : 0; const responsibility = sharedOwed + personal + selective; const remainingAfterCoPay = responsibility - coPayerPaid; const savedLabel = splitLabels[member.id]?.trim() ?? ''; const editingLabel = mode === 'exact' && labelOpen[member.id]; return <div key={member.id} className={`bg-surface px-2.5 ${mode === 'exact' ? 'py-1.5' : 'py-2.5'}`}><div className={`flex items-center ${mode === 'exact' ? 'gap-2' : 'gap-3'}`}><Avatar name={displayName(group, data, member.id)} size={mode === 'exact' ? 24 : 30} /><div className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{displayName(group, data, member.id)}</span>{personal > 0 ? <span className="text-[10px] font-bold text-primary">+ {money(personal, group.currency)} personal</span> : null}{selective > 0 ? <span className="block text-[10px] font-bold text-primary">+ {money(selective, group.currency)} selected item</span> : null}{coPayerPaid > 0 ? <span className={`block text-[10px] font-bold ${remainingAfterCoPay < -0.009 ? 'text-positive' : 'text-muted-foreground'}`}>{money(coPayerPaid, group.currency)} paid · {remainingAfterCoPay > 0.009 ? `${money(remainingAfterCoPay, group.currency)} remaining` : remainingAfterCoPay < -0.009 ? `gets ${money(-remainingAfterCoPay, group.currency)}` : 'covered'}</span> : null}</div>{mode === 'equal' ? <><span className={`tabular text-sm ${coPayerPaid > 0 && remainingAfterCoPay < -0.009 ? 'font-bold text-positive' : 'text-muted-foreground'}`}>{value > 0 ? coPayerPaid > 0 ? remainingAfterCoPay < -0.009 ? `gets ${money(-remainingAfterCoPay, group.currency)}` : money(Math.max(0, remainingAfterCoPay), group.currency) : money(responsibility, group.currency) : personal + selective > 0 ? money(personal + selective, group.currency) : '—'}</span><input type="checkbox" checked={value > 0} onChange={(event) => setWeight(member.id, event.target.checked ? 1 : 0)} className="size-5" /></> : <div className="flex items-center gap-1"><input value={value === 0 ? '' : String(Number(value.toFixed(2)))} inputMode="decimal" placeholder="0" onChange={(event) => setWeight(member.id, Number(event.target.value.replace(/[^0-9.]/g, '')) || 0)} className={`tabular rounded-lg border border-border bg-surface-2 px-2 text-right ${mode === 'exact' ? 'w-[72px] py-1 text-xs' : 'w-20 py-1.5 text-sm'}`} />{mode === 'percentage' ? <span className="text-xs font-bold text-muted-foreground">%</span> : null}</div>}</div>{mode === 'exact' ? <div className="ml-[32px] mt-1">{editingLabel ? <div className="flex items-center gap-2"><input value={labelDrafts[member.id] ?? ''} onChange={(event) => setLabelDrafts({ ...labelDrafts, [member.id]: event.target.value })} placeholder="e.g. Beer & starter" className="min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-xs outline-none focus:border-primary" /><button type="button" onClick={() => saveLabel(member.id)} className="press grid size-8 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={14} /></button><button type="button" onClick={() => setLabelOpen({ ...labelOpen, [member.id]: false })} className="press grid size-8 place-items-center rounded-full bg-surface-2"><X size={12} /></button></div> : savedLabel ? <button type="button" onClick={() => { setLabelDrafts({ ...labelDrafts, [member.id]: savedLabel }); setLabelOpen({ ...labelOpen, [member.id]: true }); }} className="press rounded-lg bg-surface-2 px-2 py-1 text-[9px] font-semibold text-primary">{savedLabel}</button> : <button type="button" onClick={() => setLabelOpen({ ...labelOpen, [member.id]: true })} className="press text-[9px] font-bold text-primary">+ label</button>}</div> : null}</div>; })}</div>}{mode === 'exact' && baseTotal > 0 ? <p className={`mt-2 text-xs font-semibold ${Math.abs(exactRemaining) < 0.01 ? 'text-positive' : 'text-negative'}`}>{Math.abs(exactRemaining) < 0.01 ? 'Shared amount is fully assigned.' : `${money(Math.abs(exactRemaining), group?.currency)} ${exactRemaining > 0 ? 'left to assign' : 'over'}`}</p> : null}{mode === 'percentage' && hasSharedAmount ? <p className={`mt-2 text-xs font-semibold ${Math.abs(percentageRemaining) < 0.01 ? 'text-positive' : 'text-negative'}`}>{Math.abs(percentageRemaining) < 0.01 ? '100% assigned.' : `${Math.abs(percentageRemaining).toFixed(2)}% ${percentageRemaining > 0 ? 'left to assign' : 'over'}`}</p> : null}</Field><div className={`mb-3 flex items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-bold ${splitSectionValid && personalOver <= 0.009 && payerValid ? 'bg-secondary text-primary' : 'bg-surface-2 text-negative'}`}><span className={`grid size-6 place-items-center rounded-full ${splitSectionValid && personalOver <= 0.009 && payerValid ? 'bg-primary text-primary-foreground' : 'bg-surface text-negative'}`}>{splitSectionValid && personalOver <= 0.009 && payerValid ? <Check size={13} /> : '!'}</span><span>{personalOver > 0.009 ? `Personal + selective items exceed the expense by ${money(personalOver, group?.currency)}` : !payerValid ? 'Check payer amounts' : hasSharedAmount && !hasSharedPeople ? 'Select at least one person to split with' : splitValid ? 'Fully assigned' : mode === 'percentage' ? `${Math.abs(percentageRemaining).toFixed(2)}% left to fix` : `${money(Math.abs(exactRemaining), group?.currency)} left to fix`}</span></div>{saveError ? <p role="alert" className="mb-2 rounded-xl bg-negative/5 px-3 py-2 text-[11px] font-bold leading-5 text-negative">{saveError}</p> : null}<div className="mb-3 grid grid-cols-3 gap-1.5"><button type="button" onClick={() => setPersonalOpen(true)} title="Personal item" className={`press flex min-h-10 items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-bold ${personalItems.length ? 'border-primary/20 bg-secondary text-primary' : 'border-border bg-surface-2 text-foreground'}`}><span>👤</span><span>Personal</span>{personalItems.length ? <span className="rounded-full bg-surface px-1.5 py-0.5 text-[9px]">{personalItems.length}</span> : null}</button><button type="button" onClick={() => setSelectiveOpen(true)} title="Split an item with only some people" className={`press flex min-h-10 items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-bold ${selectiveItems.length ? 'border-primary/20 bg-secondary text-primary' : 'border-border bg-surface-2 text-foreground'}`}><span>👥</span><span>Some people</span>{selectiveItems.length ? <span className="rounded-full bg-surface px-1.5 py-0.5 text-[9px]">{selectiveItems.length}</span> : null}</button><button type="button" onClick={() => { if (!charges.length) setCharges([{ id: uid(), description: '', amount: 0, distribution: 'equal' }]); setChargesOpen(true); }} title="Additional charges" className={`press flex min-h-10 items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-bold ${charges.length ? 'border-primary/20 bg-secondary text-primary' : 'border-border bg-surface-2 text-foreground'}`}><span>🧾</span><span>Charges</span>{charges.length ? <span className="rounded-full bg-surface px-1.5 py-0.5 text-[9px]">{charges.length}</span> : null}</button></div>
 
@@ -1356,49 +1472,159 @@ function NewGroupSheet({ open, onClose, data, update, onCreated, onJoinGroup }: 
   </SheetModal>;
 }
 
-function SettleSheet({ open, onClose, group, balances, data, update, getMemberUpi }: { open: boolean; onClose: () => void; group: Group; balances: Record<string, number>; data: SplitData; update: (fn: (data: SplitData) => SplitData) => void; getMemberUpi?: (group: Group, memberId: string) => Promise<string | null> }) {
+function SettleSheet({ open, onClose, group, balances, data, update, getMemberUpi, memberships }: { open: boolean; onClose: () => void; group: Group; balances: Record<string, number>; data: SplitData; update: (fn: (data: SplitData) => SplitData) => void; getMemberUpi?: (group: Group, memberId: string) => Promise<string | null>; memberships?: SplitzapMembershipView[] }) {
   const currentMemberId = memberIdFor(group, data);
   const { payable: debts, receivable } = personalSettlementBuckets(balances, currentMemberId);
   const nameOf = (id: string) => displayName(group, data, id);
+  const connectedMemberIds = useMemo(() => new Set((memberships ?? []).filter((item) => item.group_id === group.sharedId).map((item) => item.member_id)), [memberships, group.sharedId]);
+  const authorityOf = (debt: Debt) => settlementAuthority(debt, currentMemberId, group.sharedId ? connectedMemberIds : undefined);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial'>('full');
   const [partialAmount, setPartialAmount] = useState('');
+  const [note, setNote] = useState('');
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [upiId, setUpiId] = useState<string | null>(null);
+  const [manualUpiId, setManualUpiId] = useState('');
   const [upiLoading, setUpiLoading] = useState(false);
   const [upiAttempted, setUpiAttempted] = useState(false);
-  useEffect(() => { if (selectedDebt) { setPaymentMode('full'); setPartialAmount(''); setUpiAttempted(false); } }, [selectedDebt?.from, selectedDebt?.to, selectedDebt?.amount]);
+  const [upiFeedback, setUpiFeedback] = useState('');
+  const [undoSettlement, setUndoSettlement] = useState<Settlement | null>(null);
+  const undoTimer = useRef<number | null>(null);
+
+  useEffect(() => () => { if (undoTimer.current) window.clearTimeout(undoTimer.current); }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const pending = readPendingUpiAttempt(data.me);
+    if (!pending || pending.groupId !== group.id) return;
+    const matching = [...debts, ...receivable].find((debt) => debt.from === pending.from && debt.to === pending.to);
+    if (!matching) { clearPendingUpiAttempt(data.me); return; }
+    setSelectedDebt(matching);
+    setPaymentMode(pending.paymentMode);
+    setPartialAmount(pending.partialAmount);
+    setNote(pending.note);
+    setUpiAttempted(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, group.id, data.me]);
+
+  useEffect(() => {
+    if (!selectedDebt) return;
+    const pending = readPendingUpiAttempt(data.me);
+    const restoring = pending && pending.groupId === group.id && pending.from === selectedDebt.from && pending.to === selectedDebt.to;
+    if (restoring) return;
+    setPaymentMode('full');
+    setPartialAmount('');
+    setNote('');
+    setUpiAttempted(false);
+    setManualUpiId('');
+    setUpiFeedback('');
+  }, [selectedDebt?.from, selectedDebt?.to, selectedDebt?.amount, data.me, group.id]);
+
   const partialValue = selectedDebt ? Math.min(selectedDebt.amount, Math.max(0, Number(partialAmount) || 0)) : 0;
   const paymentAmount = selectedDebt ? (paymentMode === 'full' ? selectedDebt.amount : partialValue) : 0;
-  const canUseUpi = Boolean(selectedDebt && group.sharedId && group.currency === '₹' && selectedDebt.from === currentMemberId && getMemberUpi);
+  const selectedAuthority = selectedDebt ? authorityOf(selectedDebt) : null;
+  const canUseUpi = Boolean(selectedDebt && group.currency === '₹' && selectedDebt.from === currentMemberId);
+
   useEffect(() => {
     let active = true;
-    setUpiId(null); setUpiLoading(false); setUpiAttempted(false);
-    if (!selectedDebt || !canUseUpi || !getMemberUpi) return () => { active = false; };
+    setUpiId(null);
+    if (!selectedDebt || !canUseUpi || !group.sharedId || !getMemberUpi) { setUpiLoading(false); return () => { active = false; }; }
     setUpiLoading(true);
     void getMemberUpi(group, selectedDebt.to).then((value) => { if (active) setUpiId(value); }).catch(() => { if (active) setUpiId(null); }).finally(() => { if (active) setUpiLoading(false); });
     return () => { active = false; };
-  }, [selectedDebt?.from, selectedDebt?.to, group.sharedId, group.currency, currentMemberId, getMemberUpi]);
+  }, [selectedDebt?.from, selectedDebt?.to, group.sharedId, group.currency, canUseUpi, getMemberUpi]);
+
   const rawDebts = data.expenses.filter((expense) => expense.groupId === group.id).flatMap((expense) => expenseSettlement(expense, group).filter((debt) => debt.from === currentMemberId || debt.to === currentMemberId).map((debt) => ({ ...debt, expense })));
   const recorded = data.settlements.filter((settlement) => settlement.groupId === group.id && (settlement.from === currentMemberId || settlement.to === currentMemberId)).sort((a, b) => +new Date(b.date) - +new Date(a.date));
+
   const recordPayment = () => {
-    if (!selectedDebt || selectedDebt.from !== currentMemberId || paymentAmount <= 0) return;
-    const settlement = { id: uid(), groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, amount: paymentAmount, date: new Date().toISOString() };
+    if (!selectedDebt || !selectedAuthority || paymentAmount <= 0) return;
+    const cleanNote = note.trim();
+    const settlement: Settlement = { id: uid(), groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, amount: paymentAmount, date: new Date().toISOString(), note: cleanNote || undefined };
     update((current) => {
       const next = { ...current, settlements: [settlement, ...current.settlements] };
       return group.sharedId ? next : withLocalActivity(next, { groupId: group.id, actorName: current.myName?.trim() || nameOf(memberIdFor(group, current)), eventType: 'payment_recorded', entityType: 'payment', entityId: settlement.id, data: { after: settlement } });
     });
-    setUpiAttempted(false);
+    clearPendingUpiAttempt(data.me);
     setSelectedDebt(null);
+    setUpiAttempted(false);
+    setNote('');
+    setUndoSettlement(settlement);
+    if (undoTimer.current) window.clearTimeout(undoTimer.current);
+    undoTimer.current = window.setTimeout(() => setUndoSettlement(null), 8000);
   };
+
+  const undoPayment = () => {
+    if (!undoSettlement) return;
+    const settlement = undoSettlement;
+    update((current) => {
+      const next = { ...current, settlements: current.settlements.filter((item) => item.id !== settlement.id) };
+      return group.sharedId ? next : withLocalActivity(next, { groupId: group.id, actorName: current.myName?.trim() || nameOf(memberIdFor(group, current)), eventType: 'payment_removed', entityType: 'payment', entityId: settlement.id, data: { before: settlement } });
+    });
+    setUndoSettlement(null);
+    if (undoTimer.current) window.clearTimeout(undoTimer.current);
+  };
+
   const launchUpi = () => {
-    if (!selectedDebt || !upiId || paymentAmount <= 0) return;
-    const params = new URLSearchParams({ pa: upiId, pn: nameOf(selectedDebt.to), am: paymentAmount.toFixed(2), cu: 'INR', tn: `Splitzap · ${group.name}` });
+    if (!selectedDebt || paymentAmount <= 0) return;
+    const target = normalizeUpiId(upiId || manualUpiId);
+    if (!isValidUpiId(target)) { setUpiFeedback('Enter a valid UPI ID or scan a UPI QR code.'); return; }
+    const params = new URLSearchParams({ pa: target, pn: nameOf(selectedDebt.to), am: paymentAmount.toFixed(2), cu: 'INR', tn: `Splitzap · ${group.name}` });
+    savePendingUpiAttempt(data.me, { groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, amount: paymentAmount, paymentMode, partialAmount, note, createdAt: new Date().toISOString() });
     setUpiAttempted(true);
     window.location.href = `upi://pay?${params.toString()}`;
   };
-  return <><SheetModal open={open} onClose={onClose} title="Settle up" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>{debts.length === 0 && receivable.length === 0 ? <div className="celebration relative overflow-hidden rounded-3xl bg-secondary p-7 text-center"><ExpenseConfetti strong /><div className="success-check mx-auto grid size-16 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={30} strokeWidth={3} /></div><p className="mt-3 text-xl font-extrabold">All settled up</p><p className="mt-1 text-xs text-muted-foreground">Nothing is owed right now.</p></div> : <><div className="rounded-2xl bg-secondary px-3.5 py-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-sm">↔</span><p className="text-[11px] leading-5 text-secondary-foreground"><b>Simplified settlement.</b> Splitzap nets debts across the whole group to reduce the number of payments. You may be asked to pay someone different from the person who originally covered a specific expense.</p></div></div>{!debts.length ? <div className="mt-3 rounded-2xl bg-surface-2 px-3 py-3 text-xs font-semibold text-muted-foreground">You do not owe anything right now.</div> : null}<div className="mt-3 space-y-2">{debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="settle-row flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"><Avatar name={nameOf(debt.from)} size={32} /><ArrowRight size={16} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={32} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{nameOf(debt.from)} → {nameOf(debt.to)}</p><p className="tabular text-sm font-bold text-primary">{money(debt.amount, group.currency)}</p></div><button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Mark paid</button></div>)}</div>{receivable.length ? <div className="mt-3 rounded-2xl border border-positive/20 bg-positive/5 p-3"><p className="text-[10px] font-extrabold uppercase tracking-wide text-positive">You are owed</p><div className="mt-2 space-y-2">{receivable.map((debt) => <div key={`owed-${debt.from}-${debt.to}`} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-3"><Avatar name={nameOf(debt.from)} size={30} /><ArrowRight size={14} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={30} /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{nameOf(debt.from)} owes you</p><p className="tabular text-sm font-extrabold text-positive">{money(debt.amount, group.currency)}</p></div><span className="rounded-full bg-surface-2 px-2 py-1 text-[9px] font-bold text-muted-foreground">View only</span></div>)}</div></div> : null}<button type="button" onClick={() => setBreakdownOpen((value) => !value)} className="press mt-3 flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-3 text-left"><span className="min-w-0 flex-1"><b className="block text-xs">Original breakdown</b><span className="mt-0.5 block text-[10px] text-muted-foreground">See who originally owed whom before simplification</span></span><ChevronDown size={16} className={`transition-transform ${breakdownOpen ? 'rotate-180' : ''}`} /></button>{breakdownOpen ? <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-surface"><div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Expense obligations</div>{rawDebts.length ? rawDebts.map(({ expense, ...debt }, index) => <div key={`${expense.id}-${debt.from}-${debt.to}-${index}`} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><b className="block truncate text-xs">{nameOf(debt.from)} → {nameOf(debt.to)}</b><span className="block truncate text-[10px] text-muted-foreground">{expense.description}</span></span><span className="tabular shrink-0 text-xs font-extrabold">{money(debt.amount, group.currency)}</span></div>) : <div className="border-t border-border px-3 py-3 text-xs text-muted-foreground">No original obligations.</div>}{recorded.length ? <><div className="border-t border-border px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Payments already recorded</div>{recorded.map((payment) => <div key={payment.id} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1 text-xs font-semibold">{nameOf(payment.from)} → {nameOf(payment.to)}</span><span className="tabular text-xs font-extrabold">{money(payment.amount, group.currency)}</span></div>)}</> : null}</div> : null}</>}</SheetModal><CompactDialog open={!!selectedDebt} onClose={() => setSelectedDebt(null)} title="Record payment" footer={<PrimaryButton onClick={recordPayment} disabled={!selectedDebt || (paymentMode === 'partial' && partialValue <= 0)}>Mark as paid</PrimaryButton>}>{selectedDebt ? <><div className="rounded-2xl bg-surface-2 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Amount due</p><p className="mt-1 text-2xl font-extrabold">{money(selectedDebt.amount, group.currency)}</p><p className="mt-1 text-xs text-muted-foreground">{nameOf(selectedDebt.from)} → {nameOf(selectedDebt.to)}</p></div><div className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-2.5 py-2 text-[10px] leading-4 text-muted-foreground"><Info size={11} className="mt-0.5 shrink-0" /> This records the current simplified transfer as paid. Original expense details stay unchanged.</div>{canUseUpi ? <div className="mt-3 rounded-2xl border border-primary/15 bg-secondary p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-xs font-extrabold text-primary">Pay with UPI</p><p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">Splitzap opens your payment app with the recipient and amount filled in.</p></div><span className="rounded-full bg-surface px-2 py-1 text-[9px] font-bold text-primary">UPI</span></div>{upiLoading ? <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Checking payment details…</p> : upiId ? <><button type="button" disabled={paymentAmount <= 0} onClick={launchUpi} className="press mt-2 w-full rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground disabled:opacity-40">Pay {money(paymentAmount, group.currency)} via UPI</button><p className="mt-1.5 text-[9px] leading-4 text-muted-foreground">Opening a UPI app does not mark the payment as completed. Splitzap will ask you to confirm.</p></> : <p className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] leading-4 text-muted-foreground">{nameOf(selectedDebt!.to)} has not enabled UPI payments in Splitzap.</p>}{upiAttempted ? <div className="mt-2 rounded-xl bg-surface p-2.5"><p className="text-[11px] font-extrabold">Did you complete the payment?</p><p className="mt-0.5 text-[10px] text-muted-foreground">{money(paymentAmount, group.currency)} to {nameOf(selectedDebt!.to)}</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setUpiAttempted(false)} className="press rounded-lg bg-surface-2 py-2 text-[10px] font-bold">Not yet</button><button type="button" onClick={recordPayment} className="press rounded-lg bg-primary py-2 text-[10px] font-bold text-primary-foreground">Yes, mark paid</button></div></div> : null}</div> : null}<div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-surface-2 p-1"><button type="button" onClick={() => setPaymentMode('full')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'full' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Full payment</button><button type="button" onClick={() => setPaymentMode('partial')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'partial' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Partial payment</button></div>{paymentMode === 'partial' ? <div className="mt-3"><Field label="Amount paid" compact><input value={partialAmount} onChange={(event) => { const raw = event.target.value.replace(/[^0-9.]/g, ''); const next = Math.min(selectedDebt.amount, Math.max(0, Number(raw) || 0)); setPartialAmount(raw === '' ? '' : String(next)); }} inputMode="decimal" placeholder="0" className={`${inputClass} tabular text-right font-bold`} /></Field><div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs"><span className="font-semibold text-muted-foreground">Remaining after payment</span><span className="font-extrabold text-primary">{money(Math.max(0, selectedDebt.amount - partialValue), group.currency)}</span></div></div> : <p className="mt-3 text-xs text-muted-foreground">This records the full outstanding amount as paid.</p>}</> : null}</CompactDialog></>;
+
+  const scanUpiQr = async (file: File | null) => {
+    if (!file) return;
+    setUpiFeedback('');
+    try {
+      const Detector = (window as Window & { BarcodeDetector?: new (options?: { formats?: string[] }) => { detect: (source: ImageBitmap) => Promise<Array<{ rawValue?: string }>> } }).BarcodeDetector;
+      if (!Detector) { setUpiFeedback('QR scanning is not supported by this browser yet. Enter the UPI ID manually.'); return; }
+      const bitmap = await createImageBitmap(file);
+      try {
+        const detector = new Detector({ formats: ['qr_code'] });
+        const results = await detector.detect(bitmap);
+        const parsed = results.map((result) => upiIdFromQrValue(result.rawValue ?? '')).find(Boolean) ?? null;
+        if (!parsed) { setUpiFeedback('This QR code does not contain a readable UPI payment ID.'); return; }
+        setManualUpiId(parsed);
+        setUpiFeedback(`UPI ID detected: ${parsed}`);
+      } finally { bitmap.close(); }
+    } catch { setUpiFeedback('Could not read that QR code. Enter the UPI ID manually.'); }
+  };
+
+  return <>
+    <SheetModal open={open} onClose={onClose} title="Settle up" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>
+      {debts.length === 0 && receivable.length === 0 ? <div className="celebration relative overflow-hidden rounded-3xl bg-secondary p-7 text-center"><ExpenseConfetti strong /><div className="success-check mx-auto grid size-16 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={30} strokeWidth={3} /></div><p className="mt-3 text-xl font-extrabold">All settled up</p><p className="mt-1 text-xs text-muted-foreground">Nothing is owed right now.</p></div> : <>
+        <div className="rounded-2xl bg-secondary px-3.5 py-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-sm">↔</span><p className="text-[11px] leading-5 text-secondary-foreground"><b>Simplified settlement.</b> Splitzap nets debts across the whole group to reduce the number of payments. You may be asked to pay someone different from the person who originally covered a specific expense.</p></div></div>
+        {!debts.length ? <div className="mt-3 rounded-2xl bg-surface-2 px-3 py-3 text-xs font-semibold text-muted-foreground">You do not owe anything right now.</div> : null}
+        <div className="mt-3 space-y-2">{debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="settle-row flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"><Avatar name={nameOf(debt.from)} size={32} /><ArrowRight size={16} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={32} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{nameOf(debt.from)} → {nameOf(debt.to)}</p><p className="tabular text-sm font-bold text-primary">{money(debt.amount, group.currency)}</p></div><button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Mark paid</button></div>)}</div>
+        {receivable.length ? <div className="mt-3 rounded-2xl border border-positive/20 bg-positive/5 p-3"><p className="text-[10px] font-extrabold uppercase tracking-wide text-positive">You are owed</p><div className="mt-2 space-y-2">{receivable.map((debt) => { const authority = authorityOf(debt); const disconnected = authority === 'receiver-fallback'; return <div key={`owed-${debt.from}-${debt.to}`} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-3"><Avatar name={nameOf(debt.from)} size={30} /><ArrowRight size={14} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={30} /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{nameOf(debt.from)} owes you</p><p className="tabular text-sm font-extrabold text-positive">{money(debt.amount, group.currency)}</p>{disconnected ? <p className="mt-0.5 text-[9px] font-bold text-amber-700">Not currently connected to this Splitzap group · balance kept visible</p> : null}</div>{disconnected ? <button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-secondary px-2.5 py-2 text-[9px] font-bold text-primary">Mark received</button> : <span className="rounded-full bg-surface-2 px-2 py-1 text-[9px] font-bold text-muted-foreground">View only</span>}</div>; })}</div></div> : null}
+        <button type="button" onClick={() => setBreakdownOpen((value) => !value)} className="press mt-3 flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-3 text-left"><span className="min-w-0 flex-1"><b className="block text-xs">Original breakdown</b><span className="mt-0.5 block text-[10px] text-muted-foreground">See who originally owed whom before simplification</span></span><ChevronDown size={16} className={`transition-transform ${breakdownOpen ? 'rotate-180' : ''}`} /></button>
+        {breakdownOpen ? <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-surface"><div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Expense obligations</div>{rawDebts.length ? rawDebts.map(({ expense, ...debt }, index) => <div key={`${expense.id}-${debt.from}-${debt.to}-${index}`} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><b className="block truncate text-xs">{nameOf(debt.from)} → {nameOf(debt.to)}</b><span className="block truncate text-[10px] text-muted-foreground">{expense.description}</span></span><span className="tabular shrink-0 text-xs font-extrabold">{money(debt.amount, group.currency)}</span></div>) : <div className="border-t border-border px-3 py-3 text-xs text-muted-foreground">No original obligations.</div>}{recorded.length ? <><div className="border-t border-border px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Payments already recorded</div>{recorded.map((payment) => <div key={payment.id} className="flex items-start gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{nameOf(payment.from)} → {nameOf(payment.to)}</span>{payment.note ? <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{payment.note}</span> : null}</span><span className="tabular text-xs font-extrabold">{money(payment.amount, group.currency)}</span></div>)}</> : null}</div> : null}
+      </>}
+    </SheetModal>
+
+    <CompactDialog open={!!selectedDebt} onClose={() => { setSelectedDebt(null); setUpiFeedback(''); }} title={selectedAuthority === 'receiver-fallback' ? 'Record money received' : 'Record payment'} footer={<PrimaryButton onClick={recordPayment} disabled={!selectedDebt || !selectedAuthority || (paymentMode === 'partial' && partialValue <= 0)}>{selectedAuthority === 'receiver-fallback' ? 'Mark received' : 'Mark as paid'}</PrimaryButton>}>
+      {selectedDebt ? <>
+        <div className="rounded-2xl bg-surface-2 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Amount due</p><p className="mt-1 text-2xl font-extrabold">{money(selectedDebt.amount, group.currency)}</p><p className="mt-1 text-xs text-muted-foreground">{nameOf(selectedDebt.from)} → {nameOf(selectedDebt.to)}</p></div>
+        <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-2.5 py-2 text-[10px] leading-4 text-muted-foreground"><Info size={11} className="mt-0.5 shrink-0" /> {selectedAuthority === 'receiver-fallback' ? 'The payer is not currently connected to this group, so you can confirm money you received. The original expense stays unchanged.' : 'This records the current simplified transfer as paid. Original expense details stay unchanged.'}</div>
+        <Field label="Note (optional)" compact><input value={note} onChange={(event) => setNote(event.target.value)} maxLength={160} placeholder="Cash, dinner settlement, reference…" className={inputClass} /></Field>
+        {canUseUpi ? <div className="mt-3 rounded-2xl border border-primary/15 bg-secondary p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-xs font-extrabold text-primary">Pay with UPI</p><p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">Splitzap opens your payment app with the recipient and amount filled in.</p></div><span className="rounded-full bg-surface px-2 py-1 text-[9px] font-bold text-primary">UPI</span></div>
+          {upiLoading ? <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Checking payment details…</p> : upiId ? <><p className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] font-semibold text-muted-foreground">Using {nameOf(selectedDebt.to)}'s saved UPI ID.</p><button type="button" disabled={paymentAmount <= 0} onClick={launchUpi} className="press mt-2 w-full rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground disabled:opacity-40">Pay {money(paymentAmount, group.currency)} via UPI</button></> : <div className="mt-2"><p className="rounded-xl bg-surface px-2.5 py-2 text-[10px] leading-4 text-muted-foreground">{nameOf(selectedDebt.to)} has not shared a UPI ID. You can still enter one for this payment or scan their UPI QR.</p><input value={manualUpiId} onChange={(event) => setManualUpiId(normalizeUpiId(event.target.value))} autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="name@bank" className={`${inputClass} mt-2`} /><div className="mt-2 grid grid-cols-2 gap-2"><label className="press flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-surface py-2.5 text-[10px] font-bold text-primary"><Camera size={13} /> Scan UPI QR<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { void scanUpiQr(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label><button type="button" disabled={!isValidUpiId(manualUpiId) || paymentAmount <= 0} onClick={launchUpi} className="press rounded-xl bg-primary py-2.5 text-[10px] font-bold text-primary-foreground disabled:opacity-40">Pay via UPI</button></div></div>}
+          {upiFeedback ? <p role="status" className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] font-semibold leading-4 text-muted-foreground">{upiFeedback}</p> : null}
+          {upiAttempted ? <div className="mt-2 rounded-xl bg-surface p-2.5"><p className="text-[11px] font-extrabold">Did you complete the payment?</p><p className="mt-0.5 text-[10px] text-muted-foreground">{money(paymentAmount, group.currency)} to {nameOf(selectedDebt.to)}</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => { clearPendingUpiAttempt(data.me); setUpiAttempted(false); }} className="press rounded-lg bg-surface-2 py-2 text-[10px] font-bold">Not yet</button><button type="button" onClick={recordPayment} className="press rounded-lg bg-primary py-2 text-[10px] font-bold text-primary-foreground">Yes, mark paid</button></div></div> : null}
+          <p className="mt-1.5 text-[9px] leading-4 text-muted-foreground">Opening a UPI app never marks a payment completed automatically.</p>
+        </div> : null}
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-surface-2 p-1"><button type="button" onClick={() => setPaymentMode('full')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'full' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Full payment</button><button type="button" onClick={() => setPaymentMode('partial')} className={`press rounded-xl py-2.5 text-xs font-bold ${paymentMode === 'partial' ? 'bg-surface text-primary shadow-sm' : 'text-muted-foreground'}`}>Partial payment</button></div>
+        {paymentMode === 'partial' ? <div className="mt-3"><Field label={selectedAuthority === 'receiver-fallback' ? 'Amount received' : 'Amount paid'} compact><input value={partialAmount} onChange={(event) => { const raw = event.target.value.replace(/[^0-9.]/g, ''); const next = Math.min(selectedDebt.amount, Math.max(0, Number(raw) || 0)); setPartialAmount(raw === '' ? '' : String(next)); }} inputMode="decimal" placeholder="0" className={`${inputClass} tabular text-right font-bold`} /></Field><div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-xs"><span className="font-semibold text-muted-foreground">Remaining after payment</span><span className="font-extrabold text-primary">{money(Math.max(0, selectedDebt.amount - partialValue), group.currency)}</span></div></div> : <p className="mt-3 text-xs text-muted-foreground">This records the full outstanding amount.</p>}
+      </> : null}
+    </CompactDialog>
+
+    {undoSettlement ? <div className="fixed bottom-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] left-1/2 z-[90] flex w-[calc(100%-2rem)] max-w-[488px] -translate-x-1/2 items-center gap-3 rounded-2xl bg-foreground px-4 py-3 text-primary-foreground shadow-xl"><span className="min-w-0 flex-1 truncate text-xs font-bold">Payment recorded · {money(undoSettlement.amount, group.currency)}</span><button type="button" onClick={undoPayment} className="press rounded-lg bg-primary-foreground/12 px-3 py-2 text-xs font-extrabold">Undo</button></div> : null}
+  </>;
 }
+
 
 function buildExpenseShareMessage(expense: Expense, group: Group, data: SplitData) {
   const debts = expenseSettlement(expense, group);
