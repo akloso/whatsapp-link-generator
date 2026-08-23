@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CATEGORIES,
   CURRENCIES,
@@ -67,7 +68,7 @@ import {
   type SplitMode,
 } from './splitStoreV4';
 import type { SplitzapReceiptIntelligence } from './splitzapProduction';
-import { isValidUpiId, normalizeUpiId, settlementAuthority, upiIdFromQrValue } from './splitzapPaymentSafety';
+import { isValidUpiId, normalizeUpiId, settlementAuthority } from './splitzapPaymentSafety';
 
 type View = { name: 'home' } | { name: 'activity' } | { name: 'group'; groupId: string };
 type GroupTab = 'expenses' | 'balances' | 'insights';
@@ -251,6 +252,47 @@ function clearPendingUpiAttempt(userId: string) {
   try { window.localStorage.removeItem(pendingUpiKey(userId)); } catch { /* best effort */ }
 }
 
+
+type PendingSettlementSession = {
+  groupId: string;
+  from?: string;
+  to?: string;
+  paymentMode: 'full' | 'partial';
+  partialAmount: string;
+  note: string;
+  updatedAt: string;
+};
+
+const SETTLEMENT_SESSION_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+const settlementSessionKey = (userId: string) => `splitzap.settlementSession.${userId}`;
+
+function readPendingSettlementSession(userId: string): PendingSettlementSession | null {
+  if (!userId || typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(settlementSessionKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingSettlementSession;
+    const updated = +new Date(parsed.updatedAt);
+    if (!parsed.groupId || !Number.isFinite(updated) || Date.now() - updated > SETTLEMENT_SESSION_MAX_AGE_MS) {
+      window.localStorage.removeItem(settlementSessionKey(userId));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingSettlementSession(userId: string, session: Omit<PendingSettlementSession, 'updatedAt'>) {
+  if (!userId || typeof window === 'undefined') return;
+  try { window.localStorage.setItem(settlementSessionKey(userId), JSON.stringify({ ...session, updatedAt: new Date().toISOString() })); } catch { /* best effort */ }
+}
+
+function clearPendingSettlementSession(userId: string) {
+  if (!userId || typeof window === 'undefined') return;
+  try { window.localStorage.removeItem(settlementSessionKey(userId)); } catch { /* best effort */ }
+}
+
 function useSplitzapPwa() {
   useEffect(() => {
     const previousTitle = document.title;
@@ -327,9 +369,11 @@ export default function SplitzapAppV4({ accountAction, collaboration }: { accoun
 
   useEffect(() => {
     if (!rootData.me || pendingResumeChecked.current === rootData.me) return;
-    const pending = readPendingUpiAttempt(rootData.me);
-    if (!pending) { pendingResumeChecked.current = rootData.me; return; }
-    const group = rootData.groups.find((item) => item.id === pending.groupId);
+    const pendingUpi = readPendingUpiAttempt(rootData.me);
+    const pendingSettlement = readPendingSettlementSession(rootData.me);
+    const groupId = pendingUpi?.groupId ?? pendingSettlement?.groupId;
+    if (!groupId) { pendingResumeChecked.current = rootData.me; return; }
+    const group = rootData.groups.find((item) => item.id === groupId);
     if (!group) return;
     pendingResumeChecked.current = rootData.me;
     setResumeSettlementGroupId(group.id);
@@ -491,15 +535,15 @@ function useDialogAccessibility(open: boolean, onClose: () => void) {
 function SheetModal({ open, onClose, title, children, footer, tall = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; tall?: boolean }) {
   const titleId = useId();
   const panelRef = useDialogAccessibility(open, onClose);
-  if (!open) return null;
-  return <div className="sheet-wrap fixed inset-0 z-50 flex items-end justify-center"><button type="button" aria-label="Close dialog" onClick={onClose} className="sheet-backdrop absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={`sheet-panel relative flex w-full max-w-[520px] flex-col rounded-t-[28px] bg-surface outline-none ${tall ? 'sheet-panel--tall' : ''}`}><div className="sheet-handle mx-auto mt-2 h-1 w-10 rounded-full bg-border" /><div className="flex items-center justify-between px-5 pb-2 pt-3"><h2 id={titleId} className="text-lg font-extrabold">{title}</h2><button type="button" onClick={onClose} aria-label="Close" className="press grid size-10 place-items-center rounded-full bg-muted text-muted-foreground"><X size={16} /></button></div><div className="sheet-scroll min-h-0 flex-1 px-5 pb-4">{children}</div>{footer ? <div className="sheet-footer border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{footer}</div> : null}</div></div>;
+  if (!open || typeof document === 'undefined') return null;
+  return createPortal(<div className="sheet-wrap fixed inset-0 z-[220] flex items-end justify-center"><button type="button" aria-label="Close dialog" onClick={onClose} className="sheet-backdrop absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={`sheet-panel relative flex w-full max-w-[520px] flex-col rounded-t-[28px] bg-surface outline-none ${tall ? 'sheet-panel--tall' : ''}`}><div className="sheet-handle mx-auto mt-2 h-1 w-10 rounded-full bg-border" /><div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-3"><h2 id={titleId} className="text-lg font-extrabold">{title}</h2><button type="button" onClick={onClose} aria-label="Close" className="press grid size-10 place-items-center rounded-full bg-muted text-muted-foreground"><X size={16} /></button></div><div className="sheet-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>{footer ? <div className="sheet-footer sticky bottom-0 z-10 shrink-0 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{footer}</div> : null}</div></div>, document.body);
 }
 
 function CompactDialog({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
   const titleId = useId();
   const panelRef = useDialogAccessibility(open, onClose);
-  if (!open) return null;
-  return <div className="fixed inset-0 z-[90] grid place-items-center px-5"><button type="button" aria-label="Close dialog" onClick={onClose} className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative w-full max-w-[400px] rounded-3xl bg-surface p-4 shadow-2xl outline-none"><div className="mb-3 flex items-center justify-between"><h2 id={titleId} className="text-base font-extrabold">{title}</h2><button type="button" aria-label="Close" onClick={onClose} className="press grid size-10 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div>{children}{footer ? <div className="mt-4">{footer}</div> : null}</div></div>;
+  if (!open || typeof document === 'undefined') return null;
+  return createPortal(<div className="fixed inset-0 z-[230] grid place-items-center overflow-y-auto px-5 py-[max(1rem,env(safe-area-inset-top))]"><button type="button" aria-label="Close dialog" onClick={onClose} className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative max-h-[calc(100svh-2rem)] w-full max-w-[400px] overflow-y-auto rounded-3xl bg-surface p-4 shadow-2xl outline-none"><div className="mb-3 flex items-center justify-between"><h2 id={titleId} className="text-base font-extrabold">{title}</h2><button type="button" aria-label="Close" onClick={onClose} className="press grid size-10 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div>{children}{footer ? <div className="sticky bottom-0 z-10 mt-4 bg-surface pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2">{footer}</div> : null}</div></div>, document.body);
 }
 
 function DataBackupDialog({ open, onClose, onRestored }: { open: boolean; onClose: () => void; onRestored: () => void }) {
@@ -631,9 +675,9 @@ function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (vie
   const paymentBalances = paymentGroup ? groupBalances(paymentGroup, data.expenses, data.settlements) : {};
 
   return <AppShell onAdd={() => setQuickOpen(true)} view={{ name: 'home' }} navigate={navigate}>
-    <Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5">{accountAction}<button type="button" onClick={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan receipt" title="Scan receipt" className="press grid size-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="press flex items-center gap-1 rounded-full bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"><Plus size={14} /> New</button></div>} />
+    <Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5">{accountAction}<button type="button" onClick={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan receipt" title="Scan receipt" className="splitzap-camera-button press grid size-9 place-items-center rounded-full text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="splitzap-new-button press flex items-center gap-1 rounded-full px-3 py-2 text-xs font-bold"><Plus size={14} /> New</button></div>} />
     {!hydrated ? <section className="space-y-3 px-5 pt-2"><div className="splitzap-skeleton h-28 rounded-3xl" /><div className="splitzap-skeleton h-20 rounded-3xl" /></section> : introVisible ? <IntroPanel hasGroups={data.groups.length > 0} onPrimary={() => setShowIntro(false)} onNewGroup={() => setGroupOpen(true)} onJoinGroup={() => collaboration?.onJoinGroup()} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onRecordPayment={beginPayment} onActivity={() => navigate({ name: 'activity' })} onInstall={!installState.installed ? install : undefined} /> : <>
-      <section className="px-5"><div className="balance-strip grid grid-cols-2 overflow-hidden rounded-2xl border border-border bg-surface"><button type="button" onClick={() => setBalanceDetailMode('get')} className="press p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You get</p><p className="tabular mt-1 text-xl font-extrabold text-positive">{money(totalOwed)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button><button type="button" onClick={() => setBalanceDetailMode('owe')} className="press border-l border-border p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You owe</p><p className="tabular mt-1 text-xl font-extrabold text-negative">{money(totalOwe)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button></div></section>
+      <section className="px-5"><div className="balance-strip grid grid-cols-2 overflow-hidden rounded-2xl border border-border bg-surface"><button type="button" onClick={() => setBalanceDetailMode('get')} className="balance-card balance-card--get press p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You get</p><p className="tabular mt-1 text-xl font-extrabold text-positive">{money(totalOwed)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button><button type="button" onClick={() => setBalanceDetailMode('owe')} className="balance-card balance-card--owe press border-l border-border p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You owe</p><p className="tabular mt-1 text-xl font-extrabold text-negative">{money(totalOwe)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button></div></section>
       <section className="px-5 pt-5"><div className="mb-2 flex items-end justify-between gap-3"><div><p className="text-sm font-extrabold">Your groups</p><p className="mt-0.5 text-[11px] text-muted-foreground">{activeSummaries.length} active · {archivedSummaries.length} archived</p></div>{archivedSummaries.length ? <button type="button" onClick={() => setShowArchived((value) => !value)} className="press rounded-full bg-surface-2 px-3 py-1.5 text-[10px] font-bold text-primary">{showArchived ? 'Show active' : 'Archived'}</button> : null}</div>
         <div className="overflow-hidden rounded-2xl border border-border bg-surface">{visibleSummaries.map(({ group, mine, spent }, index) => <button type="button" key={group.id} onClick={() => navigate({ name: 'group', groupId: group.id })} className={`group-row group-accent-${groupAccentIndex(group.id)} list-enter press flex w-full items-center gap-3 border-b border-border px-3.5 py-3.5 text-left last:border-b-0`} style={{ animationDelay: `${index * 40}ms` }}><span className="group-emoji grid size-11 shrink-0 place-items-center rounded-2xl text-xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate font-bold">{group.name}</p><p className="truncate text-[11px] text-muted-foreground">{group.members.length} people · {money(spent, group.currency)} spent</p></div><div className="text-right"><p className={`text-[10px] font-semibold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? 'Settled' : mine > 0 ? 'You get' : 'You owe'}</p><p className={`tabular text-sm font-extrabold ${Math.abs(mine) < 0.01 ? 'text-muted-foreground' : mine > 0 ? 'text-positive' : 'text-negative'}`}>{Math.abs(mine) < 0.01 ? '—' : money(Math.abs(mine), group.currency)}</p></div><ChevronRight size={15} className="shrink-0 text-muted-foreground" /></button>)}{visibleSummaries.length === 0 ? <div className="p-6 text-center"><p className="text-sm font-extrabold">{showArchived ? 'No archived groups' : 'No active groups'}</p><p className="mt-1 text-xs text-muted-foreground">{showArchived ? 'Archived groups will stay safely stored here.' : 'Create a group to start splitting expenses.'}</p></div> : null}</div>
       </section>
@@ -1490,27 +1534,45 @@ function SettleSheet({ open, onClose, group, balances, data, update, getMemberUp
   const [upiFeedback, setUpiFeedback] = useState('');
   const [undoSettlement, setUndoSettlement] = useState<Settlement | null>(null);
   const undoTimer = useRef<number | null>(null);
+  const skipSettlementPersist = useRef(false);
 
   useEffect(() => () => { if (undoTimer.current) window.clearTimeout(undoTimer.current); }, []);
 
   useEffect(() => {
     if (!open) return;
-    const pending = readPendingUpiAttempt(data.me);
-    if (!pending || pending.groupId !== group.id) return;
-    const matching = [...debts, ...receivable].find((debt) => debt.from === pending.from && debt.to === pending.to);
-    if (!matching) { clearPendingUpiAttempt(data.me); return; }
-    setSelectedDebt(matching);
+    const pendingUpi = readPendingUpiAttempt(data.me);
+    const pendingSettlement = readPendingSettlementSession(data.me);
+    const pending = pendingUpi?.groupId === group.id ? pendingUpi : pendingSettlement?.groupId === group.id ? pendingSettlement : null;
+    if (!pending) return;
+    skipSettlementPersist.current = true;
+    const matching = pending.from && pending.to ? [...debts, ...receivable].find((debt) => debt.from === pending.from && debt.to === pending.to) : null;
+    if (matching) setSelectedDebt(matching);
     setPaymentMode(pending.paymentMode);
     setPartialAmount(pending.partialAmount);
     setNote(pending.note);
-    setUpiAttempted(true);
+    setUpiAttempted(Boolean(pendingUpi && pendingUpi.groupId === group.id));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, group.id, data.me]);
 
   useEffect(() => {
+    if (!open) return;
+    if (skipSettlementPersist.current) { skipSettlementPersist.current = false; return; }
+    savePendingSettlementSession(data.me, {
+      groupId: group.id,
+      from: selectedDebt?.from,
+      to: selectedDebt?.to,
+      paymentMode,
+      partialAmount,
+      note,
+    });
+  }, [open, data.me, group.id, selectedDebt?.from, selectedDebt?.to, paymentMode, partialAmount, note]);
+
+  useEffect(() => {
     if (!selectedDebt) return;
-    const pending = readPendingUpiAttempt(data.me);
-    const restoring = pending && pending.groupId === group.id && pending.from === selectedDebt.from && pending.to === selectedDebt.to;
+    const pendingUpi = readPendingUpiAttempt(data.me);
+    const pendingSettlement = readPendingSettlementSession(data.me);
+    const restoring = (pendingUpi && pendingUpi.groupId === group.id && pendingUpi.from === selectedDebt.from && pendingUpi.to === selectedDebt.to)
+      || (pendingSettlement && pendingSettlement.groupId === group.id && pendingSettlement.from === selectedDebt.from && pendingSettlement.to === selectedDebt.to);
     if (restoring) return;
     setPaymentMode('full');
     setPartialAmount('');
@@ -1546,6 +1608,7 @@ function SettleSheet({ open, onClose, group, balances, data, update, getMemberUp
       return group.sharedId ? next : withLocalActivity(next, { groupId: group.id, actorName: current.myName?.trim() || nameOf(memberIdFor(group, current)), eventType: 'payment_recorded', entityType: 'payment', entityId: settlement.id, data: { after: settlement } });
     });
     clearPendingUpiAttempt(data.me);
+    clearPendingSettlementSession(data.me);
     setSelectedDebt(null);
     setUpiAttempted(false);
     setNote('');
@@ -1570,31 +1633,22 @@ function SettleSheet({ open, onClose, group, balances, data, update, getMemberUp
     const target = normalizeUpiId(upiId || manualUpiId);
     if (!isValidUpiId(target)) { setUpiFeedback('Enter a valid UPI ID or scan a UPI QR code.'); return; }
     const params = new URLSearchParams({ pa: target, pn: nameOf(selectedDebt.to), am: paymentAmount.toFixed(2), cu: 'INR', tn: `Splitzap · ${group.name}` });
+    savePendingSettlementSession(data.me, { groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, paymentMode, partialAmount, note });
     savePendingUpiAttempt(data.me, { groupId: group.id, from: selectedDebt.from, to: selectedDebt.to, amount: paymentAmount, paymentMode, partialAmount, note, createdAt: new Date().toISOString() });
     setUpiAttempted(true);
     window.location.href = `upi://pay?${params.toString()}`;
   };
 
-  const scanUpiQr = async (file: File | null) => {
-    if (!file) return;
-    setUpiFeedback('');
-    try {
-      const Detector = (window as Window & { BarcodeDetector?: new (options?: { formats?: string[] }) => { detect: (source: ImageBitmap) => Promise<Array<{ rawValue?: string }>> } }).BarcodeDetector;
-      if (!Detector) { setUpiFeedback('QR scanning is not supported by this browser yet. Enter the UPI ID manually.'); return; }
-      const bitmap = await createImageBitmap(file);
-      try {
-        const detector = new Detector({ formats: ['qr_code'] });
-        const results = await detector.detect(bitmap);
-        const parsed = results.map((result) => upiIdFromQrValue(result.rawValue ?? '')).find(Boolean) ?? null;
-        if (!parsed) { setUpiFeedback('This QR code does not contain a readable UPI payment ID.'); return; }
-        setManualUpiId(parsed);
-        setUpiFeedback(`UPI ID detected: ${parsed}`);
-      } finally { bitmap.close(); }
-    } catch { setUpiFeedback('Could not read that QR code. Enter the UPI ID manually.'); }
+
+  const closeSettle = () => {
+    clearPendingSettlementSession(data.me);
+    clearPendingUpiAttempt(data.me);
+    setUpiAttempted(false);
+    onClose();
   };
 
   return <>
-    <SheetModal open={open} onClose={onClose} title="Settle up" footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}>
+    <SheetModal open={open} onClose={closeSettle} title="Settle up" footer={<PrimaryButton onClick={closeSettle}>Done</PrimaryButton>}>
       {debts.length === 0 && receivable.length === 0 ? <div className="celebration relative overflow-hidden rounded-3xl bg-secondary p-7 text-center"><ExpenseConfetti strong /><div className="success-check mx-auto grid size-16 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={30} strokeWidth={3} /></div><p className="mt-3 text-xl font-extrabold">All settled up</p><p className="mt-1 text-xs text-muted-foreground">Nothing is owed right now.</p></div> : <>
         <div className="rounded-2xl bg-secondary px-3.5 py-3"><div className="flex items-start gap-2"><span className="mt-0.5 text-sm">↔</span><p className="text-[11px] leading-5 text-secondary-foreground"><b>Simplified settlement.</b> Splitzap nets debts across the whole group to reduce the number of payments. You may be asked to pay someone different from the person who originally covered a specific expense.</p></div></div>
         {!debts.length ? <div className="mt-3 rounded-2xl bg-surface-2 px-3 py-3 text-xs font-semibold text-muted-foreground">You do not owe anything right now.</div> : null}
@@ -1611,7 +1665,7 @@ function SettleSheet({ open, onClose, group, balances, data, update, getMemberUp
         <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-2.5 py-2 text-[10px] leading-4 text-muted-foreground"><Info size={11} className="mt-0.5 shrink-0" /> {selectedAuthority === 'receiver-fallback' ? 'The payer is not currently connected to this group, so you can confirm money you received. The original expense stays unchanged.' : 'This records the current simplified transfer as paid. Original expense details stay unchanged.'}</div>
         <Field label="Note (optional)" compact><input value={note} onChange={(event) => setNote(event.target.value)} maxLength={160} placeholder="Cash, dinner settlement, reference…" className={inputClass} /></Field>
         {canUseUpi ? <div className="mt-3 rounded-2xl border border-primary/15 bg-secondary p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-xs font-extrabold text-primary">Pay with UPI</p><p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">Splitzap opens your payment app with the recipient and amount filled in.</p></div><span className="rounded-full bg-surface px-2 py-1 text-[9px] font-bold text-primary">UPI</span></div>
-          {upiLoading ? <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Checking payment details…</p> : upiId ? <><p className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] font-semibold text-muted-foreground">Using {nameOf(selectedDebt.to)}'s saved UPI ID.</p><button type="button" disabled={paymentAmount <= 0} onClick={launchUpi} className="press mt-2 w-full rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground disabled:opacity-40">Pay {money(paymentAmount, group.currency)} via UPI</button></> : <div className="mt-2"><p className="rounded-xl bg-surface px-2.5 py-2 text-[10px] leading-4 text-muted-foreground">{nameOf(selectedDebt.to)} has not shared a UPI ID. You can still enter one for this payment or scan their UPI QR.</p><input value={manualUpiId} onChange={(event) => setManualUpiId(normalizeUpiId(event.target.value))} autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="name@bank" className={`${inputClass} mt-2`} /><div className="mt-2 grid grid-cols-2 gap-2"><label className="press flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-surface py-2.5 text-[10px] font-bold text-primary"><Camera size={13} /> Scan UPI QR<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { void scanUpiQr(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label><button type="button" disabled={!isValidUpiId(manualUpiId) || paymentAmount <= 0} onClick={launchUpi} className="press rounded-xl bg-primary py-2.5 text-[10px] font-bold text-primary-foreground disabled:opacity-40">Pay via UPI</button></div></div>}
+          {upiLoading ? <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Checking payment details…</p> : upiId ? <><p className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] font-semibold text-muted-foreground">Using {nameOf(selectedDebt.to)}'s saved UPI ID.</p><button type="button" disabled={paymentAmount <= 0} onClick={launchUpi} className="press mt-2 w-full rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground disabled:opacity-40">Pay {money(paymentAmount, group.currency)} via UPI</button></> : <div className="mt-2"><p className="rounded-xl bg-surface px-2.5 py-2 text-[10px] leading-4 text-muted-foreground">{nameOf(selectedDebt.to)} has not shared a UPI ID. Enter their UPI ID for this payment.</p><input value={manualUpiId} onChange={(event) => setManualUpiId(normalizeUpiId(event.target.value))} autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="name@bank" className={`${inputClass} mt-2`} /><button type="button" disabled={!isValidUpiId(manualUpiId) || paymentAmount <= 0} onClick={launchUpi} className="press mt-2 w-full rounded-xl bg-primary py-2.5 text-[10px] font-bold text-primary-foreground disabled:opacity-40">Pay via UPI</button></div>}
           {upiFeedback ? <p role="status" className="mt-2 rounded-xl bg-surface px-2.5 py-2 text-[10px] font-semibold leading-4 text-muted-foreground">{upiFeedback}</p> : null}
           {upiAttempted ? <div className="mt-2 rounded-xl bg-surface p-2.5"><p className="text-[11px] font-extrabold">Did you complete the payment?</p><p className="mt-0.5 text-[10px] text-muted-foreground">{money(paymentAmount, group.currency)} to {nameOf(selectedDebt.to)}</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => { clearPendingUpiAttempt(data.me); setUpiAttempted(false); }} className="press rounded-lg bg-surface-2 py-2 text-[10px] font-bold">Not yet</button><button type="button" onClick={recordPayment} className="press rounded-lg bg-primary py-2 text-[10px] font-bold text-primary-foreground">Yes, mark paid</button></div></div> : null}
           <p className="mt-1.5 text-[9px] leading-4 text-muted-foreground">Opening a UPI app never marks a payment completed automatically.</p>

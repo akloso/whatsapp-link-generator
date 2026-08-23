@@ -10,19 +10,6 @@ export function isValidUpiId(value: string | null | undefined) {
   return UPI_RE.test(normalizeUpiId(value));
 }
 
-export function upiIdFromQrValue(rawValue: string) {
-  const raw = rawValue.trim();
-  if (!raw) return null;
-  if (isValidUpiId(raw)) return normalizeUpiId(raw);
-  try {
-    const url = new URL(raw);
-    if (url.protocol.toLowerCase() !== 'upi:') return null;
-    const id = normalizeUpiId(url.searchParams.get('pa'));
-    return isValidUpiId(id) ? id : null;
-  } catch {
-    return null;
-  }
-}
 
 export type SettlementAuthority = 'payer' | 'receiver-fallback' | null;
 

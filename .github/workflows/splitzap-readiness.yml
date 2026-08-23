@@ -60,8 +60,10 @@ jobs:
           test -f src/features/splitzap/splitzapSyncSafety.test.ts
           test -f src/features/splitzap/splitzapPaymentSafety.ts
           test ! -f scripts/tmp_splitzap_durable_sync_patch.py
-          test ! -f .github/workflows/tmp-splitzap-durable-sync.yml
           test ! -f scripts/tmp_splitzap_ux_patch.py
+          test ! -f scripts/tmp_splitzap_guest_ios_patch.py
+          test ! -f scripts/tmp_splitzap_ui_polish_patch.py
+          test ! -f .github/workflows/tmp-splitzap-durable-sync.yml
           test ! -f .github/workflows/tmp-splitzap-ux.yml
           test ! -f .github/workflows/tmp-splitzap-ux-v2.yml
           test ! -f .tmp-splitzap-ux-trigger
@@ -91,7 +93,7 @@ jobs:
           grep -q "setSyncTick" src/features/splitzap/SplitzapCloudApp.tsx
           ! grep -Fq "[accountDataReady, data, session, status, update]" src/features/splitzap/SplitzapCloudApp.tsx
           ! grep -Fq "[accountDataReady, productionTick, session, status, update]" src/features/splitzap/SplitzapCloudApp.tsx
-      - name: Production UX and account-safety assertions
+      - name: Production UX, guest and account-safety assertions
         shell: bash
         run: |
           grep -q "My Profile" src/features/splitzap/SplitzapCloudApp.tsx
@@ -105,6 +107,15 @@ jobs:
           grep -q "Wrong signed-in email" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Any already joined group member" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Offline · changes saved on this device" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Continue without login" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "splitzap.guest.data.v1" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Try Splitzap as guest" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "Local only" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "Sign in free for backup + sharing" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "guest-profile-alert" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "onInviteGroup: () => setAccountOpen(true)" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "onJoinGroup: () => setAccountOpen(true)" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "FirstRunProfileSetup" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q 'type="date"' src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Original breakdown" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Simplified settlement" src/features/splitzap/SplitzapAppV4.tsx
@@ -138,11 +149,18 @@ jobs:
           grep -q "upi://pay" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Did you complete the payment?" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "paymentMode === 'partial'" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "splitzap.settlementSession" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "readPendingSettlementSession" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "savePendingSettlementSession" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Enter their UPI ID for this payment" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "Scan UPI QR" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "BarcodeDetector" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "upiIdFromQrValue" src/features/splitzap/splitzapPaymentSafety.ts
+          grep -q "accepts valid manual UPI IDs" src/features/splitzap/splitzapSyncSafety.test.ts
           grep -q "memberIds?: string\[\]" src/features/splitzap/splitStoreV4.ts
           grep -q "Same as previous" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Receipt total matched" src/features/splitzap/SplitzapAppV4.tsx
           ! grep -q "function parseReceiptText" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "FirstRunProfileSetup" src/features/splitzap/SplitzapCloudApp.tsx
           ! grep -q '<Field label="Your name"' src/features/splitzap/SplitzapAppV4.tsx
           grep -q "personalSettlementBuckets" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "View only" src/features/splitzap/SplitzapAppV4.tsx
@@ -150,17 +168,23 @@ jobs:
           grep -q "View details" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Note (optional)" src/features/splitzap/SplitzapAppV4.tsx
           grep -q ">Undo</button>" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzap.upiPending" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Scan UPI QR" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "has not shared a UPI ID" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Mark received" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "balance kept visible" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "note?: string" src/features/splitzap/splitStoreV4.ts
           grep -q "apple-mobile-web-app-title" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "splitzap-home-center" src/features/splitzap/splitzap.css
           grep -q "sheet-panel--tall" src/features/splitzap/splitzap.css
+          grep -q "createPortal" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "z-\[220\]" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "sticky bottom-0" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "100svh" src/features/splitzap/splitzap.css
           grep -q "window.history.replaceState({}, '', '/splitzap')" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "fixed left-1/2 top-" src/features/splitzap/SplitzapCloudApp.tsx
           grep -q "Splitzap — Split bills, not bonds" src/App.tsx
           grep -q "settlementAuthority" src/features/splitzap/splitzapPaymentSafety.ts
-          grep -q "upiIdFromQrValue" src/features/splitzap/splitzapPaymentSafety.ts
+          grep -q "balance-card--get" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "balance-card--owe" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "splitzap-camera-button" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "splitzap-new-button" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "splitzapGuestNudge" src/features/splitzap/splitzap.css
+          grep -q "prefers-reduced-motion" src/features/splitzap/splitzap.css

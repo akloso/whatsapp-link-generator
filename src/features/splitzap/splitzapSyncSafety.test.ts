@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSharedGroupSnapshot, sharedSnapshotHash } from './splitzapShared';
 import type { Expense, Group, SplitData } from './splitStoreV4';
 import { compactSnapshotFingerprint, preserveDirtyRemoteRow, preserveDirtySharedGroupsOnBootstrap } from './splitzapSyncSafety';
-import { isValidUpiId, settlementAuthority, upiIdFromQrValue } from './splitzapPaymentSafety';
+import { isValidUpiId, settlementAuthority } from './splitzapPaymentSafety';
 
 type Snapshot = { expenses: string[] };
 type Row = { id: string; snapshot: Snapshot; revision: number };
@@ -81,9 +81,9 @@ describe('Splitzap settlement and UPI safety', () => {
     expect(settlementAuthority({ ...debt, from: 'me', to: 'friend' }, 'me', new Set(['me', 'friend']))).toBe('payer');
   });
 
-  it('accepts manual UPI IDs and extracts the payee from a UPI QR payload', () => {
+  it('accepts valid manual UPI IDs and rejects malformed values', () => {
     expect(isValidUpiId('Akash.Test@Bank')).toBe(true);
-    expect(upiIdFromQrValue('upi://pay?pa=akash.test%40bank&pn=Akash')).toBe('akash.test@bank');
-    expect(upiIdFromQrValue('https://example.com/qr')).toBeNull();
+    expect(isValidUpiId('not-a-upi-id')).toBe(false);
+    expect(isValidUpiId('')).toBe(false);
   });
 });
