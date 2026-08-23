@@ -21,6 +21,25 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Tighten temporary patch matcher
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/tmp_splitzap_ux_patch.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''    "  const [paymentPickerOpen, setPaymentPickerOpen] = useState(false);\\n  const [paymentGroupId, setPaymentGroupId] = useState<string | null>(null);\\n",
+    "  const [paymentPickerOpen, setPaymentPickerOpen] = useState(false);\\n  const [paymentGroupId, setPaymentGroupId] = useState<string | null>(null);\\n  const [balanceDetailMode, setBalanceDetailMode] = useState<'get' | 'owe' | null>(null);\\n",
+    'home balance detail state',
+'''
+          new = '''    "  const [showArchived, setShowArchived] = useState(false);\\n  const [paymentPickerOpen, setPaymentPickerOpen] = useState(false);\\n  const [paymentGroupId, setPaymentGroupId] = useState<string | null>(null);\\n",
+    "  const [showArchived, setShowArchived] = useState(false);\\n  const [paymentPickerOpen, setPaymentPickerOpen] = useState(false);\\n  const [paymentGroupId, setPaymentGroupId] = useState<string | null>(null);\\n  const [balanceDetailMode, setBalanceDetailMode] = useState<'get' | 'owe' | null>(null);\\n",
+    'home balance detail state',
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected one temporary matcher block, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Apply scoped Splitzap patch
         run: python scripts/tmp_splitzap_ux_patch.py
       - name: Enlarge Splitzap app icon artwork
@@ -76,7 +95,22 @@ jobs:
           grep -q "Splitzap — Split bills, not bonds" src/App.tsx
           test -f public/splitzap-icon-192.png
           test -f public/splitzap-icon-512.png
-          ! git diff -- src/features/splitzap/SplitzapAppV4.tsx | grep -q "function ReceiptScanner"
+      - name: Verify receipt scanner stayed byte-for-byte unchanged
+        shell: bash
+        run: |
+          python - <<'PY'
+          import subprocess
+          from pathlib import Path
+          before = subprocess.check_output(['git', 'show', 'HEAD:src/features/splitzap/SplitzapAppV4.tsx'], text=True)
+          after = Path('src/features/splitzap/SplitzapAppV4.tsx').read_text(encoding='utf-8')
+          def scanner(text):
+              start = text.index('function ReceiptScanner(')
+              end = text.index('function PersonalItemsDialog', start)
+              return text[start:end]
+          if scanner(before) != scanner(after):
+              raise SystemExit('Receipt scanner changed unexpectedly')
+          print('Receipt scanner unchanged')
+          PY
       - name: Commit validated source only
         shell: bash
         run: |
