@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSharedGroupSnapshot, sharedSnapshotHash } from './splitzapShared';
 import type { Expense, Group, SplitData } from './splitStoreV4';
 import { compactSnapshotFingerprint, preserveDirtyRemoteRow, preserveDirtySharedGroupsOnBootstrap } from './splitzapSyncSafety';
+import { isValidUpiId, settlementAuthority, upiIdFromQrValue } from './splitzapPaymentSafety';
 
 type Snapshot = { expenses: string[] };
 type Row = { id: string; snapshot: Snapshot; revision: number };
@@ -68,5 +69,21 @@ describe('Splitzap shared-sync safety', () => {
     const result = preserveDirtySharedGroupsOnBootstrap(serverAccount, localAccount, confirmed, false);
     expect(result.dirtyIds.size).toBe(0);
     expect(result.data.myName).toBe('Akash');
+  });
+});
+
+
+describe('Splitzap settlement and UPI safety', () => {
+  it('keeps active-user receivables view-only but lets a disconnected debtor be marked received', () => {
+    const debt = { from: 'friend', to: 'me', amount: 120 };
+    expect(settlementAuthority(debt, 'me', new Set(['me', 'friend']))).toBeNull();
+    expect(settlementAuthority(debt, 'me', new Set(['me']))).toBe('receiver-fallback');
+    expect(settlementAuthority({ ...debt, from: 'me', to: 'friend' }, 'me', new Set(['me', 'friend']))).toBe('payer');
+  });
+
+  it('accepts manual UPI IDs and extracts the payee from a UPI QR payload', () => {
+    expect(isValidUpiId('Akash.Test@Bank')).toBe(true);
+    expect(upiIdFromQrValue('upi://pay?pa=akash.test%40bank&pn=Akash')).toBe('akash.test@bank');
+    expect(upiIdFromQrValue('https://example.com/qr')).toBeNull();
   });
 });

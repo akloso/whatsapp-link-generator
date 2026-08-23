@@ -103,7 +103,7 @@ const pageMetadata: Record<Exclude<PageKey, 'blogPost'>, SeoMetadata> = {
     robots: 'noindex, nofollow, noarchive, nosnippet',
   },
   splitzap: {
-    title: 'Splitzap - Split Expenses & Share on WhatsApp | Zapora',
+    title: 'Splitzap — Split bills, not bonds',
     description:
       'Split bills, calculate settlements, manage groups, and share concise expense summaries on WhatsApp.',
     canonicalPath: '/splitzap',
