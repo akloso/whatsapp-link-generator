@@ -1,0 +1,70 @@
+name: TEMP Splitzap Sheet Scope Fix
+
+on:
+  push:
+    branches: [testing]
+    paths:
+      - 'scripts/tmp_splitzap_sheet_scope_fix.py'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: testing
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply scoped modal fix
+        run: python scripts/tmp_splitzap_sheet_scope_fix.py
+      - run: npm ci
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Splitzap regression tests
+        run: npm run test:splitzap
+      - name: Production build
+        run: npm run build
+      - name: Production dependency security gate
+        run: npm audit --omit=dev --audit-level=high
+      - name: Sheet scope assertions
+        shell: bash
+        run: |
+          grep -Fq "document.querySelector<HTMLElement>('.splitzap-root') ?? document.body" src/features/splitzap/SplitzapAppV4.tsx
+          test "$(grep -Fc "document.querySelector<HTMLElement>('.splitzap-root') ?? document.body" src/features/splitzap/SplitzapAppV4.tsx)" -ge 2
+          grep -Fq 'className="sheet-wrap fixed inset-0 z-[220]' src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq 'sheet-footer sticky bottom-0' src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq '.splitzap-root .bg-surface' src/features/splitzap/splitzap.css
+          grep -Fq '.splitzap-root .bg-foreground\\/40' src/features/splitzap/splitzap.css
+      - name: Verify financial and receipt code stayed unchanged
+        shell: bash
+        run: |
+          python - <<'PY'
+          import subprocess
+          from pathlib import Path
+          before = subprocess.check_output(['git', 'show', 'HEAD:src/features/splitzap/SplitzapAppV4.tsx'], text=True)
+          after = Path('src/features/splitzap/SplitzapAppV4.tsx').read_text(encoding='utf-8')
+          def section(text, start_marker, end_marker):
+              start = text.index(start_marker)
+              end = text.index(end_marker, start)
+              return text[start:end]
+          if section(before, 'function ReceiptScanner(', 'function PersonalItemsDialog') != section(after, 'function ReceiptScanner(', 'function PersonalItemsDialog'):
+              raise SystemExit('Receipt scanner changed unexpectedly')
+          if section(before, 'function SettleSheet(', 'function buildExpenseShareMessage') != section(after, 'function SettleSheet(', 'function buildExpenseShareMessage'):
+              raise SystemExit('Settlement financial logic changed unexpectedly')
+          print('Receipt and settlement logic unchanged')
+          PY
+      - name: Commit validated source
+        shell: bash
+        run: |
+          git config user.name "splitzap-readiness-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm -f scripts/tmp_splitzap_sheet_scope_fix.py
+          git add src/features/splitzap/SplitzapAppV4.tsx
+          git commit -m "Fix Splitzap modal CSS scope regression"
+          git push origin HEAD:testing
