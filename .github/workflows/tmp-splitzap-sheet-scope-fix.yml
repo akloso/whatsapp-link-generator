@@ -45,7 +45,7 @@ jobs:
           grep -Fq 'className="sheet-wrap fixed inset-0 z-[220]' src/features/splitzap/SplitzapAppV4.tsx
           grep -Fq 'sheet-footer sticky bottom-0' src/features/splitzap/SplitzapAppV4.tsx
           grep -Fq '.splitzap-root .bg-surface' src/features/splitzap/splitzap.css
-          grep -Fq '.splitzap-root .bg-foreground\\/40' src/features/splitzap/splitzap.css
+          grep -Fq 'background-color: oklch(var(--surface))' src/features/splitzap/splitzap.css
       - name: Verify financial and receipt code stayed unchanged
         shell: bash
         run: |
