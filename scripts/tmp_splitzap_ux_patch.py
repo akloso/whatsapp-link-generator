@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import sys
 
 PATH = 'scripts/tmp_splitzap_ux_patch.py'
 
@@ -26,7 +27,18 @@ if source.count(old_helper) != 1:
     raise RuntimeError('Original patcher helper changed unexpectedly.')
 source = source.replace(old_helper, new_helper, 1)
 
-# Preserve the original patcher's own safety checks, including the byte-for-byte
+# Preserve the original patcher's safety checks, including the byte-for-byte
 # ReceiptScanner guard. Execute from repository root exactly as the original did.
 namespace = {'__name__': '__main__', '__file__': str(Path(PATH))}
 exec(compile(source, PATH, 'exec'), namespace, namespace)
+
+# The existing 512px asset is an unreadable/corrupt PNG. Repair it from the
+# valid 192px Splitzap icon before the validator's normal 1.24x artwork zoom.
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'pillow'])
+from PIL import Image
+
+source_icon = Path('public/splitzap-icon-192.png')
+target_icon = Path('public/splitzap-icon-512.png')
+image = Image.open(source_icon).convert('RGBA')
+image.resize((512, 512), Image.Resampling.LANCZOS).save(target_icon, optimize=True)
+print('Rebuilt valid 512px Splitzap icon from the 192px source.')
