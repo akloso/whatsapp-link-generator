@@ -61,31 +61,31 @@ jobs:
       - name: Financial and sync-safety assertions
         shell: bash
         run: |
-          grep -q "preserveDirtyRemoteRow" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "preserveDirtySharedGroupsOnBootstrap" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "SHARED_CONFIRMED_PREFIX" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "restartDirtySharedIds" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "sharedSyncing" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "splitzap.settlementSession" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Did you complete the payment?" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Enter their UPI ID for this payment" src/features/splitzap/SplitzapAppV4.tsx
-          ! grep -q "Scan UPI QR" src/features/splitzap/SplitzapAppV4.tsx
-          ! grep -q "BarcodeDetector" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "Continue without login" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "splitzap.guest.data.v1" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "preserveDirtyRemoteRow" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "preserveDirtySharedGroupsOnBootstrap" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "SHARED_CONFIRMED_PREFIX" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "restartDirtySharedIds" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "sharedSyncing" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "splitzap.settlementSession" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "Did you complete the payment?" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "Enter their UPI ID for this payment" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -Fq "Scan UPI QR" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -Fq "BarcodeDetector" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "Continue without login" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "splitzap.guest.data.v1" src/features/splitzap/SplitzapCloudApp.tsx
       - name: Minimal-copy and visual assertions
         shell: bash
         run: |
-          grep -q "Try Splitzap as guest" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Local only · No backup, sync or shared groups" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "Sign in free for backup + sharing" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "guest-profile-alert" src/features/splitzap/SplitzapCloudApp.tsx
-          grep -q "balance-card--get" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "balance-card--owe" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzap-camera-button" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzap-new-button" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzapGuestNudge" src/features/splitzap/splitzap.css
-          grep -q "prefers-reduced-motion" src/features/splitzap/splitzap.css
+          grep -Fq "Try Splitzap as guest" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "Local only" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "Sign in free for backup + sharing" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "guest-profile-alert" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "balance-card--get" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "balance-card--owe" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "splitzap-camera-button" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "splitzap-new-button" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "splitzapGuestNudge" src/features/splitzap/splitzap.css
+          grep -Fq "prefers-reduced-motion" src/features/splitzap/splitzap.css
       - name: Verify receipt scanner stayed unchanged by UI pass
         if: steps.patch.outputs.run == 'true'
         shell: bash
