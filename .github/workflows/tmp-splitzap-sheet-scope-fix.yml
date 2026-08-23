@@ -5,6 +5,11 @@ on:
     branches: [testing]
     paths:
       - 'scripts/tmp_splitzap_sheet_scope_fix.py'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/tmp_splitzap_sheet_scope_fix.py'
+      - '.github/workflows/tmp-splitzap-sheet-scope-fix.yml'
 
 permissions:
   contents: write
