@@ -22,8 +22,40 @@ const LAST_SYNC_AT_KEY = 'splitzap.cloud.lastSyncAt';
 const LAST_USER_KEY = 'splitzap.cloud.lastUserId';
 const PENDING_JOIN_KEY = 'splitzap.shared.pendingJoin';
 const SHARED_CONFIRMED_PREFIX = 'splitzap.shared.confirmed.';
+const GUEST_MODE_KEY = 'splitzap.guestMode';
+const GUEST_DATA_KEY = 'splitzap.guest.data.v1';
 
 const dataHash = (data: SplitData) => JSON.stringify(data);
+
+function freshGuestData(): SplitData {
+  return {
+    schemaVersion: SPLITZAP_SCHEMA_VERSION,
+    me: `guest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    myName: '',
+    groups: [],
+    expenses: [],
+    settlements: [],
+    history: [],
+    activity: [],
+    preferences: { defaultCurrency: '₹', theme: 'system', reducedMotion: false },
+  };
+}
+
+function loadGuestData(): SplitData | null {
+  try {
+    const raw = window.localStorage.getItem(GUEST_DATA_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SplitData;
+    if (!parsed || typeof parsed.me !== 'string' || !parsed.me.startsWith('guest-') || !Array.isArray(parsed.groups) || !Array.isArray(parsed.expenses) || !Array.isArray(parsed.settlements)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function persistGuestData(data: SplitData) {
+  try { window.localStorage.setItem(GUEST_DATA_KEY, JSON.stringify(data)); } catch { /* best effort */ }
+}
 
 function safeGet(key: string) {
   try { return window.localStorage.getItem(key); } catch { return null; }
@@ -107,6 +139,7 @@ export default function SplitzapCloudApp() {
   const { data, update, hydrated } = useSplitData();
   const [session, setSession] = useState<SplitzapSession | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [guestMode, setGuestMode] = useState(() => typeof window !== 'undefined' && safeGet(GUEST_MODE_KEY) === '1');
   const [accountOpen, setAccountOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<SplitzapProfile | null>(null);
@@ -143,6 +176,10 @@ export default function SplitzapCloudApp() {
     const unsubscribe = onSplitzapAuthChange((next, event) => {
       if (!active) return;
       setSession(next);
+      if (next) {
+        setGuestMode(false);
+        try { window.localStorage.removeItem(GUEST_MODE_KEY); } catch { /* best effort */ }
+      }
       if (next && initializedUser.current === next.user.id && event !== 'PASSWORD_RECOVERY') {
         // Token refresh / same-account auth events must never remount the app or destroy an open draft.
         return;
@@ -179,6 +216,11 @@ export default function SplitzapCloudApp() {
     });
     return () => { active = false; };
   }, [accountDataReady, session, update]);
+
+  useEffect(() => {
+    if (!authReady || session || !guestMode) return;
+    persistGuestData(data);
+  }, [authReady, data, guestMode, session]);
 
   useEffect(() => {
     const theme = profile?.theme ?? data.preferences?.theme ?? 'system';
@@ -510,6 +552,38 @@ export default function SplitzapCloudApp() {
     onParseReceipt: parseSplitzapReceiptText,
   };
 
+
+  const continueAsGuest = () => {
+    const guest = loadGuestData() ?? freshGuestData();
+    update(() => guest);
+    setGuestMode(true);
+    setAccountOpen(false);
+    setStatus('local');
+    setStatusMessage('Guest · this device only');
+    try { window.localStorage.setItem(GUEST_MODE_KEY, '1'); } catch { /* best effort */ }
+  };
+
+  const leaveGuestMode = () => {
+    persistGuestData(latestData.current);
+    setGuestMode(false);
+    setAccountOpen(false);
+    try { window.localStorage.removeItem(GUEST_MODE_KEY); } catch { /* best effort */ }
+  };
+
+  const guestCollaboration = {
+    signedIn: false,
+    activity: [],
+    pendingRequests: [],
+    memberships: [],
+    onInviteGroup: () => setAccountOpen(true),
+    onManageMembers: () => setAccountOpen(true),
+    onJoinGroup: () => setAccountOpen(true),
+    onDeleteGroup: removeGroup,
+    onArchiveGroup: archiveGroup,
+  };
+
+  const guestAccountAction = <button type="button" onClick={() => setAccountOpen(true)} aria-label="Guest mode · sign in to sync" title="Guest mode · sign in to sync" className="press relative grid size-9 place-items-center rounded-full border border-red-200 bg-red-50 text-red-700 shadow-sm"><span className="text-[10px] font-extrabold">GUEST</span><span aria-hidden="true" className="absolute -right-0.5 -top-0.5 grid size-4 place-items-center rounded-full border-2 border-white bg-red-500 text-[8px] font-black text-white">!</span></button>;
+
   const indicatorClass = status === 'error' ? 'bg-red-500' : 'bg-amber-400';
   const accountInitial = (profile?.display_name?.trim()?.[0] || data.myName?.trim()?.[0] || session?.user.email?.[0] || '').toUpperCase();
   const accountAction = <button type="button" onClick={() => setProfileOpen(true)} aria-label="My Profile" title={status === 'error' || status === 'offline' ? statusMessage : 'My Profile'} className="press relative grid size-9 place-items-center rounded-full border border-border bg-surface text-primary shadow-sm"><span className="text-xs font-extrabold">{accountInitial || '?'}</span>{status === 'error' || status === 'offline' ? <span aria-hidden="true" className={`absolute right-0 top-0 size-2.5 rounded-full border-2 border-surface ${indicatorClass}`} /> : null}</button>;
@@ -518,9 +592,18 @@ export default function SplitzapCloudApp() {
   if (!authReady) {
     return <div className="fixed inset-0 z-[120] grid place-items-center bg-[#fbfaf6] px-6 text-slate-900"><div className="text-center"><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#256f66] text-2xl font-extrabold text-white shadow-lg">₹</div><Loader2 size={22} className="mx-auto mt-5 animate-spin text-[#256f66]" /><p className="mt-3 text-sm font-bold">Opening Splitzap…</p></div></div>;
   }
-  if (!session) {
-    return <AccountSheet open locked onClose={() => undefined} session={null} status={status} statusMessage={statusMessage} lastSyncedAt={lastSyncedAt} recoveryMode={false} onRecoveryComplete={() => undefined} />;
+  if (!session && !guestMode) {
+    return <AccountSheet open locked onClose={() => undefined} session={null} status={status} statusMessage={statusMessage} lastSyncedAt={lastSyncedAt} recoveryMode={false} onRecoveryComplete={() => undefined} onContinueAsGuest={continueAsGuest} />;
   }
+  if (!session && guestMode) {
+    if (!hydrated) return <div className="fixed inset-0 z-[120] grid place-items-center bg-[#fbfaf6] text-slate-900"><Loader2 size={22} className="animate-spin text-[#256f66]" /></div>;
+    if (!data.myName?.trim()) return <GuestFirstRunSetup data={data} update={update} onSignIn={leaveGuestMode} />;
+    return <>
+      <SplitzapAppV4 accountAction={guestAccountAction} collaboration={guestCollaboration} />
+      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} session={null} status="local" statusMessage="Guest · this device only" lastSyncedAt={null} recoveryMode={false} onRecoveryComplete={() => undefined} guestMode />
+    </>;
+  }
+  if (!session) return null;
   if (!accountDataReady) {
     return <div className="fixed inset-0 z-[120] grid place-items-center bg-[#fbfaf6] px-6 text-slate-900"><div className="w-full max-w-sm text-center"><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#256f66] text-2xl font-extrabold text-white shadow-lg">₹</div>{status === 'connecting' ? <Loader2 size={22} className="mx-auto mt-5 animate-spin text-[#256f66]" /> : null}<p className="mt-4 text-sm font-extrabold">{status === 'connecting' ? 'Loading your Splitzap…' : statusMessage}</p>{status !== 'connecting' ? <><button type="button" onClick={() => window.location.reload()} className="mt-4 w-full rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white">Try again</button><button type="button" onClick={() => void signOutSplitzap()} className="mt-2 w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">Sign out</button></> : null}</div></div>;
   }
@@ -542,6 +625,22 @@ export default function SplitzapCloudApp() {
   </>;
 }
 
+
+
+function GuestFirstRunSetup({ data, update, onSignIn }: {
+  data: SplitData;
+  update: (fn: (data: SplitData) => SplitData) => void;
+  onSignIn: () => void;
+}) {
+  const [name, setName] = useState(data.myName || '');
+  const [error, setError] = useState('');
+  const save = () => {
+    const clean = name.trim();
+    if (!clean) { setError('Enter the name people in your expenses should see.'); return; }
+    update((current) => ({ ...current, myName: clean, groups: current.groups.map((group) => { const id = memberIdFor(group, current); return { ...group, members: group.members.map((member) => member.id === id ? { ...member, name: clean } : member) }; }) }));
+  };
+  return <div className="fixed inset-0 z-[135] grid place-items-center overflow-y-auto bg-[#fbfaf6] px-5 py-8 text-slate-900"><div className="w-full max-w-sm rounded-[28px] bg-white p-6 shadow-xl"><div className="mx-auto grid size-14 place-items-center rounded-2xl bg-red-50 text-xl font-extrabold text-red-600">G</div><h1 className="mt-4 text-center text-xl font-extrabold">Use Splitzap without login</h1><p className="mt-1 text-center text-xs leading-5 text-slate-500">You can create groups and split expenses on this device right away.</p><div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-3 text-[11px] leading-5 text-red-700"><b className="block">Guest mode is local only</b>Your data is not backed up or synced. You cannot join or live-share groups with friends. Sign in free anytime for cloud sync and sharing.</div><label className="mt-5 block text-xs font-bold text-slate-600">What should people call you?</label><input autoFocus value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Your name" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#256f66]" /><button type="button" disabled={!name.trim()} onClick={save} className="mt-3 w-full rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white disabled:opacity-40">Continue locally</button>{error ? <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">{error}</p> : null}<button type="button" onClick={onSignIn} className="mt-3 w-full rounded-xl bg-slate-100 px-4 py-3 text-xs font-bold text-slate-700">Sign in instead</button></div></div>;
+}
 
 function FirstRunProfileSetup({ session, data, update, onReady }: {
   session: SplitzapSession;
@@ -959,7 +1058,7 @@ function ManageMembersSheet({ open, group, memberships, requests, onClose, onInv
   </SimpleModal>;
 }
 
-function AccountSheet({ open, onClose, session, status, statusMessage, lastSyncedAt, recoveryMode, onRecoveryComplete, locked = false }: {
+function AccountSheet({ open, onClose, session, status, statusMessage, lastSyncedAt, recoveryMode, onRecoveryComplete, locked = false, guestMode = false, onContinueAsGuest }: {
   open: boolean;
   onClose: () => void;
   session: SplitzapSession | null;
@@ -969,6 +1068,8 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
   recoveryMode: boolean;
   onRecoveryComplete: () => void;
   locked?: boolean;
+  guestMode?: boolean;
+  onContinueAsGuest?: () => void;
 }) {
   const [mode, setMode] = useState<EmailMode>('signin');
   const [email, setEmail] = useState('');
@@ -1133,6 +1234,7 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
           </div>
         ) : (
           <div>
+            {guestMode ? <div className="mb-3 rounded-2xl border border-red-100 bg-red-50 p-3"><p className="text-xs font-extrabold text-red-700">You are using Guest mode</p><p className="mt-1 text-[11px] leading-5 text-red-600">Data is kept only on this device. Sign in free to back it up, sync across devices, and join or live-share groups with friends.</p></div> : null}
             <button type="button" disabled={busy} onClick={() => void runGoogle()} className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-sm disabled:opacity-50">
               <GoogleMark /> Continue with Google
             </button>
@@ -1155,6 +1257,8 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
             {mode === 'signin' ? <button type="button" onClick={() => setResetOpen((value) => !value)} className="mt-3 w-full text-center text-xs font-bold text-[#256f66]">Forgot password?</button> : null}
             {resetOpen ? <div className="mt-3"><EmailAllowanceNotice action="Password reset" /><button type="button" disabled={busy || !email.trim()} onClick={() => void runPasswordReset()} className="mt-2 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-bold text-amber-800 disabled:opacity-45">Send reset email</button></div> : null}
             {feedback ? <p role="status" className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">{feedback}</p> : null}
+
+            {!guestMode && onContinueAsGuest ? <><div className="my-4 flex items-center gap-3"><span className="h-px flex-1 bg-slate-200" /><span className="text-[11px] font-semibold text-slate-400">or</span><span className="h-px flex-1 bg-slate-200" /></div><button type="button" onClick={onContinueAsGuest} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700">Continue without login</button><p className="mt-2 text-center text-[10px] leading-4 text-slate-500">Local-only mode: no cloud backup, cross-device sync, shared-group invites or live collaboration.</p></> : null}
           </div>
         )}
       </section>

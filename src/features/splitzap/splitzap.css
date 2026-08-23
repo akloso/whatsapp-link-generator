@@ -997,3 +997,34 @@ html[data-splitzap-reduced-motion="true"] .splitzap-root *::after { animation-du
     -webkit-overflow-scrolling: touch;
   }
 }
+
+
+/* iOS Safari bottom-sheet hardening: sheets are portaled above app navigation. */
+.sheet-wrap {
+  padding-top: max(0.35rem, env(safe-area-inset-top));
+}
+
+.sheet-panel {
+  max-height: calc(100svh - max(0.35rem, env(safe-area-inset-top)));
+}
+
+.sheet-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  flex: 0 0 auto;
+  box-shadow: 0 -10px 24px -18px oklch(0.2 0.04 165 / 0.45);
+}
+
+@supports (-webkit-touch-callout: none) {
+  .sheet-panel--tall {
+    height: calc(100svh - max(0.35rem, env(safe-area-inset-top)));
+    max-height: calc(100svh - max(0.35rem, env(safe-area-inset-top)));
+  }
+  .sheet-panel .sheet-scroll {
+    min-height: 0;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}
