@@ -45,6 +45,21 @@ jobs:
       - name: Apply approved guest/iOS/settlement patch
         if: steps.patch.outputs.run == 'true'
         run: python scripts/tmp_splitzap_guest_ios_patch.py
+      - name: Tighten authenticated branch narrowing
+        if: steps.patch.outputs.run == 'true'
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/features/splitzap/SplitzapCloudApp.tsx')
+          text = path.read_text(encoding='utf-8')
+          marker = '''  if (!accountDataReady) {\n'''
+          if '  if (!session) return null;\n  if (!accountDataReady) {' not in text:
+              if text.count(marker) != 1:
+                  raise SystemExit(f'Authenticated branch marker count: {text.count(marker)}')
+              text = text.replace(marker, '  if (!session) return null;\n' + marker, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
       - uses: actions/setup-node@v4
         with:
           node-version: 20
