@@ -111,7 +111,7 @@ export type JoinV2Result = {
 const one = <T>(value: T | T[] | null | undefined): T | null => Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 
 export async function getSplitzapProfile(): Promise<SplitzapProfile> {
-  const { data, error } = await splitzapSupabase.rpc('splitzap_get_profile');
+  const { data, error } = await splitzapSupabase.rpc('splitzap_get_profile_v2');
   if (error) throw error;
   const row = one(data) as SplitzapProfile | null;
   if (!row) return { display_name: '', default_currency: '₹', theme: 'system', reduced_motion: false };

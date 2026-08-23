@@ -705,6 +705,14 @@ export function simplify(balance: Record<string, number>): Debt[] {
   return result;
 }
 
+export function personalSettlementBuckets(balance: Record<string, number>, memberId: string) {
+  const all = simplify(balance);
+  return {
+    payable: all.filter((debt) => debt.from === memberId),
+    receivable: all.filter((debt) => debt.to === memberId),
+  };
+}
+
 export function money(amount: number, currency = '₹') {
   const value = Math.abs(amount);
   return `${currency}${value.toLocaleString(undefined, {

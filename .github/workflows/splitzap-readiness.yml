@@ -36,7 +36,7 @@ jobs:
       - run: npm ci
       - name: TypeScript
         run: npm run typecheck
-      - name: Splitzap calculation tests
+      - name: Splitzap calculation and sync-safety tests
         run: npm run test:splitzap
       - name: Production build
         run: npm run build
@@ -54,8 +54,13 @@ jobs:
         run: |
           test -f src/features/splitzap/splitzapShared.ts
           test -f src/features/splitzap/splitzapProduction.ts
+          test -f src/features/splitzap/splitzapSyncSafety.ts
+          test -f src/features/splitzap/splitzapSyncSafety.test.ts
+          test ! -f scripts/tmp_splitzap_durable_sync_patch.py
+          test ! -f .github/workflows/tmp-splitzap-durable-sync.yml
           grep -q "SPLITZAP_SCHEMA_VERSION = 2" src/features/splitzap/splitStoreV4.ts
-          grep -q "splitzap_update_shared_group" src/features/splitzap/splitzapShared.ts
+          grep -q "splitzap_update_shared_group_v2" src/features/splitzap/splitzapShared.ts
+          grep -q "splitzap_get_profile_v2" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_create_invite" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_join_v2" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_resolve_join_request" src/features/splitzap/splitzapProduction.ts
@@ -68,6 +73,16 @@ jobs:
           grep -q "splitzap_update_payment_profile" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_get_group_member_upi" src/features/splitzap/splitzapProduction.ts
           grep -q "splitzap_parse_receipt_text" src/features/splitzap/splitzapProduction.ts
+          grep -q "preserveDirtyRemoteRow" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "preserveDirtySharedGroupsOnBootstrap" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "compactSnapshotFingerprint" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "SHARED_CONFIRMED_PREFIX" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "restartDirtySharedIds" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "across an app restart" src/features/splitzap/splitzapSyncSafety.test.ts
+          grep -q "sharedSyncing" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "setSyncTick" src/features/splitzap/SplitzapCloudApp.tsx
+          ! grep -Fq "[accountDataReady, data, session, status, update]" src/features/splitzap/SplitzapCloudApp.tsx
+          ! grep -Fq "[accountDataReady, productionTick, session, status, update]" src/features/splitzap/SplitzapCloudApp.tsx
       - name: Production UX and account-safety assertions
         shell: bash
         run: |
@@ -119,3 +134,8 @@ jobs:
           grep -q "Same as previous" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "Receipt total matched" src/features/splitzap/SplitzapAppV4.tsx
           ! grep -q "function parseReceiptText" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "FirstRunProfileSetup" src/features/splitzap/SplitzapCloudApp.tsx
+          ! grep -q '<Field label="Your name"' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "personalSettlementBuckets" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "selectedDebt.from !== currentMemberId" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "View only" src/features/splitzap/SplitzapAppV4.tsx

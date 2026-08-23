@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "test:splitzap": "vitest run src/features/splitzap/splitStoreV4.test.ts"
+    "test:splitzap": "vitest run src/features/splitzap/splitStoreV4.test.ts src/features/splitzap/splitzapSyncSafety.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
