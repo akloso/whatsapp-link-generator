@@ -405,10 +405,19 @@ export default function SplitzapCloudApp() {
           for (const item of changed) {
             const sharedId = item.group.sharedId!;
             const result = await updateSharedGroup(sharedId, item.snapshot, item.group.sharedRevision);
-            sharedHashes.current.set(sharedId, sharedSnapshotHash(item.snapshot));
+            const syncedSnapshot = result.snapshot;
+            sharedHashes.current.set(sharedId, sharedSnapshotHash(syncedSnapshot));
             restartDirtySharedIds.current.delete(sharedId);
-            rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, { id: sharedId, revision: result.revision, snapshot: item.snapshot });
-            update((current) => ({ ...current, groups: current.groups.map((group) => group.id === item.group.id ? { ...group, sharedRevision: result.revision } : group) }));
+            rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, { id: sharedId, revision: result.revision, snapshot: syncedSnapshot });
+            if (result.rebased) {
+              const refreshed = await fetchSharedGroup(sharedId, session.user.id);
+              if (!refreshed) throw new Error('Could not reload the reconciled shared group.');
+              sharedHashes.current.set(sharedId, sharedSnapshotHash(refreshed.snapshot));
+              rememberConfirmedSharedState(session.user.id, confirmedSharedState.current, refreshed);
+              update((current) => mergeSharedRowsIntoLocal(current, [refreshed], false));
+            } else {
+              update((current) => ({ ...current, groups: current.groups.map((group) => group.id === item.group.id ? { ...group, sharedRevision: result.revision } : group) }));
+            }
           }
           setStatus('synced'); setStatusMessage('Synced'); setProductionTick((value) => value + 1);
         } catch (cause) {
