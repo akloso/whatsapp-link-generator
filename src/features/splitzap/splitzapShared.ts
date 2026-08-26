@@ -7,6 +7,7 @@ import {
   type SplitData,
 } from './splitStoreV4';
 import { splitzapSupabase } from './splitzapCloud';
+import { assertSharedSnapshotIntegrity } from './splitzapFinancialIntegrity';
 
 export type SharedRole = 'owner' | 'member';
 
@@ -79,8 +80,12 @@ function canonicalizeForHash(value: unknown): unknown {
   return value;
 }
 
+export function canonicalJsonHash(value: unknown) {
+  return JSON.stringify(canonicalizeForHash(value));
+}
+
 export function sharedSnapshotHash(snapshot: SharedGroupSnapshot) {
-  return JSON.stringify(canonicalizeForHash(snapshot));
+  return canonicalJsonHash(snapshot);
 }
 
 function applySharedRow(current: SplitData, row: SharedGroupRow): SplitData {
@@ -152,6 +157,7 @@ export function removeGroupFromLocal(current: SplitData, groupId: string): Split
 }
 
 export async function createSharedGroup(snapshot: SharedGroupSnapshot, memberId: string): Promise<SharedGroupRow> {
+  assertSharedSnapshotIntegrity(snapshot);
   const { data, error } = await splitzapSupabase.rpc('splitzap_create_shared_group', {
     p_snapshot: snapshot,
     p_member_id: memberId,
@@ -280,6 +286,7 @@ export async function joinSharedGroup(code: string, memberId?: string, displayNa
 }
 
 export async function updateSharedGroup(sharedId: string, snapshot: SharedGroupSnapshot, expectedRevision?: number) {
+  assertSharedSnapshotIntegrity(snapshot);
   const { data, error } = await splitzapSupabase.rpc('splitzap_update_shared_group_v2', {
     p_group_id: sharedId,
     p_snapshot: snapshot,
