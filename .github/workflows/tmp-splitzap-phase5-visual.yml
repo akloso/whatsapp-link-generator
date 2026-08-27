@@ -63,11 +63,30 @@ jobs:
             if (!(await action.isVisible())) throw new Error(`${label} is not visible in the + hub`);
           }
 
+          // SheetModal intentionally fades in for 180 ms. Validate its settled state,
+          // not an intermediate animation frame that makes an opaque panel look translucent.
+          await page.waitForTimeout(350);
           const box = await quick.boundingBox();
           if (!box || box.width < 300 || box.y + box.height > 844.5) throw new Error(`Quick actions sheet is outside the mobile viewport: ${JSON.stringify(box)}`);
 
+          const visual = await quick.evaluate((element) => {
+            const panel = getComputedStyle(element);
+            const wrap = element.closest('.sheet-wrap');
+            return {
+              backgroundColor: panel.backgroundColor,
+              panelOpacity: panel.opacity,
+              wrapOpacity: wrap ? getComputedStyle(wrap).opacity : null,
+            };
+          });
+          if (Number(visual.panelOpacity) < 0.99 || Number(visual.wrapOpacity) < 0.99) {
+            throw new Error(`Quick actions sheet did not settle to full opacity: ${JSON.stringify(visual)}`);
+          }
+          if (visual.backgroundColor === 'rgba(0, 0, 0, 0)' || visual.backgroundColor === 'transparent') {
+            throw new Error(`Quick actions sheet has a transparent final background: ${JSON.stringify(visual)}`);
+          }
+
           await page.screenshot({ path: '/tmp/phase5-quick-actions.png', fullPage: true });
-          console.log('Rendered mobile + hub validated:', box);
+          console.log('Rendered mobile + hub validated:', box, visual);
           await browser.close();
           JS
           node ./phase5-visual.mjs
