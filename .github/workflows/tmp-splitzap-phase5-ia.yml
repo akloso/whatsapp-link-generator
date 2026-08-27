@@ -1,0 +1,114 @@
+name: Temporary Splitzap Phase 5 IA patch
+
+on:
+  push:
+    branches: [splitzap-ia-cleanup]
+    paths:
+      - '.github/workflows/tmp-splitzap-phase5-ia.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: splitzap-ia-cleanup
+      - name: Apply information architecture cleanup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app = Path('src/features/splitzap/SplitzapAppV4.tsx')
+          text = app.read_text()
+
+          for old in ['  Download,\n', '  HardDrive,\n', '  Upload,\n']:
+              text = text.replace(old, '', 1)
+          text = text.replace('  createSplitBackup,\n', '', 1)
+          text = text.replace('  restoreSplitBackup,\n', '', 1)
+          text = text.replace('  const [dataToolsOpen, setDataToolsOpen] = useState(false);\n', '', 1)
+
+          after_restore = """  const afterRestore = () => {\n    window.history.replaceState({}, '', '/splitzap');\n    setView({ name: 'home' });\n    clearStorageError();\n  };\n\n"""
+          if text.count(after_restore) != 1:
+              raise SystemExit(f'afterRestore target count: {text.count(after_restore)}')
+          text = text.replace(after_restore, '', 1)
+
+          old_root = """        ? <HomeScreen navigate={navigate} onDataBackup={() => setDataToolsOpen(true)} accountAction={accountAction} collaboration={collaboration} />\n        : view.name === 'activity'\n          ? <ActivityScreen navigate={navigate} collaboration={collaboration} />\n          : <GroupScreen groupId={view.groupId} navigate={navigate} collaboration={collaboration} resumeSettlement={resumeSettlementGroupId === view.groupId} onSettlementResumeConsumed={() => setResumeSettlementGroupId(null)} />}\n      {storageError ? <div role=\"alert\" className=\"fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex w-[calc(100%-1.5rem)] max-w-[496px] -translate-x-1/2 items-start gap-2 rounded-2xl border border-negative/20 bg-surface px-3 py-3 shadow-xl\"><AlertTriangle size={18} className=\"mt-0.5 shrink-0 text-negative\" /><p className=\"min-w-0 flex-1 text-[11px] font-semibold leading-4 text-foreground\">{storageError}</p><button type=\"button\" onClick={() => setDataToolsOpen(true)} className=\"press shrink-0 rounded-lg bg-secondary px-2.5 py-2 text-[11px] font-bold text-primary\">Backup</button><button type=\"button\" aria-label=\"Dismiss storage warning\" onClick={clearStorageError} className=\"press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground\"><X size={14} /></button></div> : null}\n      <DataBackupDialog open={dataToolsOpen} onClose={() => setDataToolsOpen(false)} onRestored={afterRestore} />"""
+          new_root = """        ? <HomeScreen navigate={navigate} accountAction={accountAction} collaboration={collaboration} />\n        : view.name === 'activity'\n          ? <ActivityScreen navigate={navigate} collaboration={collaboration} />\n          : <GroupScreen groupId={view.groupId} navigate={navigate} collaboration={collaboration} resumeSettlement={resumeSettlementGroupId === view.groupId} onSettlementResumeConsumed={() => setResumeSettlementGroupId(null)} />}\n      {storageError ? <div role=\"alert\" className=\"fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex w-[calc(100%-1.5rem)] max-w-[496px] -translate-x-1/2 items-start gap-2 rounded-2xl border border-negative/20 bg-surface px-3 py-3 shadow-xl\"><AlertTriangle size={18} className=\"mt-0.5 shrink-0 text-negative\" /><p className=\"min-w-0 flex-1 text-[11px] font-semibold leading-4 text-foreground\">{storageError}</p><button type=\"button\" aria-label=\"Dismiss storage warning\" onClick={clearStorageError} className=\"press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground\"><X size={14} /></button></div> : null}"""
+          if text.count(old_root) != 1:
+              raise SystemExit(f'root IA target count: {text.count(old_root)}')
+          text = text.replace(old_root, new_root, 1)
+
+          pattern = r"\nfunction DataBackupDialog\([\s\S]*?\nfunction IntroPanel\("
+          replacement = '\nfunction IntroPanel('
+          text, count = re.subn(pattern, replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'DataBackupDialog block target count: {count}')
+
+          old_home_sig = "function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (view: View) => void; onDataBackup: () => void; accountAction?: ReactNode; collaboration?: SplitzapCollaboration })"
+          new_home_sig = "function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (view: View) => void; accountAction?: ReactNode; collaboration?: SplitzapCollaboration })"
+          if text.count(old_home_sig) != 1:
+              raise SystemExit(f'HomeScreen signature target count: {text.count(old_home_sig)}')
+          text = text.replace(old_home_sig, new_home_sig, 1)
+
+          old_header = '<Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5">{accountAction}<button type="button" onClick={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan receipt" title="Scan receipt" className="splitzap-camera-button press grid size-9 place-items-center rounded-full text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="splitzap-new-button press flex items-center gap-1 rounded-full px-3 py-2 text-xs font-bold"><Plus size={14} /> New</button></div>} />'
+          new_header = '<Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={accountAction} />'
+          if text.count(old_header) != 1:
+              raise SystemExit(f'home header target count: {text.count(old_header)}')
+          text = text.replace(old_header, new_header, 1)
+
+          old_quick = """function QuickActionsSheet({ open, onClose, onAddExpense, onNewGroup, onRecordPayment }: { open: boolean; onClose: () => void; onAddExpense: () => void; onNewGroup: () => void; onRecordPayment: () => void }) {\n  const action = (fn: () => void) => { onClose(); fn(); };\n  return <SheetModal open={open} onClose={onClose} title=\"Quick actions\"><div className=\"grid grid-cols-3 gap-2 pb-2\">{[\n    { label: 'Add expense', icon: '＋', run: onAddExpense, tone: 'quick-food' },\n    { label: 'Record payment', icon: '₹', run: onRecordPayment, tone: 'quick-payment' },\n    { label: 'New group', icon: '👥', run: onNewGroup, tone: 'quick-group' },\n  ].map((item) => <button type=\"button\" key={item.label} onClick={() => action(item.run)} className={`quick-action press min-h-20 rounded-2xl border border-border bg-surface p-3 text-left ${item.tone}`}><span className=\"grid size-8 place-items-center rounded-xl bg-surface-2 text-base font-extrabold\">{item.icon}</span><b className=\"mt-2 block text-[11px] leading-4\">{item.label}</b></button>)}</div></SheetModal>;\n}"""
+          new_quick = """function QuickActionsSheet({ open, onClose, onAddExpense, onScanReceipt, onNewGroup, onRecordPayment }: { open: boolean; onClose: () => void; onAddExpense: () => void; onScanReceipt?: () => void; onNewGroup: () => void; onRecordPayment: () => void }) {\n  const action = (fn: () => void) => { onClose(); fn(); };\n  const actions = [\n    { label: 'Add expense', icon: '＋', run: onAddExpense, tone: 'quick-food' },\n    ...(onScanReceipt ? [{ label: 'Scan receipt', icon: '📷', run: onScanReceipt, tone: 'quick-scan' }] : []),\n    { label: 'Record payment', icon: '₹', run: onRecordPayment, tone: 'quick-payment' },\n    { label: 'New group', icon: '👥', run: onNewGroup, tone: 'quick-group' },\n  ];\n  return <SheetModal open={open} onClose={onClose} title=\"Quick actions\"><div className=\"grid grid-cols-2 gap-2 pb-2\">{actions.map((item) => <button type=\"button\" key={item.label} onClick={() => action(item.run)} className={`quick-action press min-h-20 rounded-2xl border border-border bg-surface p-3 text-left ${item.tone}`}><span className=\"grid size-8 place-items-center rounded-xl bg-surface-2 text-base font-extrabold\">{item.icon}</span><b className=\"mt-2 block text-[11px] leading-4\">{item.label}</b></button>)}</div></SheetModal>;\n}"""
+          if text.count(old_quick) != 1:
+              raise SystemExit(f'QuickActionsSheet target count: {text.count(old_quick)}')
+          text = text.replace(old_quick, new_quick, 1)
+
+          old_home_quick = '<QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onRecordPayment={beginPayment} />'
+          new_home_quick = '<QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onScanReceipt={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onRecordPayment={beginPayment} />'
+          if text.count(old_home_quick) != 1:
+              raise SystemExit(f'home QuickActions target count: {text.count(old_home_quick)}')
+          text = text.replace(old_home_quick, new_home_quick, 1)
+
+          app.write_text(text)
+
+          cloud = Path('src/features/splitzap/SplitzapCloudApp.tsx')
+          cloud_text = cloud.read_text()
+          if cloud_text.count('>Export data</b>') != 1 or cloud_text.count('>Import data</b>') != 1:
+              raise SystemExit('Profile data labels did not match exactly once each')
+          cloud_text = cloud_text.replace('>Export data</b>', '>Export Splitzap data</b>', 1)
+          cloud_text = cloud_text.replace('>Import data</b>', '>Import Splitzap backup</b>', 1)
+          cloud.write_text(cloud_text)
+
+          workflow = Path('.github/workflows/splitzap-readiness.yml')
+          wf = workflow.read_text()
+          marker = '          grep -q "prefers-reduced-motion" src/features/splitzap/splitzap.css\n'
+          addition = '''          grep -q "prefers-reduced-motion" src/features/splitzap/splitzap.css\n          grep -q 'label="Groups"' src/features/splitzap/SplitzapAppV4.tsx\n          grep -q 'label="Activity"' src/features/splitzap/SplitzapAppV4.tsx\n          grep -q "Scan receipt', icon: '📷'" src/features/splitzap/SplitzapAppV4.tsx\n          ! grep -q "DataBackupDialog" src/features/splitzap/SplitzapAppV4.tsx\n          ! grep -q "splitzap-camera-button" src/features/splitzap/SplitzapAppV4.tsx\n          ! grep -q "splitzap-new-button" src/features/splitzap/SplitzapAppV4.tsx\n          grep -q "Data & Privacy" src/features/splitzap/SplitzapCloudApp.tsx\n          grep -q "Export Splitzap data" src/features/splitzap/SplitzapCloudApp.tsx\n          grep -q "Import Splitzap backup" src/features/splitzap/SplitzapCloudApp.tsx\n'''
+          if wf.count(marker) != 1:
+              raise SystemExit(f'readiness marker count: {wf.count(marker)}')
+          workflow.write_text(wf.replace(marker, addition, 1))
+          PY
+
+          ! grep -q 'DataBackupDialog' src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q 'splitzap-camera-button' src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q 'splitzap-new-button' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q 'onScanReceipt={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)}' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q 'Export Splitzap data' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q 'Import Splitzap backup' src/features/splitzap/SplitzapCloudApp.tsx
+      - name: Verify receipt scanner body was not removed
+        shell: bash
+        run: |
+          grep -q 'function ReceiptScanner' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q 'Receipt total matched' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q 'parseSplitzapReceiptText' src/features/splitzap/SplitzapCloudApp.tsx
+      - name: Commit Phase 5 IA cleanup
+        shell: bash
+        run: |
+          git config user.name "Splitzap Phase 5 Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/SplitzapCloudApp.tsx .github/workflows/splitzap-readiness.yml
+          git commit -m "Clean up Splitzap information architecture"
+          git push origin HEAD:splitzap-ia-cleanup
