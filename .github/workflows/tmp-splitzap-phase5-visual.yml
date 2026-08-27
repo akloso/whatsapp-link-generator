@@ -39,7 +39,7 @@ jobs:
       - name: Validate mobile information architecture
         shell: bash
         run: |
-          cat > /tmp/phase5-visual.mjs <<'JS'
+          cat > phase5-visual.mjs <<'JS'
           import { chromium } from 'playwright';
           const browser = await chromium.launch({ headless: true });
           const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
@@ -70,7 +70,8 @@ jobs:
           console.log('Rendered mobile + hub validated:', box);
           await browser.close();
           JS
-          node /tmp/phase5-visual.mjs
+          node ./phase5-visual.mjs
+          rm phase5-visual.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: splitzap-phase5-mobile-visual
