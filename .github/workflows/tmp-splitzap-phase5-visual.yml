@@ -54,15 +54,15 @@ jobs:
             await page.getByRole('button', { name: 'Start splitting' }).click();
           }
 
-          await page.getByRole('button', { name: 'Add expense' }).last().click();
-          await page.getByRole('heading', { name: 'Quick actions' }).waitFor();
+          await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+          const quick = page.getByRole('dialog', { name: 'Quick actions' });
+          await quick.waitFor();
 
           for (const label of ['Add expense', 'Scan receipt', 'Record payment', 'New group']) {
-            const action = page.getByRole('button', { name: label });
+            const action = quick.getByRole('button', { name: new RegExp(label, 'i') });
             if (!(await action.isVisible())) throw new Error(`${label} is not visible in the + hub`);
           }
 
-          const quick = page.getByRole('dialog', { name: 'Quick actions' });
           const box = await quick.boundingBox();
           if (!box || box.width < 300 || box.y + box.height > 844.5) throw new Error(`Quick actions sheet is outside the mobile viewport: ${JSON.stringify(box)}`);
 
