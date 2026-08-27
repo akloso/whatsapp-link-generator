@@ -82,14 +82,6 @@ jobs:
           cloud_text = cloud_text.replace('>Export data</b>', '>Export Splitzap data</b>', 1)
           cloud_text = cloud_text.replace('>Import data</b>', '>Import Splitzap backup</b>', 1)
           cloud.write_text(cloud_text)
-
-          workflow = Path('.github/workflows/splitzap-readiness.yml')
-          wf = workflow.read_text()
-          marker = '          grep -q "prefers-reduced-motion" src/features/splitzap/splitzap.css\n'
-          addition = '''          grep -q "prefers-reduced-motion" src/features/splitzap/splitzap.css\n          grep -q 'label="Groups"' src/features/splitzap/SplitzapAppV4.tsx\n          grep -q 'label="Activity"' src/features/splitzap/SplitzapAppV4.tsx\n          grep -q "Scan receipt', icon: '📷'" src/features/splitzap/SplitzapAppV4.tsx\n          ! grep -q "DataBackupDialog" src/features/splitzap/SplitzapAppV4.tsx\n          ! grep -q "splitzap-camera-button" src/features/splitzap/SplitzapAppV4.tsx\n          ! grep -q "splitzap-new-button" src/features/splitzap/SplitzapAppV4.tsx\n          grep -q "Data & Privacy" src/features/splitzap/SplitzapCloudApp.tsx\n          grep -q "Export Splitzap data" src/features/splitzap/SplitzapCloudApp.tsx\n          grep -q "Import Splitzap backup" src/features/splitzap/SplitzapCloudApp.tsx\n'''
-          if wf.count(marker) != 1:
-              raise SystemExit(f'readiness marker count: {wf.count(marker)}')
-          workflow.write_text(wf.replace(marker, addition, 1))
           PY
 
           ! grep -q 'DataBackupDialog' src/features/splitzap/SplitzapAppV4.tsx
@@ -109,6 +101,6 @@ jobs:
         run: |
           git config user.name "Splitzap Phase 5 Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/SplitzapCloudApp.tsx .github/workflows/splitzap-readiness.yml
+          git add src/features/splitzap/SplitzapAppV4.tsx src/features/splitzap/SplitzapCloudApp.tsx
           git commit -m "Clean up Splitzap information architecture"
           git push origin HEAD:splitzap-ia-cleanup
