@@ -1,0 +1,78 @@
+name: Temporary Splitzap Phase 5 visual validation
+
+on:
+  push:
+    branches: [splitzap-ia-cleanup]
+    paths:
+      - '.github/workflows/tmp-splitzap-phase5-visual.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: splitzap-ia-cleanup
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install browser test runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start Splitzap locally
+        shell: bash
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/splitzap-vite.log 2>&1 &
+          echo $! > /tmp/splitzap-vite.pid
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:5173/splitzap >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/splitzap-vite.log
+          exit 1
+      - name: Validate mobile information architecture
+        shell: bash
+        run: |
+          cat > /tmp/phase5-visual.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+          await page.goto('http://127.0.0.1:5173/splitzap', { waitUntil: 'networkidle' });
+
+          const guest = page.getByRole('button', { name: 'Continue without login' });
+          if (await guest.isVisible().catch(() => false)) await guest.click();
+
+          const guestName = page.getByPlaceholder('Your name');
+          if (await guestName.isVisible().catch(() => false)) {
+            await guestName.fill('Visual Test');
+            await page.getByRole('button', { name: 'Start splitting' }).click();
+          }
+
+          await page.getByRole('button', { name: 'Add expense' }).last().click();
+          await page.getByRole('heading', { name: 'Quick actions' }).waitFor();
+
+          for (const label of ['Add expense', 'Scan receipt', 'Record payment', 'New group']) {
+            const action = page.getByRole('button', { name: label });
+            if (!(await action.isVisible())) throw new Error(`${label} is not visible in the + hub`);
+          }
+
+          const quick = page.getByRole('dialog', { name: 'Quick actions' });
+          const box = await quick.boundingBox();
+          if (!box || box.width < 300 || box.y + box.height > 844.5) throw new Error(`Quick actions sheet is outside the mobile viewport: ${JSON.stringify(box)}`);
+
+          await page.screenshot({ path: '/tmp/phase5-quick-actions.png', fullPage: true });
+          console.log('Rendered mobile + hub validated:', box);
+          await browser.close();
+          JS
+          node /tmp/phase5-visual.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: splitzap-phase5-mobile-visual
+          path: /tmp/phase5-quick-actions.png
+          if-no-files-found: error
