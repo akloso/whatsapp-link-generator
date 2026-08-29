@@ -10,12 +10,20 @@ import {
 } from './splitzapShared';
 import { compactSnapshotFingerprint, preserveDirtyRemoteRow, preserveDirtySharedGroupsOnBootstrap, type ConfirmedSharedState } from './splitzapSyncSafety';
 import {
+  getSplitzapNotificationPreferences, isSplitzapAndroidApp, listenForNativeNotificationStatus, listenForNativePushToken, readStoredNativePushToken, registerSplitzapPushDevice, requestNativeNotificationPermission, unregisterStoredSplitzapPushDevice, updateSplitzapNotificationPreferences, type SplitzapNotificationPreferences,
+} from './splitzapNotifications';
+import {
   archiveSharedGroup, buildInviteLink, createSharedInvite, deleteSplitzapAccount, disableSharedInvite, getSharedMemberUpi, getSplitzapPaymentProfile, getSplitzapProfile, leaveSharedGroupV2, listPendingJoinRequests, listRecentlyDeletedGroups, loadSharedActivity, listSharedInvites, listSharedMemberships, parseSplitzapReceiptText, previewSharedInviteV2, renameSharedMember, requestSharedJoinV2, resolveSharedJoinRequest, restoreSharedGroup, sharedRowFromJoin, softDeleteSharedGroup, subscribeToProductionChanges, transferSharedGroupOwnership, unlinkSharedMember, updateSplitzapPaymentProfile, updateSplitzapProfileName, updateSplitzapProfilePreferences,
   type InvitePreviewV2, type RecentlyDeletedGroup, type SharedActivityEvent, type SharedInvite, type SharedJoinRequest, type SharedMembership, type SplitzapProfile,
 } from './splitzapProduction';
 
 type SyncStatus = 'local' | 'connecting' | 'syncing' | 'synced' | 'offline' | 'error';
 type EmailMode = 'signin' | 'signup';
+
+async function signOutSplitzapSafely() {
+  try { await unregisterStoredSplitzapPushDevice(); } catch { /* best effort while the session is still valid */ }
+  await signOutSplitzap();
+}
 
 const LAST_SYNC_HASH_KEY = 'splitzap.cloud.lastSyncHash';
 const LAST_SYNC_AT_KEY = 'splitzap.cloud.lastSyncAt';
@@ -197,6 +205,18 @@ export default function SplitzapCloudApp() {
     });
     return () => { active = false; unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (!session || !accountDataReady || !isSplitzapAndroidApp()) return;
+    let active = true;
+    const register = async (detail: ReturnType<typeof readStoredNativePushToken>) => {
+      if (!active || !detail) return;
+      try { await registerSplitzapPushDevice(detail); } catch { /* retry on the next token event/resume */ }
+    };
+    void register(readStoredNativePushToken());
+    const unsubscribe = listenForNativePushToken((detail) => { void register(detail); });
+    return () => { active = false; unsubscribe(); };
+  }, [accountDataReady, session]);
 
   useEffect(() => {
     if (!session || !accountDataReady) { setProfileReady(false); return; }
@@ -605,7 +625,7 @@ export default function SplitzapCloudApp() {
   }
   if (!session) return null;
   if (!accountDataReady) {
-    return <div className="fixed inset-0 z-[120] grid place-items-center bg-[#fbfaf6] px-6 text-slate-900"><div className="w-full max-w-sm text-center"><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#256f66] text-2xl font-extrabold text-white shadow-lg">₹</div>{status === 'connecting' ? <Loader2 size={22} className="mx-auto mt-5 animate-spin text-[#256f66]" /> : null}<p className="mt-4 text-sm font-extrabold">{status === 'connecting' ? 'Loading your Splitzap…' : statusMessage}</p>{status !== 'connecting' ? <><button type="button" onClick={() => window.location.reload()} className="mt-4 w-full rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white">Try again</button><button type="button" onClick={() => void signOutSplitzap()} className="mt-2 w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">Sign out</button></> : null}</div></div>;
+    return <div className="fixed inset-0 z-[120] grid place-items-center bg-[#fbfaf6] px-6 text-slate-900"><div className="w-full max-w-sm text-center"><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#256f66] text-2xl font-extrabold text-white shadow-lg">₹</div>{status === 'connecting' ? <Loader2 size={22} className="mx-auto mt-5 animate-spin text-[#256f66]" /> : null}<p className="mt-4 text-sm font-extrabold">{status === 'connecting' ? 'Loading your Splitzap…' : statusMessage}</p>{status !== 'connecting' ? <><button type="button" onClick={() => window.location.reload()} className="mt-4 w-full rounded-xl bg-[#256f66] px-4 py-3 text-sm font-bold text-white">Try again</button><button type="button" onClick={() => void signOutSplitzapSafely()} className="mt-2 w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">Sign out</button></> : null}</div></div>;
   }
 
   if (!profileReady) {
@@ -885,7 +905,10 @@ function ProfileScreen({ open, onClose, session, data, update, status, statusMes
   const [feedback, setFeedback] = useState('');
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [notificationPrefs, setNotificationPrefs] = useState<SplitzapNotificationPreferences>({ expenses: true, payments: true, group_activity: true });
+  const [notificationPermission, setNotificationPermission] = useState<'granted' | 'not-granted'>(() => readStoredNativePushToken()?.permission === 'granted' ? 'granted' : 'not-granted');
   const installState = useSplitzapInstall();
+  const androidApp = isSplitzapAndroidApp();
 
   const refreshDeleted = async () => {
     try { setDeleted(await listRecentlyDeletedGroups()); } catch { setDeleted([]); }
@@ -899,7 +922,12 @@ function ProfileScreen({ open, onClose, session, data, update, status, statusMes
     setReducedMotion(profile?.reduced_motion ?? data.preferences?.reducedMotion ?? false);
     setFeedback('');
     void getSplitzapPaymentProfile().then((payment) => { setUpiId(payment.upi_id ?? ''); setAllowGroupUpi(Boolean(payment.allow_group_upi)); }).catch(() => { setUpiId(''); setAllowGroupUpi(false); });
+    void getSplitzapNotificationPreferences().then(setNotificationPrefs).catch(() => setNotificationPrefs({ expenses: true, payments: true, group_activity: true }));
+    setNotificationPermission(readStoredNativePushToken()?.permission === 'granted' ? 'granted' : 'not-granted');
     void refreshDeleted();
+    const stopStatus = listenForNativeNotificationStatus(setNotificationPermission);
+    const stopToken = listenForNativePushToken((detail) => setNotificationPermission(detail.permission === 'granted' ? 'granted' : 'not-granted'));
+    return () => { stopStatus(); stopToken(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, profile?.display_name, profile?.default_currency, profile?.theme, profile?.reduced_motion]);
 
@@ -948,6 +976,16 @@ function ProfileScreen({ open, onClose, session, data, update, status, statusMes
     finally { setBusy(false); }
   };
 
+  const saveNotificationPreferences = async () => {
+    setBusy(true); setFeedback('');
+    try {
+      const saved = await updateSplitzapNotificationPreferences(notificationPrefs);
+      setNotificationPrefs(saved);
+      setFeedback('Notification preferences saved.');
+    } catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Could not save notification preferences.'); }
+    finally { setBusy(false); }
+  };
+
   const downloadExport = () => {
     try {
       const blob = new Blob([createSplitBackup()], { type: 'application/json' });
@@ -985,6 +1023,7 @@ function ProfileScreen({ open, onClose, session, data, update, status, statusMes
     if (deleteConfirm !== 'DELETE') return;
     setBusy(true); setFeedback('');
     try {
+      try { await unregisterStoredSplitzapPushDevice(); } catch { /* best effort before account removal */ }
       await deleteSplitzapAccount();
       clearSplitzapExpenseDraft(session.user.id);
       try { await signOutSplitzap(); } catch { /* account may already be removed */ }
@@ -1004,10 +1043,11 @@ function ProfileScreen({ open, onClose, session, data, update, status, statusMes
       <ProfileSection title="Account & Security"><ProfileRow label="Google" value={providers.includes('google') ? 'Connected' : 'Not connected'} /><ProfileRow label="Email sign-in" value={session.user.email ? 'Available' : 'Unavailable'} /><button type="button" onClick={onOpenSecurity} className="mt-2 w-full rounded-xl bg-slate-50 px-3 py-3 text-left text-xs font-bold text-[#256f66]">Password & sign-in settings</button></ProfileSection>
       <ProfileSection title="Payments"><label className="block text-xs font-bold text-slate-600">UPI ID</label><input value={upiId} onChange={(event) => { const next = event.target.value.replace(/\s/g, ''); setUpiId(next); if (!next) setAllowGroupUpi(false); }} autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="name@bank" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#256f66]" /><label className="mt-3 flex items-start gap-3 rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold"><input type="checkbox" checked={allowGroupUpi} disabled={!upiId.trim()} onChange={(event) => setAllowGroupUpi(event.target.checked)} className="mt-0.5 size-5 shrink-0" /><span><span className="block">Allow group members to pay me via UPI</span><span className="mt-1 block text-[10px] font-medium leading-4 text-slate-500">Only people who share an active Splitzap group with you can use this UPI ID while settling with you. It is not shown as public profile information.</span></span></label><button type="button" disabled={busy} onClick={() => void savePaymentProfile()} className="mt-3 w-full rounded-xl bg-[#e7f4ef] py-3 text-xs font-bold text-[#256f66] disabled:opacity-40">Save UPI settings</button></ProfileSection>
       <ProfileSection title="Preferences"><div className="grid grid-cols-2 gap-2"><div><label className="block text-[11px] font-bold text-slate-600">Default currency</label><select value={currency} onChange={(event) => setCurrency(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">{['₹','$','€','£','¥'].map((item) => <option key={item}>{item}</option>)}</select></div><div><label className="block text-[11px] font-bold text-slate-600">Theme</label><select value={theme} onChange={(event) => setTheme(event.target.value as SplitzapProfile['theme'])} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div><label className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3 text-xs font-bold">Reduced animations<input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} className="size-5" /></label><button type="button" disabled={busy} onClick={() => void savePreferences()} className="mt-3 w-full rounded-xl bg-[#e7f4ef] py-3 text-xs font-bold text-[#256f66]">Save preferences</button></ProfileSection>
+      <ProfileSection title="Notifications"><div className="space-y-2">{([['expenses','Expenses','New shared expenses'],['payments','Payments','Payments and settlements'],['group_activity','Group activity','People joining or leaving']] as const).map(([key,label,detail]) => <label key={key} className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3"><input type="checkbox" checked={notificationPrefs[key]} onChange={(event) => setNotificationPrefs((current) => ({ ...current, [key]: event.target.checked }))} className="size-5 shrink-0" /><span className="min-w-0 flex-1"><b className="block text-xs">{label}</b><span className="block text-[10px] text-slate-500">{detail}</span></span></label>)}</div><button type="button" disabled={busy} onClick={() => void saveNotificationPreferences()} className="mt-3 w-full rounded-xl bg-[#e7f4ef] py-3 text-xs font-bold text-[#256f66] disabled:opacity-40">Save notifications</button>{androidApp ? <div className="mt-2">{notificationPermission === 'granted' ? <p className="rounded-xl bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-700">Android notifications allowed</p> : <button type="button" onClick={() => { if (!requestNativeNotificationPermission()) setFeedback('Notification permission is available in the Splitzap Android app.'); }} className="w-full rounded-xl bg-slate-900 py-3 text-xs font-bold text-white">Turn on Android notifications</button>}</div> : <p className="mt-2 text-[10px] leading-4 text-slate-500">Push alerts are available in the Splitzap Android app.</p>}</ProfileSection>
       <ProfileSection title="Data & Privacy">{status === 'offline' || status === 'error' ? <div className={`rounded-xl px-3 py-3 ${status === 'offline' ? 'bg-amber-50' : 'bg-red-50'}`}><p className={`text-xs font-bold ${status === 'offline' ? 'text-amber-800' : 'text-red-800'}`}>{status === 'offline' ? 'Offline' : 'Sync problem'}</p><p className={`mt-0.5 text-[10px] ${status === 'offline' ? 'text-amber-700' : 'text-red-700'}`}>{statusMessage}{lastSyncedAt ? ` · Last synced ${new Date(lastSyncedAt).toLocaleString()}` : ''}</p></div> : null}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={downloadExport} className="rounded-xl bg-slate-50 px-3 py-3 text-left"><Download size={16} className="text-[#256f66]" /><b className="mt-2 block text-xs">Export data</b></button><label className="cursor-pointer rounded-xl bg-slate-50 px-3 py-3 text-left"><Upload size={16} className="text-[#256f66]" /><b className="mt-2 block text-xs">Import data</b><input type="file" accept="application/json,.json" className="hidden" onChange={(event) => { void importFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label></div><p className="mt-2 text-[10px] leading-4 text-slate-500">Import never overwrites a live shared group. Shared cloud copies are protected and skipped.</p><button type="button" onClick={() => setDeleteAccountOpen(true)} className="mt-3 w-full rounded-xl bg-red-50 py-3 text-xs font-bold text-red-700">Delete account</button></ProfileSection>
       <ProfileSection title="Recently Deleted"><p className="mb-2 text-[10px] leading-4 text-slate-500">Shared groups deleted for everyone can be restored for 30 days.</p>{deleted.length ? <div className="space-y-2">{deleted.map((item) => { const group = item.snapshot.group; const days = item.purge_after ? Math.max(0, Math.ceil((+new Date(item.purge_after) - Date.now()) / 86400000)) : 30; return <div key={item.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><span className="text-xl">{group.emoji}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{group.name}</p><p className="text-[10px] text-slate-500">{days} days left to restore</p></div><button type="button" disabled={busy} onClick={() => void restoreDeleted(item.id)} className="rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-[#256f66]">Restore</button></div>; })}</div> : <p className="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-500">Nothing recently deleted.</p>}</ProfileSection>
       <ProfileSection title="Help & About">{!installState.installed ? <button type="button" onClick={() => { void installState.install().then((result) => { if (result.outcome === 'manual') setFeedback(installState.ios ? 'To install Splitzap on iPhone, open the browser Share menu and choose Add to Home Screen.' : 'Open your browser menu and choose Install app or Add to Home screen.'); else if (result.outcome === 'accepted') setFeedback('Splitzap installation started.'); }); }} className="mb-2 flex w-full items-center gap-3 rounded-xl bg-[#eef6f3] px-3 py-3 text-left text-xs font-bold text-[#256f66]"><Download size={15} /> Install Splitzap</button> : null}<details className="rounded-xl bg-slate-50 px-3 py-3"><summary className="cursor-pointer list-none text-xs font-bold">Help & feedback <ChevronRight size={14} className="float-right" /></summary><p className="mt-2 text-[11px] leading-5 text-slate-600">For help with groups, expenses, payments, invites or anything that does not look right, email <a className="font-bold text-[#256f66]" href="mailto:hizapora@gmail.com?subject=Splitzap%20Help">hizapora@gmail.com</a>.</p></details><details className="mt-2 rounded-xl bg-slate-50 px-3 py-3"><summary className="cursor-pointer list-none text-xs font-bold">Privacy <ChevronRight size={14} className="float-right" /></summary><p className="mt-2 text-[11px] leading-5 text-slate-600">Splitzap uses your account information to provide the service and keep your expense data available across your devices. Information inside a shared group can be seen by people in that group. We do not sell your personal information. You can export your data or delete your account from My Profile. For privacy questions, email hizapora@gmail.com.</p></details></ProfileSection>
-      <button type="button" onClick={() => { clearSplitzapExpenseDraft(session.user.id); void signOutSplitzap(); }} className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700">Sign out</button>
+      <button type="button" onClick={() => { clearSplitzapExpenseDraft(session.user.id); void signOutSplitzapSafely(); }} className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700">Sign out</button>
     </main></div>{deleteAccountOpen ? <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/40 p-3"><div className="w-full max-w-[500px] rounded-3xl bg-white p-5"><h3 className="text-base font-extrabold">Delete Splitzap account?</h3><p className="mt-2 text-xs leading-5 text-slate-600">This removes your account data. If you own a shared group with other joined members, Splitzap will block deletion until you transfer ownership or remove those members.</p><label className="mt-4 block text-xs font-bold text-slate-600">Type DELETE</label><input value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm" /><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => { setDeleteAccountOpen(false); setDeleteConfirm(''); }} className="rounded-xl bg-slate-100 py-3 text-xs font-bold">Cancel</button><button type="button" disabled={busy || deleteConfirm !== 'DELETE'} onClick={() => void removeAccount()} className="rounded-xl bg-red-600 py-3 text-xs font-bold text-white disabled:opacity-40">Delete account</button></div></div></div> : null}</div>;
 }
 
@@ -1230,7 +1270,7 @@ function AccountSheet({ open, onClose, session, status, statusMessage, lastSynce
 
             {feedback ? <p role="status" className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">{feedback}</p> : null}
             <p className="mt-3 text-xs leading-5 text-slate-500">When you are online, Splitzap keeps your latest changes synced to your account. If your connection drops while you are signed in, you can keep working and changes will sync when you reconnect.</p>
-            <button type="button" onClick={() => { if (session) clearSplitzapExpenseDraft(session.user.id); void signOutSplitzap().then(onClose); }} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700"><LogOut size={16} /> Sign out</button>
+            <button type="button" onClick={() => { if (session) clearSplitzapExpenseDraft(session.user.id); void signOutSplitzapSafely().then(onClose); }} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700"><LogOut size={16} /> Sign out</button>
           </div>
         ) : (
           <div>
