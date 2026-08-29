@@ -1,5 +1,6 @@
 import { createClient, type AuthChangeEvent, type Session } from '@supabase/supabase-js';
 import type { SplitData } from './splitStoreV4';
+import { assertSplitDataIntegrity } from './splitzapFinancialIntegrity';
 
 export type SplitzapSession = Session;
 export type SplitzapAuthEvent = AuthChangeEvent;
@@ -94,6 +95,7 @@ export async function fetchSplitzapCloudState(userId: string): Promise<SplitzapC
 }
 
 export async function saveSplitzapCloudState(userId: string, data: SplitData): Promise<string> {
+  assertSplitDataIntegrity(data);
   const updatedAt = new Date().toISOString();
   const { error } = await splitzapSupabase
     .from('splitzap_user_state')

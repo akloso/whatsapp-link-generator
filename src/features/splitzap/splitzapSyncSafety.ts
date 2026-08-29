@@ -1,5 +1,11 @@
 import type { SplitData } from './splitStoreV4';
 import { buildSharedGroupSnapshot, sharedSnapshotHash } from './splitzapShared';
+export {
+  buildSharedEntityBaseline,
+  reconcileSharedGroupSnapshots,
+  type SharedEntityBaseline,
+  type SharedEntityConflict,
+} from './splitzapEntityConflict';
 
 export type RemoteSnapshotRow<TSnapshot> = {
   snapshot: TSnapshot;

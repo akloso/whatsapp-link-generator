@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildSharedGroupSnapshot, sharedSnapshotHash } from './splitzapShared';
-import type { Expense, Group, SplitData } from './splitStoreV4';
-import { compactSnapshotFingerprint, preserveDirtyRemoteRow, preserveDirtySharedGroupsOnBootstrap } from './splitzapSyncSafety';
+import { buildSharedGroupSnapshot, sharedSnapshotHash, type SharedGroupSnapshot } from './splitzapShared';
+import type { Expense, Group, Settlement, SplitData } from './splitStoreV4';
+import {
+  buildSharedEntityBaseline,
+  compactSnapshotFingerprint,
+  preserveDirtyRemoteRow,
+  preserveDirtySharedGroupsOnBootstrap,
+  reconcileSharedGroupSnapshots,
+} from './splitzapSyncSafety';
 import { isValidUpiId, settlementAuthority } from './splitzapPaymentSafety';
 
 type Snapshot = { expenses: string[] };
@@ -24,6 +30,14 @@ const newExpense: Expense = {
 const data = (expenses: Expense[]): SplitData => ({
   schemaVersion: 2, me: 'me', myName: 'Akash', groups: [group], expenses, settlements: [], history: [], activity: [],
   preferences: { defaultCurrency: '₹', theme: 'system', reducedMotion: false },
+});
+
+const sharedSnapshot = (expenses: Expense[], settlements: Settlement[] = []): SharedGroupSnapshot => ({
+  schemaVersion: 2,
+  group: { ...group, sharedId: undefined, sharedRevision: undefined, sharedRole: undefined, myMemberId: undefined },
+  expenses,
+  settlements,
+  history: [],
 });
 
 describe('Splitzap shared-sync safety', () => {
@@ -69,6 +83,48 @@ describe('Splitzap shared-sync safety', () => {
     const result = preserveDirtySharedGroupsOnBootstrap(serverAccount, localAccount, confirmed, false);
     expect(result.dirtyIds.size).toBe(0);
     expect(result.data.myName).toBe('Akash');
+  });
+
+  it('auto-merges non-overlapping expense additions from two devices', () => {
+    const baselineSnapshot = sharedSnapshot([oldExpense]);
+    const localExpense: Expense = { ...newExpense, id: 'local-120' };
+    const remoteExpense: Expense = { ...newExpense, id: 'remote-80', amount: 80, description: 'Remote ₹80' };
+    const result = reconcileSharedGroupSnapshots(
+      buildSharedEntityBaseline(baselineSnapshot),
+      sharedSnapshot([localExpense, oldExpense]),
+      sharedSnapshot([remoteExpense, oldExpense]),
+    );
+    expect(result.conflicts).toEqual([]);
+    expect(result.snapshot?.expenses.map((expense) => expense.id)).toEqual(expect.arrayContaining(['old-expense', 'local-120', 'remote-80']));
+  });
+
+  it('refuses to silently choose a winner when both devices edit the same expense differently', () => {
+    const baselineSnapshot = sharedSnapshot([oldExpense]);
+    const local = { ...oldExpense, description: 'Local edit' };
+    const remote = { ...oldExpense, description: 'Remote edit' };
+    const result = reconcileSharedGroupSnapshots(
+      buildSharedEntityBaseline(baselineSnapshot),
+      sharedSnapshot([local]),
+      sharedSnapshot([remote]),
+    );
+    expect(result.snapshot).toBeNull();
+    expect(result.conflicts).toEqual([{ entityType: 'expense', entityId: 'old-expense' }]);
+  });
+
+  it('merges an expense change on one device with a settlement recorded on another', () => {
+    const baselineSnapshot = sharedSnapshot([oldExpense]);
+    const local = { ...oldExpense, note: 'Dinner details' };
+    const payment: Settlement = {
+      id: 'payment-1', groupId: 'g1', from: 'me', to: 'friend', amount: 50, date: '2026-08-22T02:00:00.000Z',
+    };
+    const result = reconcileSharedGroupSnapshots(
+      buildSharedEntityBaseline(baselineSnapshot),
+      sharedSnapshot([local]),
+      sharedSnapshot([oldExpense], [payment]),
+    );
+    expect(result.conflicts).toEqual([]);
+    expect(result.snapshot?.expenses[0]?.note).toBe('Dinner details');
+    expect(result.snapshot?.settlements).toEqual([payment]);
   });
 });
 
