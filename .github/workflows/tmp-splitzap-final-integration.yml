@@ -17,12 +17,47 @@ jobs:
         with:
           ref: splitzap-final-integration
           fetch-depth: 0
-      - name: Merge Phase 5 and Phase 6 branches
+      - name: Merge Phase 5 and Phase 6 with guarded conflict resolution
         shell: bash
         run: |
           git config user.name "Splitzap Integration Bot"
           git config user.email "actions@users.noreply.github.com"
           git fetch origin splitzap-ia-cleanup splitzap-notifications
-          git merge --no-ff --no-edit origin/splitzap-ia-cleanup || { git status --short; exit 1; }
-          git merge --no-ff --no-edit origin/splitzap-notifications || { git status --short; exit 1; }
+
+          git merge --no-ff --no-edit origin/splitzap-ia-cleanup
+          git merge --no-ff --no-edit -X theirs origin/splitzap-notifications
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/features/splitzap/SplitzapCloudApp.tsx')
+          text = path.read_text()
+          text = text.replace('>Export data</b>', '>Export Splitzap data</b>')
+          text = text.replace('>Import data</b>', '>Import Splitzap backup</b>')
+          path.write_text(text)
+          PY
+
+          # Phase 4 must survive the merge.
+          grep -Fq 'const syncedSnapshot = result.snapshot;' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'if (result.rebased)' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'mergeSharedRowsIntoLocal(current, [refreshed], false)' src/features/splitzap/SplitzapCloudApp.tsx
+          test -f src/features/splitzap/splitzapFinancialIntegrity.ts
+          test -f src/features/splitzap/splitzapEntityConflict.ts
+
+          # Phase 5 must survive the merge.
+          ! grep -Fq 'DataBackupDialog' src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -Fq 'splitzap-camera-button' src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "Scan receipt', icon: '📷'" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq 'Export Splitzap data' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'Import Splitzap backup' src/features/splitzap/SplitzapCloudApp.tsx
+
+          # Phase 6 must survive the merge.
+          test -f src/features/splitzap/splitzapNotifications.ts
+          grep -Fq "from './splitzapNotifications'" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'registerSplitzapPushDevice' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'title="Notifications"' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'Turn on Android notifications' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'signOutSplitzapSafely' src/features/splitzap/SplitzapCloudApp.tsx
+
+          git add src/features/splitzap/SplitzapCloudApp.tsx
+          git commit -m "Preserve Phase 5 data labels in final integration" || true
           git push origin HEAD:splitzap-final-integration
