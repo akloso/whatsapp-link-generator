@@ -7,6 +7,12 @@ import {
   type SplitData,
 } from './splitStoreV4';
 import { splitzapSupabase } from './splitzapCloud';
+import { assertSharedSnapshotIntegrity } from './splitzapFinancialIntegrity';
+import {
+  buildSharedEntityBaseline,
+  reconcileSharedGroupSnapshots,
+  type SharedEntityBaseline,
+} from './splitzapEntityConflict';
 
 export type SharedRole = 'owner' | 'member';
 
@@ -40,6 +46,52 @@ export type JoinPreview = {
   claimed_member_ids: string[];
   already_joined: boolean;
 };
+
+type PersistedEntityBaseline = { revision: number; baseline: SharedEntityBaseline };
+const ENTITY_BASELINE_PREFIX = 'splitzap.shared.entityBaseline.';
+const ENTITY_BASELINE_HISTORY = 6;
+
+function baselineKey(userId: string, sharedId: string) {
+  return `${ENTITY_BASELINE_PREFIX}${userId}.${sharedId}`;
+}
+
+function readEntityBaselines(userId: string, sharedId: string): PersistedEntityBaseline[] {
+  if (typeof window === 'undefined' || !userId || !sharedId) return [];
+  try {
+    const raw = window.localStorage.getItem(baselineKey(userId, sharedId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as PersistedEntityBaseline[];
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => Number.isFinite(Number(item?.revision)) && item?.baseline && typeof item.baseline === 'object')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberEntityBaseline(userId: string, sharedId: string, revision: number, snapshot: SharedGroupSnapshot) {
+  if (typeof window === 'undefined' || !userId || !sharedId || !Number.isFinite(revision)) return;
+  try {
+    const entry: PersistedEntityBaseline = { revision, baseline: buildSharedEntityBaseline(snapshot) };
+    const next = [entry, ...readEntityBaselines(userId, sharedId).filter((item) => item.revision !== revision)]
+      .sort((a, b) => b.revision - a.revision)
+      .slice(0, ENTITY_BASELINE_HISTORY);
+    window.localStorage.setItem(baselineKey(userId, sharedId), JSON.stringify(next));
+  } catch { /* best effort; conflict fallback remains conservative without a baseline */ }
+}
+
+function entityBaselineFor(userId: string, sharedId: string, revision: number) {
+  return readEntityBaselines(userId, sharedId).find((item) => item.revision === revision)?.baseline;
+}
+
+async function currentUserId() {
+  try {
+    const { data } = await splitzapSupabase.auth.getSession();
+    return data.session?.user.id ?? '';
+  } catch {
+    return '';
+  }
+}
 
 const cleanGroupForSnapshot = (group: Group): Group => {
   const {
@@ -79,8 +131,12 @@ function canonicalizeForHash(value: unknown): unknown {
   return value;
 }
 
+export function canonicalJsonHash(value: unknown) {
+  return JSON.stringify(canonicalizeForHash(value));
+}
+
 export function sharedSnapshotHash(snapshot: SharedGroupSnapshot) {
-  return JSON.stringify(canonicalizeForHash(snapshot));
+  return canonicalJsonHash(snapshot);
 }
 
 function applySharedRow(current: SplitData, row: SharedGroupRow): SplitData {
@@ -152,6 +208,7 @@ export function removeGroupFromLocal(current: SplitData, groupId: string): Split
 }
 
 export async function createSharedGroup(snapshot: SharedGroupSnapshot, memberId: string): Promise<SharedGroupRow> {
+  assertSharedSnapshotIntegrity(snapshot);
   const { data, error } = await splitzapSupabase.rpc('splitzap_create_shared_group', {
     p_snapshot: snapshot,
     p_member_id: memberId,
@@ -159,7 +216,7 @@ export async function createSharedGroup(snapshot: SharedGroupSnapshot, memberId:
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error('Could not create the shared group.');
-  return {
+  const result: SharedGroupRow = {
     id: row.shared_id,
     join_code: row.join_code,
     revision: Number(row.revision) || 1,
@@ -170,6 +227,9 @@ export async function createSharedGroup(snapshot: SharedGroupSnapshot, memberId:
     schema_version: Number((row.snapshot as SharedGroupSnapshot).schemaVersion) || 1,
     updated_at: new Date().toISOString(),
   };
+  const userId = await currentUserId();
+  rememberEntityBaseline(userId, result.id, result.revision, result.snapshot);
+  return result;
 }
 
 export async function loadSharedGroupsForUser(userId: string): Promise<SharedGroupRow[]> {
@@ -187,7 +247,7 @@ export async function loadSharedGroupsForUser(userId: string): Promise<SharedGro
     .neq('status', 'deleted');
   if (error) throw error;
   const membershipByGroup = new Map(memberships.map((item) => [item.group_id, item]));
-  return (groups ?? []).map((group) => {
+  const rows = (groups ?? []).map((group) => {
     const membership = membershipByGroup.get(group.id)!;
     return {
       id: group.id,
@@ -201,8 +261,10 @@ export async function loadSharedGroupsForUser(userId: string): Promise<SharedGro
       schema_version: Number(group.schema_version) || Number((group.snapshot as SharedGroupSnapshot).schemaVersion) || 1,
       archived_at: group.archived_at,
       deleted_at: group.deleted_at,
-    };
+    } satisfies SharedGroupRow;
   });
+  rows.forEach((row) => rememberEntityBaseline(userId, row.id, row.revision, row.snapshot));
+  return rows;
 }
 
 export async function fetchSharedGroup(sharedId: string, userId: string): Promise<SharedGroupRow | null> {
@@ -221,7 +283,7 @@ export async function fetchSharedGroup(sharedId: string, userId: string): Promis
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return {
+  const row: SharedGroupRow = {
     id: data.id,
     join_code: data.join_code,
     snapshot: data.snapshot as SharedGroupSnapshot,
@@ -234,6 +296,8 @@ export async function fetchSharedGroup(sharedId: string, userId: string): Promis
     archived_at: data.archived_at,
     deleted_at: data.deleted_at,
   };
+  rememberEntityBaseline(userId, row.id, row.revision, row.snapshot);
+  return row;
 }
 
 export async function previewSharedGroupJoin(code: string): Promise<JoinPreview> {
@@ -266,7 +330,7 @@ export async function joinSharedGroup(code: string, memberId?: string, displayNa
     .eq('id', row.shared_id)
     .single();
   if (groupError) throw groupError;
-  return {
+  const result: SharedGroupRow = {
     id: row.shared_id,
     join_code: group.join_code,
     snapshot: row.snapshot as SharedGroupSnapshot,
@@ -277,9 +341,12 @@ export async function joinSharedGroup(code: string, memberId?: string, displayNa
     status: 'active',
     schema_version: Number((row.snapshot as SharedGroupSnapshot).schemaVersion) || 1,
   };
+  const userId = await currentUserId();
+  rememberEntityBaseline(userId, result.id, result.revision, result.snapshot);
+  return result;
 }
 
-export async function updateSharedGroup(sharedId: string, snapshot: SharedGroupSnapshot, expectedRevision?: number) {
+async function sendSharedGroupUpdate(sharedId: string, snapshot: SharedGroupSnapshot, expectedRevision?: number) {
   const { data, error } = await splitzapSupabase.rpc('splitzap_update_shared_group_v2', {
     p_group_id: sharedId,
     p_snapshot: snapshot,
@@ -289,6 +356,51 @@ export async function updateSharedGroup(sharedId: string, snapshot: SharedGroupS
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error('Shared group sync failed.');
   return { revision: Number(row.revision), updatedAt: row.updated_at as string };
+}
+
+export async function updateSharedGroup(sharedId: string, snapshot: SharedGroupSnapshot, expectedRevision?: number) {
+  assertSharedSnapshotIntegrity(snapshot);
+  const userId = await currentUserId();
+  const baseline = expectedRevision == null || !userId
+    ? undefined
+    : entityBaselineFor(userId, sharedId, expectedRevision);
+
+  try {
+    const result = await sendSharedGroupUpdate(sharedId, snapshot, expectedRevision);
+    rememberEntityBaseline(userId, sharedId, result.revision, snapshot);
+    return { ...result, snapshot, rebased: false };
+  } catch (originalError) {
+    if (expectedRevision == null || !baseline || !userId) throw originalError;
+
+    const { data: remote, error: remoteError } = await splitzapSupabase
+      .from('splitzap_shared_groups')
+      .select('snapshot, revision, status')
+      .eq('id', sharedId)
+      .maybeSingle();
+    if (remoteError || !remote || remote.status === 'deleted') throw originalError;
+
+    const remoteRevision = Number(remote.revision) || 0;
+    if (remoteRevision <= expectedRevision) throw originalError;
+    const remoteSnapshot = remote.snapshot as SharedGroupSnapshot;
+    const reconciled = reconcileSharedGroupSnapshots(baseline, snapshot, remoteSnapshot);
+    if (!reconciled.snapshot || reconciled.conflicts.length) {
+      const conflict = reconciled.conflicts[0];
+      const detail = conflict?.entityType === 'expense'
+        ? 'the same expense'
+        : conflict?.entityType === 'settlement'
+          ? 'the same payment'
+          : conflict?.entityType === 'group'
+            ? 'the group details'
+            : 'the same group data';
+      throw new Error(`This group changed on another device and both devices changed ${detail}. Your local changes were not overwritten.`);
+    }
+
+    assertSharedSnapshotIntegrity(reconciled.snapshot);
+    rememberEntityBaseline(userId, sharedId, remoteRevision, remoteSnapshot);
+    const result = await sendSharedGroupUpdate(sharedId, reconciled.snapshot, remoteRevision);
+    rememberEntityBaseline(userId, sharedId, result.revision, reconciled.snapshot);
+    return { ...result, snapshot: reconciled.snapshot, rebased: true };
+  }
 }
 
 export async function leaveSharedGroup(sharedId: string) {

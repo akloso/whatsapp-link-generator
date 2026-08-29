@@ -10,8 +10,6 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
-  Download,
-  HardDrive,
   History,
   Home,
   Info,
@@ -26,7 +24,6 @@ import {
   Search,
   Share2,
   Trash2,
-  Upload,
   UserPlus,
   Users,
   X,
@@ -38,7 +35,6 @@ import {
   CURRENCIES,
   baseAmountOf,
   categoryOf,
-  createSplitBackup,
   expenseBalances,
   groupBalances,
   money,
@@ -49,7 +45,6 @@ import {
   selectiveItemShare,
   shareOf,
   simplify,
-  restoreSplitBackup,
   uid,
   useSplitData,
   useSplitStorageStatus,
@@ -364,7 +359,6 @@ export default function SplitzapAppV4({ accountAction, collaboration }: { accoun
   const [view, setView] = useState<View>(() => parseView());
   const [resumeSettlementGroupId, setResumeSettlementGroupId] = useState<string | null>(null);
   const pendingResumeChecked = useRef<string | null>(null);
-  const [dataToolsOpen, setDataToolsOpen] = useState(false);
   const { storageError, clearStorageError } = useSplitStorageStatus();
 
   useEffect(() => {
@@ -405,22 +399,15 @@ export default function SplitzapAppV4({ accountAction, collaboration }: { accoun
     window.requestAnimationFrame(() => document.querySelector<HTMLElement>('.splitzap-main-scroll')?.scrollTo({ top: 0, behavior: 'auto' }));
   };
 
-  const afterRestore = () => {
-    window.history.replaceState({}, '', '/splitzap');
-    setView({ name: 'home' });
-    clearStorageError();
-  };
-
   return (
     <div className="splitzap-root h-[100dvh] overflow-hidden bg-background text-foreground">
       <div className="splitzap-ambient" aria-hidden="true" />
       {view.name === 'home'
-        ? <HomeScreen navigate={navigate} onDataBackup={() => setDataToolsOpen(true)} accountAction={accountAction} collaboration={collaboration} />
+        ? <HomeScreen navigate={navigate} accountAction={accountAction} collaboration={collaboration} />
         : view.name === 'activity'
           ? <ActivityScreen navigate={navigate} collaboration={collaboration} />
           : <GroupScreen groupId={view.groupId} navigate={navigate} collaboration={collaboration} resumeSettlement={resumeSettlementGroupId === view.groupId} onSettlementResumeConsumed={() => setResumeSettlementGroupId(null)} />}
-      {storageError ? <div role="alert" className="fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex w-[calc(100%-1.5rem)] max-w-[496px] -translate-x-1/2 items-start gap-2 rounded-2xl border border-negative/20 bg-surface px-3 py-3 shadow-xl"><AlertTriangle size={18} className="mt-0.5 shrink-0 text-negative" /><p className="min-w-0 flex-1 text-[11px] font-semibold leading-4 text-foreground">{storageError}</p><button type="button" onClick={() => setDataToolsOpen(true)} className="press shrink-0 rounded-lg bg-secondary px-2.5 py-2 text-[11px] font-bold text-primary">Backup</button><button type="button" aria-label="Dismiss storage warning" onClick={clearStorageError} className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div> : null}
-      <DataBackupDialog open={dataToolsOpen} onClose={() => setDataToolsOpen(false)} onRestored={afterRestore} />
+      {storageError ? <div role="alert" className="fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex w-[calc(100%-1.5rem)] max-w-[496px] -translate-x-1/2 items-start gap-2 rounded-2xl border border-negative/20 bg-surface px-3 py-3 shadow-xl"><AlertTriangle size={18} className="mt-0.5 shrink-0 text-negative" /><p className="min-w-0 flex-1 text-[11px] font-semibold leading-4 text-foreground">{storageError}</p><button type="button" aria-label="Dismiss storage warning" onClick={clearStorageError} className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div> : null}
     </div>
   );
 }
@@ -546,53 +533,19 @@ function CompactDialog({ open, onClose, title, children, footer }: { open: boole
   return createPortal(<div className="fixed inset-0 z-[230] grid place-items-center overflow-y-auto px-5 py-[max(1rem,env(safe-area-inset-top))]"><button type="button" aria-label="Close dialog" onClick={onClose} className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" /><div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative max-h-[calc(100svh-2rem)] w-full max-w-[400px] overflow-y-auto rounded-3xl bg-surface p-4 shadow-2xl outline-none"><div className="mb-3 flex items-center justify-between"><h2 id={titleId} className="text-base font-extrabold">{title}</h2><button type="button" aria-label="Close" onClick={onClose} className="press grid size-10 place-items-center rounded-full bg-surface-2 text-muted-foreground"><X size={14} /></button></div>{children}{footer ? <div className="sticky bottom-0 z-10 mt-4 bg-surface pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2">{footer}</div> : null}</div></div>, document.querySelector<HTMLElement>('.splitzap-root') ?? document.body);
 }
 
-function DataBackupDialog({ open, onClose, onRestored }: { open: boolean; onClose: () => void; onRestored: () => void }) {
-  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
-  useEffect(() => { if (open) setFeedback(null); }, [open]);
-
-  const downloadBackup = () => {
-    try {
-      const blob = new Blob([createSplitBackup()], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `splitzap-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      setFeedback({ kind: 'success', text: 'Backup downloaded. Keep the file somewhere safe.' });
-    } catch {
-      setFeedback({ kind: 'error', text: 'Could not create the backup file on this device.' });
-    }
-  };
-
-  const restoreFile = async (file: File | null) => {
-    if (!file) return;
-    if (!window.confirm('Restore this backup? Current Splitzap groups, expenses and payments on this device will be replaced.')) return;
-    try {
-      const restored = restoreSplitBackup(await file.text());
-      setFeedback({ kind: 'success', text: `Restored ${restored.groups.length} ${restored.groups.length === 1 ? 'group' : 'groups'} successfully.` });
-      onRestored();
-    } catch (cause) {
-      setFeedback({ kind: 'error', text: cause instanceof Error ? cause.message : 'Could not restore this backup.' });
-    }
-  };
-
-  return <CompactDialog open={open} onClose={onClose} title="Backup & restore"><div className="space-y-3"><div className="rounded-2xl bg-secondary p-3"><div className="flex items-start gap-2"><HardDrive size={18} className="mt-0.5 shrink-0 text-primary" /><div><p className="text-sm font-extrabold">Keep an extra copy of your Splitzap data</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">Export a backup before clearing browser data, changing phones or reinstalling the app.</p></div></div></div><button type="button" onClick={downloadBackup} className="press flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 text-left"><span className="grid size-9 place-items-center rounded-xl bg-surface text-primary"><Download size={17} /></span><span className="min-w-0 flex-1"><b className="block text-sm">Export backup</b><span className="text-[11px] text-muted-foreground">Download all groups, expenses and payments</span></span></button><label className="press flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 text-left"><span className="grid size-9 place-items-center rounded-xl bg-surface text-primary"><Upload size={17} /></span><span className="min-w-0 flex-1"><b className="block text-sm">Restore backup</b><span className="text-[11px] text-muted-foreground">Replace this device's data from a Splitzap JSON backup</span></span><input type="file" accept="application/json,.json" className="hidden" onChange={(event) => { void restoreFile(event.target.files?.[0] ?? null); event.currentTarget.value = ''; }} /></label>{feedback ? <p role="status" className={`rounded-xl px-3 py-2.5 text-[11px] font-bold ${feedback.kind === 'success' ? 'bg-secondary text-primary' : 'bg-negative/5 text-negative'}`}>{feedback.text}</p> : null}</div></CompactDialog>;
-}
-
 function IntroPanel({ hasGroups, onPrimary, onNewGroup, onJoinGroup, onAddExpense, onRecordPayment, onActivity, onInstall }: { hasGroups: boolean; onPrimary: () => void; onNewGroup: () => void; onJoinGroup: () => void; onAddExpense: () => void; onRecordPayment: () => void; onActivity: () => void; onInstall?: () => void }) {
   return <section className="splitzap-home-center px-5 pt-2"><div className="splitzap-welcome card-soft w-full overflow-hidden p-6 text-center"><div className="welcome-orbit mx-auto mb-5" aria-hidden="true"><span>🍜</span><span>🚕</span><span>🏠</span><span>🎉</span><strong>₹</strong></div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Splitzap</p><h2 className="mt-2 text-3xl font-extrabold">Split bills, not bonds.</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep shared spending clear and settle with fewer payments.</p>{hasGroups ? <><button type="button" onClick={onPrimary} className="press mt-5 text-xs font-bold text-primary">Back to your groups</button><div className="mt-4 grid grid-cols-3 gap-2"><button type="button" onClick={onAddExpense} className="welcome-action press rounded-2xl bg-orange-50 p-3 text-left"><span className="text-lg">＋</span><b className="mt-2 block text-[11px]">Add expense</b></button><button type="button" onClick={onRecordPayment} className="welcome-action press rounded-2xl bg-emerald-50 p-3 text-left"><span className="text-lg">₹</span><b className="mt-2 block text-[11px]">Record payment</b></button><button type="button" onClick={onActivity} className="welcome-action press rounded-2xl bg-violet-50 p-3 text-left"><span className="text-lg">↗</span><b className="mt-2 block text-[11px]">Activity</b></button></div><button type="button" onClick={onNewGroup} className="press mt-3 text-xs font-bold text-muted-foreground">+ Create another group</button></> : <div className="mt-6 grid grid-cols-2 gap-2"><button type="button" onClick={onNewGroup} className="press rounded-2xl bg-primary p-4 text-left text-primary-foreground"><Plus size={18} /><b className="mt-3 block text-sm">Create a group</b><span className="mt-1 block text-[10px] opacity-80">Start a new split</span></button><button type="button" onClick={onJoinGroup} className="press rounded-2xl bg-secondary p-4 text-left text-primary"><UserPlus size={18} /><b className="mt-3 block text-sm">Join a group</b><span className="mt-1 block text-[10px] text-muted-foreground">Use an invite link</span></button></div>}{onInstall ? <button type="button" onClick={onInstall} className="press mt-4 text-xs font-bold text-muted-foreground">Install Splitzap on this device</button> : null}</div></section>;
 }
 
-function QuickActionsSheet({ open, onClose, onAddExpense, onNewGroup, onRecordPayment }: { open: boolean; onClose: () => void; onAddExpense: () => void; onNewGroup: () => void; onRecordPayment: () => void }) {
+function QuickActionsSheet({ open, onClose, onAddExpense, onScanReceipt, onNewGroup, onRecordPayment }: { open: boolean; onClose: () => void; onAddExpense: () => void; onScanReceipt?: () => void; onNewGroup: () => void; onRecordPayment: () => void }) {
   const action = (fn: () => void) => { onClose(); fn(); };
-  return <SheetModal open={open} onClose={onClose} title="Quick actions"><div className="grid grid-cols-3 gap-2 pb-2">{[
+  const actions = [
     { label: 'Add expense', icon: '＋', run: onAddExpense, tone: 'quick-food' },
+    ...(onScanReceipt ? [{ label: 'Scan receipt', icon: '📷', run: onScanReceipt, tone: 'quick-scan' }] : []),
     { label: 'Record payment', icon: '₹', run: onRecordPayment, tone: 'quick-payment' },
     { label: 'New group', icon: '👥', run: onNewGroup, tone: 'quick-group' },
-  ].map((item) => <button type="button" key={item.label} onClick={() => action(item.run)} className={`quick-action press min-h-20 rounded-2xl border border-border bg-surface p-3 text-left ${item.tone}`}><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-base font-extrabold">{item.icon}</span><b className="mt-2 block text-[11px] leading-4">{item.label}</b></button>)}</div></SheetModal>;
+  ];
+  return <SheetModal open={open} onClose={onClose} title="Quick actions"><div className="grid grid-cols-2 gap-2 pb-2">{actions.map((item) => <button type="button" key={item.label} onClick={() => action(item.run)} className={`quick-action press min-h-20 rounded-2xl border border-border bg-surface p-3 text-left ${item.tone}`}><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-base font-extrabold">{item.icon}</span><b className="mt-2 block text-[11px] leading-4">{item.label}</b></button>)}</div></SheetModal>;
 }
 
 function GroupPickerSheet({ open, onClose, groups, onPick }: { open: boolean; onClose: () => void; groups: Group[]; onPick: (groupId: string) => void }) {
@@ -626,7 +579,7 @@ function HomeBalanceSheet({ open, mode, groups, data, onClose, onSettle }: {
 
 const groupAccentIndex = (id: string) => [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 6;
 
-function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (view: View) => void; onDataBackup: () => void; accountAction?: ReactNode; collaboration?: SplitzapCollaboration }) {
+function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (view: View) => void; accountAction?: ReactNode; collaboration?: SplitzapCollaboration }) {
   const { data, update, hydrated } = useSplitData();
   const [addOpen, setAddOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
@@ -675,7 +628,7 @@ function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (vie
   const paymentBalances = paymentGroup ? groupBalances(paymentGroup, data.expenses, data.settlements) : {};
 
   return <AppShell onAdd={() => setQuickOpen(true)} view={{ name: 'home' }} navigate={navigate}>
-    <Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={<div className="flex items-center gap-1.5">{accountAction}<button type="button" onClick={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)} aria-label="Scan receipt" title="Scan receipt" className="splitzap-camera-button press grid size-9 place-items-center rounded-full text-primary-foreground shadow-sm"><Camera size={16} /></button><button type="button" onClick={() => setGroupOpen(true)} className="splitzap-new-button press flex items-center gap-1 rounded-full px-3 py-2 text-xs font-bold"><Plus size={14} /> New</button></div>} />
+    <Header title="Splitzap" subtitle="Split bills, not bonds" onTitleClick={data.groups.length ? () => setShowIntro(true) : undefined} right={accountAction} />
     {!hydrated ? <section className="space-y-3 px-5 pt-2"><div className="splitzap-skeleton h-28 rounded-3xl" /><div className="splitzap-skeleton h-20 rounded-3xl" /></section> : introVisible ? <IntroPanel hasGroups={data.groups.length > 0} onPrimary={() => setShowIntro(false)} onNewGroup={() => setGroupOpen(true)} onJoinGroup={() => collaboration?.onJoinGroup()} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onRecordPayment={beginPayment} onActivity={() => navigate({ name: 'activity' })} onInstall={!installState.installed ? install : undefined} /> : <>
       <section className="px-5"><div className="balance-strip grid grid-cols-2 overflow-hidden rounded-2xl border border-border bg-surface"><button type="button" onClick={() => setBalanceDetailMode('get')} className="balance-card balance-card--get press p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You get</p><p className="tabular mt-1 text-xl font-extrabold text-positive">{money(totalOwed)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button><button type="button" onClick={() => setBalanceDetailMode('owe')} className="balance-card balance-card--owe press border-l border-border p-4 text-left"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">You owe</p><p className="tabular mt-1 text-xl font-extrabold text-negative">{money(totalOwe)}</p><p className="mt-1 text-[9px] font-bold text-primary">View details</p></button></div></section>
       <section className="px-5 pt-5"><div className="mb-2 flex items-end justify-between gap-3"><div><p className="text-sm font-extrabold">Your groups</p><p className="mt-0.5 text-[11px] text-muted-foreground">{activeSummaries.length} active · {archivedSummaries.length} archived</p></div>{archivedSummaries.length ? <button type="button" onClick={() => setShowArchived((value) => !value)} className="press rounded-full bg-surface-2 px-3 py-1.5 text-[10px] font-bold text-primary">{showArchived ? 'Show active' : 'Archived'}</button> : null}</div>
@@ -683,7 +636,7 @@ function HomeScreen({ navigate, accountAction, collaboration }: { navigate: (vie
       </section>
     </>}
     <HomeBalanceSheet open={Boolean(balanceDetailMode)} mode={balanceDetailMode ?? 'owe'} groups={activeGroups} data={data} onClose={() => setBalanceDetailMode(null)} onSettle={(groupId) => { setBalanceDetailMode(null); setPaymentGroupId(groupId); }} />
-    <QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onRecordPayment={beginPayment} />
+    <QuickActionsSheet open={quickOpen} onClose={() => setQuickOpen(false)} onAddExpense={() => activeGroups.length ? setAddOpen(true) : setGroupOpen(true)} onScanReceipt={() => activeGroups.length ? setScannerOpen(true) : setGroupOpen(true)} onNewGroup={() => setGroupOpen(true)} onRecordPayment={beginPayment} />
     <GroupPickerSheet open={paymentPickerOpen} onClose={() => setPaymentPickerOpen(false)} groups={activeGroups} onPick={setPaymentGroupId} />
     {activeGroups.length ? <AddExpenseSheet key={addOpen ? 'expense-open' : 'expense-closed'} open={addOpen} onClose={() => { setAddOpen(false); setScanSeed(null); }} data={data} update={update} seed={scanSeed} /> : null}
     <ReceiptScanner open={scannerOpen} onClose={() => setScannerOpen(false)} data={data} onParseReceipt={collaboration?.onParseReceipt} onUse={(seed) => { setScanSeed(seed); setScannerOpen(false); setAddOpen(true); }} />
@@ -1596,7 +1549,20 @@ function SettleSheet({ open, onClose, group, balances, data, update, getMemberUp
     return () => { active = false; };
   }, [selectedDebt?.from, selectedDebt?.to, group.sharedId, group.currency, canUseUpi, getMemberUpi]);
 
-  const rawDebts = data.expenses.filter((expense) => expense.groupId === group.id).flatMap((expense) => expenseSettlement(expense, group).filter((debt) => debt.from === currentMemberId || debt.to === currentMemberId).map((debt) => ({ ...debt, expense })));
+  const groupMemberIds = group.members.map((member) => member.id);
+  const rawDebts = data.expenses.filter((expense) => expense.groupId === group.id).flatMap((expense) => {
+    const paid = paymentsOf(expense);
+    return expenseSettlement(expense, group)
+      .filter((debt) => debt.from === currentMemberId || debt.to === currentMemberId)
+      .map((debt) => ({
+        ...debt,
+        expense,
+        fromShare: shareOf(expense, debt.from, groupMemberIds),
+        fromPaid: paid[debt.from] ?? 0,
+        toShare: shareOf(expense, debt.to, groupMemberIds),
+        toPaid: paid[debt.to] ?? 0,
+      }));
+  });
   const recorded = data.settlements.filter((settlement) => settlement.groupId === group.id && (settlement.from === currentMemberId || settlement.to === currentMemberId)).sort((a, b) => +new Date(b.date) - +new Date(a.date));
 
   const recordPayment = () => {
@@ -1655,7 +1621,7 @@ function SettleSheet({ open, onClose, group, balances, data, update, getMemberUp
         <div className="mt-3 space-y-2">{debts.map((debt) => <div key={`${debt.from}-${debt.to}`} className="settle-row flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"><Avatar name={nameOf(debt.from)} size={32} /><ArrowRight size={16} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={32} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{nameOf(debt.from)} → {nameOf(debt.to)}</p><p className="tabular text-sm font-bold text-primary">{money(debt.amount, group.currency)}</p></div><button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Mark paid</button></div>)}</div>
         {receivable.length ? <div className="mt-3 rounded-2xl border border-positive/20 bg-positive/5 p-3"><p className="text-[10px] font-extrabold uppercase tracking-wide text-positive">You are owed</p><div className="mt-2 space-y-2">{receivable.map((debt) => { const authority = authorityOf(debt); const disconnected = authority === 'receiver-fallback'; return <div key={`owed-${debt.from}-${debt.to}`} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-3"><Avatar name={nameOf(debt.from)} size={30} /><ArrowRight size={14} className="text-muted-foreground" /><Avatar name={nameOf(debt.to)} size={30} /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{nameOf(debt.from)} owes you</p><p className="tabular text-sm font-extrabold text-positive">{money(debt.amount, group.currency)}</p>{disconnected ? <p className="mt-0.5 text-[9px] font-bold text-amber-700">Not currently connected to this Splitzap group · balance kept visible</p> : null}</div>{disconnected ? <button type="button" onClick={() => setSelectedDebt(debt)} className="press rounded-full bg-secondary px-2.5 py-2 text-[9px] font-bold text-primary">Mark received</button> : <span className="rounded-full bg-surface-2 px-2 py-1 text-[9px] font-bold text-muted-foreground">View only</span>}</div>; })}</div></div> : null}
         <button type="button" onClick={() => setBreakdownOpen((value) => !value)} className="press mt-3 flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3 py-3 text-left"><span className="min-w-0 flex-1"><b className="block text-xs">Original breakdown</b><span className="mt-0.5 block text-[10px] text-muted-foreground">See who originally owed whom before simplification</span></span><ChevronDown size={16} className={`transition-transform ${breakdownOpen ? 'rotate-180' : ''}`} /></button>
-        {breakdownOpen ? <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-surface"><div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Expense obligations</div>{rawDebts.length ? rawDebts.map(({ expense, ...debt }, index) => <div key={`${expense.id}-${debt.from}-${debt.to}-${index}`} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><b className="block truncate text-xs">{nameOf(debt.from)} → {nameOf(debt.to)}</b><span className="block truncate text-[10px] text-muted-foreground">{expense.description}</span></span><span className="tabular shrink-0 text-xs font-extrabold">{money(debt.amount, group.currency)}</span></div>) : <div className="border-t border-border px-3 py-3 text-xs text-muted-foreground">No original obligations.</div>}{recorded.length ? <><div className="border-t border-border px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Payments already recorded</div>{recorded.map((payment) => <div key={payment.id} className="flex items-start gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{nameOf(payment.from)} → {nameOf(payment.to)}</span>{payment.note ? <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{payment.note}</span> : null}</span><span className="tabular text-xs font-extrabold">{money(payment.amount, group.currency)}</span></div>)}</> : null}</div> : null}
+        {breakdownOpen ? <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-surface"><div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Expense obligations</div>{rawDebts.length ? rawDebts.map(({ expense, ...debt }, index) => <div key={`${expense.id}-${debt.from}-${debt.to}-${index}`} className="flex items-center gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><b className="block truncate text-xs">{nameOf(debt.from)} → {nameOf(debt.to)}</b><span className="block truncate text-[10px] text-muted-foreground">{expense.description}</span><span className="mt-0.5 block text-[9px] text-muted-foreground">{nameOf(debt.from)}: share {money(debt.fromShare, group.currency)} · paid {money(debt.fromPaid, group.currency)}</span><span className="block text-[9px] text-muted-foreground">{nameOf(debt.to)}: share {money(debt.toShare, group.currency)} · paid {money(debt.toPaid, group.currency)}</span></span><span className="tabular shrink-0 text-xs font-extrabold">{money(debt.amount, group.currency)}</span></div>) : <div className="border-t border-border px-3 py-3 text-xs text-muted-foreground">No original obligations.</div>}{recorded.length ? <><div className="border-t border-border px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Payments already recorded</div>{recorded.map((payment) => <div key={payment.id} className="flex items-start gap-2 border-t border-border px-3 py-3"><span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{nameOf(payment.from)} → {nameOf(payment.to)}</span>{payment.note ? <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{payment.note}</span> : null}</span><span className="tabular text-xs font-extrabold">{money(payment.amount, group.currency)}</span></div>)}</> : null}</div> : null}
       </>}
     </SheetModal>
 
