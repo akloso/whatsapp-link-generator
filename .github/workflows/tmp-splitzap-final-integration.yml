@@ -1,0 +1,28 @@
+name: Temporary Splitzap final integration
+
+on:
+  push:
+    branches: [splitzap-final-integration]
+    paths:
+      - '.github/workflows/tmp-splitzap-final-integration.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: splitzap-final-integration
+          fetch-depth: 0
+      - name: Merge Phase 5 and Phase 6 branches
+        shell: bash
+        run: |
+          git config user.name "Splitzap Integration Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin splitzap-ia-cleanup splitzap-notifications
+          git merge --no-ff --no-edit origin/splitzap-ia-cleanup || { git status --short; exit 1; }
+          git merge --no-ff --no-edit origin/splitzap-notifications || { git status --short; exit 1; }
+          git push origin HEAD:splitzap-final-integration
