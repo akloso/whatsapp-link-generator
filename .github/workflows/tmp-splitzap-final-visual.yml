@@ -1,0 +1,89 @@
+name: Temporary Splitzap final visual validation
+
+on:
+  push:
+    branches: [splitzap-final-integration]
+    paths:
+      - '.github/workflows/tmp-splitzap-final-visual.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: splitzap-final-integration
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start Splitzap locally
+        shell: bash
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/splitzap-vite.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:5173/splitzap >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/splitzap-vite.log
+          exit 1
+      - name: Render and validate mobile UI
+        shell: bash
+        run: |
+          cat > final-visual.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+          await page.goto('http://127.0.0.1:5173/splitzap', { waitUntil: 'networkidle' });
+
+          const guest = page.getByRole('button', { name: 'Continue without login' });
+          if (await guest.isVisible().catch(() => false)) await guest.click();
+          const guestName = page.getByPlaceholder('Your name');
+          if (await guestName.isVisible().catch(() => false)) {
+            await guestName.fill('Final Visual');
+            await page.getByRole('button', { name: 'Start splitting' }).click();
+          }
+
+          await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+          const quick = page.getByRole('dialog', { name: 'Quick actions' });
+          await quick.waitFor();
+          await page.waitForTimeout(350);
+          for (const label of ['Add expense', 'Scan receipt', 'Record payment', 'New group']) {
+            if (!(await quick.getByRole('button', { name: new RegExp(label, 'i') }).isVisible())) throw new Error(`${label} missing from + hub`);
+          }
+          const quickBox = await quick.boundingBox();
+          const quickStyle = await quick.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, opacity: getComputedStyle(el).opacity, wrapOpacity: getComputedStyle(el.closest('.sheet-wrap')).opacity }));
+          if (!quickBox || quickBox.y + quickBox.height > 844.5 || Number(quickStyle.opacity) < .99 || Number(quickStyle.wrapOpacity) < .99 || quickStyle.bg === 'rgba(0, 0, 0, 0)') throw new Error(`Quick actions visual regression: ${JSON.stringify({quickBox,quickStyle})}`);
+          await page.screenshot({ path: '/tmp/splitzap-final-quick-actions.png', fullPage: true });
+
+          await page.keyboard.press('Escape');
+          await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+          await quick.waitFor();
+          await quick.getByRole('button', { name: /New group/i }).click();
+          const groupDialog = page.getByRole('dialog', { name: 'New group' });
+          await groupDialog.waitFor();
+          await page.waitForTimeout(350);
+          const groupBox = await groupDialog.boundingBox();
+          const groupStyle = await groupDialog.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, opacity: getComputedStyle(el).opacity, wrapOpacity: getComputedStyle(el.closest('.sheet-wrap')).opacity }));
+          if (!groupBox || groupBox.y + groupBox.height > 844.5 || Number(groupStyle.opacity) < .99 || Number(groupStyle.wrapOpacity) < .99 || groupStyle.bg === 'rgba(0, 0, 0, 0)') throw new Error(`New group visual regression: ${JSON.stringify({groupBox,groupStyle})}`);
+          await page.screenshot({ path: '/tmp/splitzap-final-new-group.png', fullPage: true });
+          console.log('Final rendered mobile validation passed', { quickBox, quickStyle, groupBox, groupStyle });
+          await browser.close();
+          JS
+          node ./final-visual.mjs
+          rm final-visual.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: splitzap-final-mobile-visual
+          path: |
+            /tmp/splitzap-final-quick-actions.png
+            /tmp/splitzap-final-new-group.png
+          if-no-files-found: error
