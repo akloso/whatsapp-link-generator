@@ -184,7 +184,14 @@ jobs:
           grep -q "settlementAuthority" src/features/splitzap/splitzapPaymentSafety.ts
           grep -q "balance-card--get" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "balance-card--owe" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzap-camera-button" src/features/splitzap/SplitzapAppV4.tsx
-          grep -q "splitzap-new-button" src/features/splitzap/SplitzapAppV4.tsx
           grep -q "splitzapGuestNudge" src/features/splitzap/splitzap.css
           grep -q "prefers-reduced-motion" src/features/splitzap/splitzap.css
+          grep -q 'label="Groups"' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q 'label="Activity"' src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Scan receipt', icon: '📷'" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "DataBackupDialog" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "splitzap-camera-button" src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -q "splitzap-new-button" src/features/splitzap/SplitzapAppV4.tsx
+          grep -q "Data & Privacy" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Export Splitzap data" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -q "Import Splitzap backup" src/features/splitzap/SplitzapCloudApp.tsx
