@@ -1,0 +1,83 @@
+name: Splitzap Final Integration Readiness
+
+on:
+  push:
+    branches: [testing]
+    paths:
+      - 'src/features/splitzap/**'
+      - 'public/.well-known/assetlinks.json'
+      - '.github/workflows/splitzap-final-readiness.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'src/features/splitzap/**'
+      - 'public/.well-known/assetlinks.json'
+      - '.github/workflows/splitzap-final-readiness.yml'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-final-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Splitzap tests
+        run: npm run test:splitzap
+      - name: Production build
+        run: npm run build
+      - name: Phase 4 financial/data hardening assertions
+        shell: bash
+        run: |
+          test -f src/features/splitzap/splitzapFinancialIntegrity.ts
+          test -f src/features/splitzap/splitzapEntityConflict.ts
+          test -f src/features/splitzap/splitzapFinancialIntegrity.test.ts
+          grep -Fq 'assertSharedSnapshotIntegrity' src/features/splitzap/splitzapShared.ts
+          grep -Fq 'reconcileSharedGroupSnapshots' src/features/splitzap/splitzapShared.ts
+          grep -Fq 'const syncedSnapshot = result.snapshot;' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'if (result.rebased)' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'mergeSharedRowsIntoLocal(current, [refreshed], false)' src/features/splitzap/SplitzapCloudApp.tsx
+      - name: Phase 5 information architecture assertions
+        shell: bash
+        run: |
+          ! grep -Fq 'DataBackupDialog' src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -Fq 'splitzap-camera-button' src/features/splitzap/SplitzapAppV4.tsx
+          ! grep -Fq 'splitzap-new-button' src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq "Scan receipt', icon: '📷'" src/features/splitzap/SplitzapAppV4.tsx
+          grep -Fq 'Export Splitzap data' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'Import Splitzap backup' src/features/splitzap/SplitzapCloudApp.tsx
+      - name: Phase 6 notification assertions
+        shell: bash
+        run: |
+          test -f src/features/splitzap/splitzapNotifications.ts
+          grep -Fq "splitzap_register_push_device" src/features/splitzap/splitzapNotifications.ts
+          grep -Fq "splitzap_update_notification_preferences" src/features/splitzap/splitzapNotifications.ts
+          grep -Fq "registerSplitzapPushDevice" src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'title="Notifications"' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'Turn on Android notifications' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq 'signOutSplitzapSafely' src/features/splitzap/SplitzapCloudApp.tsx
+          grep -Fq "hash.startsWith('#group=')" src/features/splitzap/SplitzapAppV4.tsx
+      - name: Android App Links verification assertions
+        shell: bash
+        run: |
+          test -f public/.well-known/assetlinks.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('public/.well-known/assetlinks.json').read_text())
+          target = data[0]['target']
+          assert data[0]['relation'] == ['delegate_permission/common.handle_all_urls']
+          assert target['namespace'] == 'android_app'
+          assert target['package_name'] == 'com.zapora.splitzap'
+          assert target['sha256_cert_fingerprints'] == ['44:1E:E1:1B:01:3E:4E:04:CD:C5:AE:CB:F0:DB:43:64:8C:D2:3D:03:6A:F9:35:E3:21:EA:FD:92:20:3F:25:9A']
+          PY
