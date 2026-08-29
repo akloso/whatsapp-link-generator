@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.zapora.splitzap",
+      "sha256_cert_fingerprints": [
+        "44:1E:E1:1B:01:3E:4E:04:CD:C5:AE:CB:F0:DB:43:64:8C:D2:3D:03:6A:F9:35:E3:21:EA:FD:92:20:3F:25:9A"
+      ]
+    }
+  }
+]
